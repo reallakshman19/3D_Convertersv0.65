@@ -8,7 +8,7 @@ Phase 4 Preview exposes the explicit action:
 Update wall thickness as per B31.3 Sec II
 ```
 
-The action calculates proposals only. It does **not** modify Wall Thk. On a qualified result, use the new **⤓ Pull** icon beside the existing **↓ Fill Down** icon in the Step 4 Wall Thk cell to explicitly accept that branch's pipe-occurrence wall. Pull and Fill are independent operations.
+The action calculates proposals only. It does **not** modify Wall Thk. On a qualified result, use the new **⤓ Pull** icon beside the existing **↓ Fill Down** icon in the Step 4 Wall Thk cell to explicitly accept the validated same-OD wall for that Preview branch. Pull and Fill are independent operations.
 
 ## Runtime chain
 
@@ -22,7 +22,7 @@ strict active S / E / W / Y at T1
         ↓
 manual controlled S/E/W/Y fallback only if active factors are incomplete
         ↓
-Preview P1 + corrosion + effective Step 4 pipe-node OD
+Preview P1 + corrosion + effective Step 4 source-bound node OD
         ↓
 B31.3-2024 straight-pipe thickness API
         ↓
@@ -34,7 +34,7 @@ CALCULATED proposal + source-bound node evidence
         ↓
 explicit ⤓ Pull confirmation (never Fill Down)
         ↓
-accepted branch/pipe occurrence wall → Rebuild Preview → native output parity verification
+accepted same-OD node group → Rebuild Preview → enriched XML parity verification
 ```
 
 ## Material-column custody
@@ -125,17 +125,17 @@ The B31.3 material core itself still does not silently choose a pipe-dimension s
 
 ## OD custody
 
-The pressure calculation uses the effective Step 4 source-bound pipe-node OD ledger exposed by the Preview worker. The Pipe Wall Master DN OD is a parity/reference value only. Mixed or missing pipe OD produces HOLD for that row instead of arbitrary branch-level selection.
+The pressure calculation uses the effective Step 4 source-bound node OD ledger exposed by the Preview worker. AVEVA may encode pipe-run nodes as ELBO, TEE, RIGID, etc., without a literal PIPE node type. A single, positive OD group may be accepted for that branch; zero-OD nodes retain their existing walls. Distinct positive ODs in the branch produce HOLD rather than arbitrary selection. The Pipe Wall Master DN OD is a parity/reference value only.
 
 For the retained DN50 source-data warning:
 
 ```text
 master reference OD = 60.0 mm
 source candidates    = 60.3 mm, 26.7 mm
-selected source OD   = 60.3 mm
+status               = HOLD (mixed positive ODs)
 ```
 
-The 26.7 mm fitting/flange endpoint is rejected as the pipe-calculation OD. The project master inconsistency is not silently corrected.
+The 26.7 mm fitting/flange endpoint is not silently ignored in favor of 60.3 mm. Resolve the physical occurrence/scope upstream in Preview; the project master inconsistency is not silently corrected.
 
 ## Wall selection
 
@@ -169,7 +169,7 @@ Explicit Pull writes a separate accepted record:
 config.b313WallUpdate.acceptedWallByBranch[branchOccurrenceIndex]
 ```
 
-The accepted wall is applied to validated pipe-node occurrences on full Preview rebuild, after material/rating resolution. It is not a shared Piping-Class/DN override.
+The accepted wall is applied to the validated positive-OD node group on full Preview rebuild, after material/rating resolution. Zero-OD nodes are preserved, and mixed-OD branches remain held. It is not a shared Piping-Class/DN override.
 
 The proposal and acceptance evidence includes:
 
