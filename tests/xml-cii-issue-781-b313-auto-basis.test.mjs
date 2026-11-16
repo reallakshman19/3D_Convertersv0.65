@@ -77,7 +77,10 @@ assert.match(runtimeSource, /fallbackInputCell\(model, 'Y', 'coefficientY'/);
 assert.match(runtimeSource, /data-b313-auto-field="stressUnit"/);
 assert.match(runtimeSource, /data-b313-factor-info-button/);
 assert.match(runtimeSource, /data-b313-auto-refresh/);
-assert.match(runtimeSource, /USER_ACCEPTED_PREVIEW_FALLBACK/);
+assert.match(runtimeSource, /data-b313-auto-source-reference/);
+assert.match(runtimeSource, /data-b313-auto-design-approved/);
+assert.match(runtimeSource, /data-b313-mill-basis/);
+assert.match(runtimeSource, /data-b313-cs-fallback/);
 assert.match(runtimeSource, /no interpolation/i);
 assert.match(diagnosticsSource, /installPreviewB313AutoBasisPanel/);
 
