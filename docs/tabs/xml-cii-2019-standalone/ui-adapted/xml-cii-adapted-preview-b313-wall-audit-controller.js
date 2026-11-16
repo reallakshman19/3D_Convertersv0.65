@@ -74,16 +74,20 @@ export function derivePreviewB313AuditSummary(report = {}) {
   const declaredInput = Math.max(0, finite(report?.summary?.inputRows) ?? 0);
   const evaluatedRows = Math.max(declaredInput, rows.length);
   const updatedRows = rows.filter((row) => row.status === 'UPDATED').length;
-  const explicitNotUpdatedRows = rows.filter((row) => row.status !== 'UPDATED').length;
-  const notUpdatedRows = Math.max(explicitNotUpdatedRows, evaluatedRows - updatedRows);
+  const calculatedRows = rows.filter((row) => row.status === 'CALCULATED').length;
+  const explicitNotUpdatedRows = rows.filter((row) => !['UPDATED', 'CALCULATED'].includes(row.status)).length;
+  const notUpdatedRows = Math.max(explicitNotUpdatedRows, evaluatedRows - updatedRows - calculatedRows);
   const declaredUpdated = Math.max(0, finite(report?.summary?.updatedRows) ?? 0);
+  const declaredCalculated = Math.max(0, finite(report?.summary?.calculatedRows) ?? 0);
   const declaredSkipped = Math.max(0, finite(report?.summary?.skippedRows) ?? 0);
   const summaryMismatch = declaredInput !== evaluatedRows
     || declaredUpdated !== updatedRows
+    || declaredCalculated !== calculatedRows
     || declaredSkipped !== notUpdatedRows;
   return {
     evaluatedRows,
     updatedRows,
+    calculatedRows,
     notUpdatedRows,
     summaryMismatch,
     hasInput: evaluatedRows > 0,
@@ -93,7 +97,8 @@ export function derivePreviewB313AuditSummary(report = {}) {
 
 function statusPill(status) {
   const updated = status === 'UPDATED';
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.03em;background:${updated ? '#dcfce7' : '#fef3c7'};color:${updated ? '#166534' : '#92400e'};border:1px solid ${updated ? '#86efac' : '#fcd34d'};">${updated ? 'UPDATED' : 'NOT UPDATED'}</span>`;
+  const calculated = status === 'CALCULATED';
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.03em;background:${updated ? '#dcfce7' : '#fef3c7'};color:${updated ? '#166534' : '#92400e'};border:1px solid ${updated ? '#86efac' : '#fcd34d'};">${updated ? 'UPDATED' : calculated ? 'CALCULATED · PULL REQUIRED' : 'NOT UPDATED'}</span>`;
 }
 
 function authorityLabel(mode) {
@@ -122,7 +127,7 @@ function updatedRowHtml(row) {
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;">${esc(material)}</div><div style="font-size:10px;color:#64748b;">${esc(materialId)} · T1 ${esc(t1)} °C</div></td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#166534;">${esc(factorMode)}</div><div style="font-size:10px;color:#475569;">${factorDetail}</div><div style="font-size:10px;color:#64748b;">${esc(factorSource)}</div></td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div>${wallDetail}</div><div style="font-size:10px;color:#475569;margin-top:2px;">${resultDetail}</div></td>
-    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;white-space:nowrap;">${statusPill('UPDATED')}</td>
+    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;white-space:nowrap;">${statusPill(row.status || 'UPDATED')}</td>
   </tr>`;
 }
 
@@ -190,19 +195,22 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
       ? '<div style="margin-top:8px;padding:7px 10px;border-radius:6px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;font-size:10px;">Audit counters were recomputed from row evidence because the supplied summary was stale or inconsistent.</div>'
       : '';
   const border = summary.allUpdated ? '#86efac' : '#f59e0b';
+  const countsLabel = summary.calculatedRows > 0
+    ? `Calculated ${summary.calculatedRows} · Awaiting Pull · Held ${summary.notUpdatedRows}`
+    : `Updated ${summary.updatedRows} · Not updated ${summary.notUpdatedRows}`;
   const titleColor = summary.allUpdated ? '#166534' : '#92400e';
-  const tableRows = rows.map((row) => row.status === 'UPDATED' ? updatedRowHtml(row) : failedRowHtml(row)).join('');
+  const tableRows = rows.map((row) => ['UPDATED', 'CALCULATED'].includes(row.status) ? updatedRowHtml(row) : failedRowHtml(row)).join('');
   const emptyRows = rows.length ? '' : '<tr><td colspan="5" style="padding:12px;text-align:center;color:#64748b;">No row-level audit evidence available.</td></tr>';
 
   return `<details data-mc-b313-report open style="margin:10px 0;border:1px solid ${border};border-radius:8px;background:#ffffff;padding:10px;box-shadow:0 1px 2px rgba(15,23,42,.06);">
-    <summary style="cursor:pointer;font-weight:800;color:${titleColor};">B31.3 wall update audit · Evaluated ${summary.evaluatedRows} · Updated ${summary.updatedRows} · Not updated ${summary.notUpdatedRows}</summary>
+    <summary style="cursor:pointer;font-weight:800;color:${titleColor};">B31.3 wall update audit · Evaluated ${summary.evaluatedRows} · ${countsLabel}</summary>
     <div style="font-size:11px;color:#475569;margin:8px 0;">Line-list and Piping Class data may resolve the governed material identity. They do not invent numeric S/E/W/Y. Automatic factors must still come from strict VERIFIED / PROJECT_APPROVED B31.3 factor records at the row T1 and, where applicable, the manufacturing route.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       <span style="padding:4px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-size:10px;"><strong>Code basis</strong> ASME B31.3-2024 §304.1.2 Eq. (3a)</span>
       <span style="padding:4px 8px;border-radius:6px;background:#ecfdf5;color:#166534;font-size:10px;"><strong>Primary factors</strong> Preview Material → B31.3 identity → active strict S/E/W/Y at T1</span>
       <span style="padding:4px 8px;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;"><strong>Fallback</strong> manual S/E/W/Y only when active master is incomplete; controlled source required</span>
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Excluded</strong> BENCHMARK_ONLY / SCREENING factors</span>
-      <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Mill tolerance</strong> 12.5% negative</span>
+      <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Mill tolerance</strong> ${esc(text(rows.find((row) => row.result?.calculation?.manufacturingTolerance)?.result?.calculation?.manufacturingTolerance?.inputValue ?? 12.5))}${rows.some((row) => row.result?.calculation?.manufacturingTolerance?.basis === 'absolute') ? ' mm absolute' : '% negative'}</span>
     </div>
     ${warning}
     <div style="overflow:auto;max-height:380px;margin-top:8px;border:1px solid #e2e8f0;border-radius:6px;">
