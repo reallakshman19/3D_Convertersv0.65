@@ -19,6 +19,8 @@ export function b313PreviewInputSignature(row = {}, config = {}) {
     materialCodeMatchedMaterial: txt(row.materialCodeMatchedMaterial),
     p1: txt(row.p1),
     p1Source: txt(row.p1Source),
+    p1Unit: txt(row.p1Unit),
+    p1UnitSource: txt(row.p1UnitSource),
     t1: txt(row.t1),
     t1Source: txt(row.t1Source),
     corrosion: txt(row.corrosion),
@@ -75,6 +77,15 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
     if (JSON.stringify(b313PreviewNodeSignature(actual[i])) !== JSON.stringify(proposal.nodeScope[i])) {
       return { ok: false, code: 'B313_PULL_SCOPE_CHANGED' };
     }
+  }
+  // Do not silently reduce a source-specified wall, even when a thinner
+  // schedule satisfies the pressure-only calculation.
+  const existingWall = txt(branchRow?.wallThickness);
+  const existingNominal = existingWall === '' ? NaN : Number(existingWall);
+  if (Number.isFinite(existingNominal) && existingNominal > Number(proposal.nominalWallMm) + 1e-9
+      && proposal.reductionReviewed !== true) {
+    return { ok: false, code: 'B313_PULL_WALL_REDUCTION_REVIEW_REQUIRED',
+      existingWallMm: existingNominal, proposedWallMm: proposal.nominalWallMm };
   }
   if (proposal.materialFallbackApplied && proposal.materialFallbackReviewed !== true) {
     return { ok: false, code: 'B313_PULL_CS_FALLBACK_REVIEW_REQUIRED' };
