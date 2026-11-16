@@ -292,7 +292,7 @@ export function resolvePreviewB313FactorBasis({
   if (!materialIdentity?.ok || !materialIdentity?.material?.materialId) {
     return failure('B313_PREVIEW_MATERIAL_IDENTITY_REQUIRED', 'A resolved B31.3 material identity is required before design factors can be selected.', { materialIdentity });
   }
-  const temperature = Number(designTemperatureC);
+  const temperature = text(designTemperatureC) === '' ? NaN : Number(designTemperatureC);
   if (!Number.isFinite(temperature)) {
     return failure('B313_PREVIEW_T1_REQUIRED', 'Preview T1 must be a finite design temperature in °C.');
   }
