@@ -19,7 +19,7 @@ permissions:
 jobs:
   step4-unit:
     name: Exact-head B31.3 / Preview regressions
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
             tests/xml-cii-b313-preview-ui-static.test.js
   step4-chromium:
     name: Browser Step 4 live Preview
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
