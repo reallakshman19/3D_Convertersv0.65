@@ -75,6 +75,7 @@ assert.deepEqual(
   {
     evaluatedRows: 2,
     updatedRows: 1,
+    calculatedRows: 0,
     notUpdatedRows: 1,
     summaryMismatch: true,
     hasInput: true,
