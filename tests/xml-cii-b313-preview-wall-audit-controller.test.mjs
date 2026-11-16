@@ -88,7 +88,7 @@ const html = renderPreviewB313WallAuditHtml(staleSummaryReport);
 assert.match(html, /Evaluated 2 · Updated 1 · Not updated 1/);
 assert.match(html, /ASME B31\.3-2024 §304\.1\.2 Eq\. \(3a\)/);
 assert.match(html, /Preview Material → B31\.3 identity → active strict S\/E\/W\/Y at T1/);
-assert.match(html, /BENCHMARK_ONLY / SCREENING factors/);
+assert.match(html, /BENCHMARK_ONLY \/ SCREENING factors/);
 assert.match(html, /12\.5% negative/);
 assert.match(html, /A106_GR_B · T1 120 °C/);
 assert.match(html, /S 118 MPa · E 1 · W 1 · Y 0\.4/);
