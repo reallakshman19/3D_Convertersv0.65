@@ -507,6 +507,7 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
       const pipingClassKey = sourceTd?.dataset?.mcPcKey || '';
       const filled = pipingClassKey ? applyAdaptedPreviewSmartFillByClass({ host, config, ensureOverrides, field, pipingClassKey, currentValue: currentVal }) : applyAdaptedPreviewOverrideFillDown({ host, config, ensureOverrides, field, fromRow, currentValue: currentVal });
       if (filled > 0) {
+        host.dataset.mcB313PreviewDirty = 'true';
         if (field === 'rating') {
           const overrides = ensureOverrides(config);
           for (const row of branchRows) {
@@ -551,6 +552,7 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
       const isPcField = fieldKey === 'hydroPressure';
       const filled = (isPcField && pipingClassKey) ? applyAdaptedPreviewSmartProcessFillByClass({ host, config, ensureOverrides, field: fieldKey, pipingClassKey, lineKey: '', currentValue: value }) : (lineKey ? applyAdaptedPreviewSmartProcessFillByClass({ host, config, ensureOverrides, field: fieldKey, pipingClassKey: '', lineKey, currentValue: value }) : applyAdaptedPreviewProcessFillDown({ host, config, ensureOverrides, field: fieldKey, fromRow, currentValue: value }));
       if (filled > 0) {
+        host.dataset.mcB313PreviewDirty = 'true';
         onSaveConfig(config);
         _markPreviewSaved(host, `${filled} process override${filled === 1 ? '' : 's'} saved (smart fill). Click Rebuild Preview to recompute suggestions.`);
       }
