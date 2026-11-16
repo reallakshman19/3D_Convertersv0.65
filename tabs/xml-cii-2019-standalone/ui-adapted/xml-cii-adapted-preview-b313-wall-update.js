@@ -517,12 +517,12 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       return;
     }
     const scopedNodes = previewNodeRows.filter((n) => Number(n.branchOccurrenceIndex) === rowIndex
-      && /^(?:PIPE|PIPELINE)$/i.test(text(n.componentType)));
+      && positive(n.outsideDiameterMm));
     const outsideDiameters = [...new Set(scopedNodes.map((n) => positive(n.outsideDiameterMm)).filter(Boolean))];
     const referenceOd = masterOutsideDiameterMm(row?.sizeMm ?? row?.boreMm, dimensionBasis.standard);
     const selectedOd = outsideDiameters.length === 1 ? outsideDiameters[0] : null;
     const toleranceMm = referenceOd ? Math.max(1.5, referenceOd * 0.02) : null;
-    const odBasis = !scopedNodes.length || scopedNodes.some((n) => !positive(n.outsideDiameterMm))
+    const odBasis = !scopedNodes.length
       ? { ok: false, code: 'B313_PREVIEW_SOURCE_NODE_OD_UNAVAILABLE' }
       : !selectedOd
         ? { ok: false, code: 'B313_PREVIEW_MIXED_OR_MISSING_PIPE_OD', outsideDiameters }
