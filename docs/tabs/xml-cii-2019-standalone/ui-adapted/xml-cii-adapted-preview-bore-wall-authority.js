@@ -5,6 +5,7 @@ import {
   childText,
   children,
   exactClassWallFromIndex,
+  nodeBoreMm,
   stagedBranchWallEvidenceFromIndex,
   resolveBranchNominalBore,
   text,
@@ -12,6 +13,7 @@ import {
 import {
   resolveXmlCiiWallThicknessWithEvidence,
 } from '../../../converters/xml-cii2019-core/dtxr-wall-evidence-ledger.js';
+import { b313ReadAcceptedWall } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import {
   resolveXmlCiiBoreAuthority,
 } from '../../../converters/xml-cii2019-core/bore-authority.js';
@@ -92,7 +94,12 @@ function withWallEvidenceFields(result, dtxr) {
 }
 
 function correctedRow(row, branch, indexes, config) {
-  const boreMm = resolveBranchNominalBore(row.branchName, row.sizeMm, config);
+  // v0.55 (from v0.35 PR #36): nominal bore comes from the source XML node
+  // OutsideDiameter; the branch-name/regex bore is only a fallback.
+  const localBores = branch ? [...new Set(children(branch, 'Node')
+    .map(nodeBoreMm).filter((bore)=>Number.isFinite(bore)&&bore>0))] : [];
+  const boreMm = localBores.length ? localBores[0] :
+    resolveBranchNominalBore(row.branchName, row.sizeMm, config);
   const evidence = branchEvidence(branch, row.branchName, indexes.stagedWall);
   const { authority, dtxr } = wallAuthorityForBore({
     boreMm,
@@ -105,6 +112,9 @@ function correctedRow(row, branch, indexes, config) {
     ...row,
     sizeMm: boreMm,
     size: boreMm ? `${boreMm}mm` : row.size,
+    nominalBoreAuthority:localBores.length?'actual-node-outside-diameter':'line-fallback-no-verified-od',
+    mixedDiameterBranch:localBores.length>1,
+    branchNodeNominalBoresMm:localBores,
     wallThicknessKey: classSizeKey(row, boreMm),
   };
   if (authority) {
@@ -244,6 +254,7 @@ function buildNodeBoreWallRows({
         endpoint: childText(node, 'Endpoint'),
         pipingClass,
         boreMm: bore.boreMm,
+        outsideDiameterMm: Number(childText(node, 'OutsideDiameter') || childText(node, 'OuterDiameter') || childText(node, 'OD')) || null,
         boreSource: bore.source,
         boreFallbackUsed: bore.fallbackUsed,
         boreTraceMismatch: bore.traceMismatch,
@@ -356,11 +367,23 @@ export function applyPreviewBoreWallAuthority({
     indexes,
     config,
   });
+  // Accepted Pull authority is applied only after the complete node ledger
+  // validates the original branch/node occurrence identities and dimensions.
+  // No class/DN-wide override or calculation-time write is used here.
+  const accepted = branchRows.map((row, index) =>
+    b313ReadAcceptedWall(config, row, index, nodeAuthority.rows));
+  const finalBranchRows = branchRows.map((row, index) => accepted[index]
+    ? { ...row, wallThickness: String(accepted[index].nominalWallMm), wallThicknessSource: 'b313-pulled', b313PullStatus: 'ACCEPTED' }
+    : row);
+  const finalNodeRows = nodeAuthority.rows.map((row) => {
+    const record = accepted[row.branchOccurrenceIndex];
+    return record ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' } : row;
+  });
   return {
     ...result,
-    branchRows,
-    nodeRows: correctNodeRows(result.nodeRows, nodeAuthority.rows, {requireSourceOrdinal}),
-    nodeBoreWallRows: nodeAuthority.rows,
+    branchRows: finalBranchRows,
+    nodeRows: correctNodeRows(result.nodeRows, finalNodeRows, {requireSourceOrdinal}),
+    nodeBoreWallRows: finalNodeRows,
     boreAuthorityDiagnostics: nodeAuthority.diagnostics,
   };
 }

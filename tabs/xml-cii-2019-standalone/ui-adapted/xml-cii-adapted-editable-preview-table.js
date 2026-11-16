@@ -97,7 +97,7 @@ export function previewMaterialCodeSuggestionEvidence(row) {
 }
 
 export class XmlCiiAdaptedEditablePreviewTable {
-  constructor({ branchRows, nodesByBranch, onCellEditClick, onFillDownClick, onProcessInputChange, onProcessFillDownClick, onWeightCandidateSelect, processInputHtmlRenderer, matchBadgeHtmlRenderer, onClassSourceSelect }) {
+  constructor({ branchRows, nodesByBranch, onCellEditClick, onFillDownClick, onProcessInputChange, onProcessFillDownClick, onWeightCandidateSelect, onB313PullClick, processInputHtmlRenderer, matchBadgeHtmlRenderer, onClassSourceSelect }) {
     this.branchRows = branchRows;
     this.nodesByBranch = nodesByBranch;
     this.onCellEditClick = onCellEditClick;
@@ -107,6 +107,7 @@ export class XmlCiiAdaptedEditablePreviewTable {
     this.processInputHtmlRenderer = processInputHtmlRenderer;
     this.matchBadgeHtmlRenderer = matchBadgeHtmlRenderer;
     this.onWeightCandidateSelect = onWeightCandidateSelect;
+    this.onB313PullClick = onB313PullClick;
     this.onClassSourceSelect=onClassSourceSelect;
   }
 
@@ -127,6 +128,7 @@ export class XmlCiiAdaptedEditablePreviewTable {
     const pcBadge = this.matchBadgeHtmlRenderer ? this.matchBadgeHtmlRenderer(row.pipingClassMethod, row.pipingClassConfidence, row.pipingClassNeedsReview, row.pipingClass, row.pipingClassDerived) : `<span class="mc-preview-editable-val">${this._escape(row.pipingClass || '')}</span>`;
     const mcBadge = this._renderMaterialCodeCell(row);
     const tdApprox = (needs, attrs = '') => needs ? `class="mc-preview-td mc-preview-approx" ${attrs}` : `class="mc-preview-td" ${attrs}`;
+    const pullBtn = (fromRow) => `<button type="button" class="mc-preview-b313-pull-btn" data-mc-b313-pull-row="${fromRow}" title="Pull the accepted B31.3 selected wall into this Preview row only (never Fill Down)" aria-label="Pull B31.3 wall for row ${fromRow + 1}">⤓</button>`;
     const fillDownBtn = (field, fromRow) => `<button type="button" class="mc-preview-filldown-btn" data-mc-fill-field="${this._escape(field)}" data-mc-fill-from="${fromRow}" title="Smart fill by field key: wall thickness by piping class + size; corrosion/material code by piping class; process data by line key.">↓</button>`;
     const renderProcessField = (fieldKey, val, src, pcKey = '') => this.processInputHtmlRenderer ? this.processInputHtmlRenderer(fieldKey, ['insThk','insType'].includes(fieldKey)?(row.lineKey||row.branchName):row.lineKey, val, src, ri, pcKey) : `<input type="text" value="${this._escape(val)}" data-mc-pd-field="${this._escape(fieldKey)}" data-mc-pd-linekey="${this._escape(row.lineKey)}" data-mc-pd-row="${ri}">`;
     const editAttrs = (type, key, extra = '') => `data-mc-edit-type="${this._escapeAttr(type)}" data-mc-edit-key="${this._escapeAttr(key || row.lineKey || row.branchName || '')}" data-mc-edit-row="${ri}" data-mc-pc-key="${this._escapeAttr(type === 'wallThickness' || type === 'materialCode' ? classSizeKey : classKey)}" ${extra}`;
@@ -176,7 +178,7 @@ export class XmlCiiAdaptedEditablePreviewTable {
         <td class="mc-preview-td mc-preview-pd-td">${renderProcessField('t2', row.t2, row.t2Source)}</td>
         <td class="mc-preview-td mc-preview-pd-td">${renderProcessField('t3', row.t3, row.t3Source)}</td>
         <td class="mc-preview-td mc-preview-pd-td">${renderProcessField('density', row.density, row.densitySource)}</td>
-        <td ${tdApprox(false, editAttrs('wallThickness', wallKey, `title="Wall thickness override key: ${this._escapeAttr(wallKey)}"`))}>${editablePlain('wallThickness', row.wallThickness, wallKey, row.wallThicknessSource)}${fillDownBtn('wallThickness', ri)}</td>
+        <td ${tdApprox(false, editAttrs('wallThickness', wallKey, `title="Wall thickness override key: ${this._escapeAttr(wallKey)}"`))}>${editablePlain('wallThickness', row.wallThickness, wallKey, row.wallThicknessSource)}${pullBtn(ri)}${fillDownBtn('wallThickness', ri)}</td>
         <td ${tdApprox(false, editAttrs('corrosion', corrosionKey, `title="Corrosion override key: ${this._escapeAttr(corrosionKey)}"`))}>${editablePlain('corrosion', row.corrosion, corrosionKey, row.corrosionSource)}${fillDownBtn('corrosion', ri)}</td>
         <td class="mc-preview-td mc-preview-pd-td${row.insThkNeedsReview?' mc-preview-approx':''}">${renderProcessField('insThk', row.insThk, row.insThkSource||'none')}${insulationNote('insThk')}${row.insThkNeedsReview?'<small class="mc-preview-badge bad">Review thickness</small>':''}</td>
         <td class="mc-preview-td mc-preview-pd-td${row.insTypeNeedsReview?' mc-preview-approx':''}">${renderProcessField('insType', row.insType, row.insTypeSource||'none')}${insulationNote('insType')}</td>
@@ -186,7 +188,8 @@ export class XmlCiiAdaptedEditablePreviewTable {
   bind(hostEl) {
     const branchTable = hostEl.querySelector('[data-resizable-table="branch-preview"]');
     if (branchTable) adaptedAttachColumnResizers(branchTable, BRANCH_COLUMNS, { storageKey: 'xmlCii.preview.branch.columnWidths.v1' });
-    hostEl.querySelectorAll('[data-mc-edit-type]').forEach(td => { td.style.cursor = 'pointer'; td.addEventListener('click', (e) => { if (e.target.closest('.mc-preview-filldown-btn')) return; const editType = td.getAttribute('data-mc-edit-type'); const derivedKey = td.getAttribute('data-mc-edit-derived') || td.getAttribute('data-mc-edit-key') || td.getAttribute('data-mc-edit-mat') || ''; let currentVal = td.getAttribute('data-mc-current-val') || td.querySelector('.mc-preview-editable-val')?.textContent?.trim() || ''; if (currentVal === '—') currentVal = ''; const rowIndex = Number(td.getAttribute('data-mc-edit-row') || 0); if (typeof this.onCellEditClick === 'function') this.onCellEditClick({ editType, derivedKey, currentVal, rowIndex, td }); }); });
+    hostEl.querySelectorAll('[data-mc-edit-type]').forEach(td => { td.style.cursor = 'pointer'; td.addEventListener('click', (e) => { if (e.target.closest('.mc-preview-filldown-btn, .mc-preview-b313-pull-btn')) return; const editType = td.getAttribute('data-mc-edit-type'); const derivedKey = td.getAttribute('data-mc-edit-derived') || td.getAttribute('data-mc-edit-key') || td.getAttribute('data-mc-edit-mat') || ''; let currentVal = td.getAttribute('data-mc-current-val') || td.querySelector('.mc-preview-editable-val')?.textContent?.trim() || ''; if (currentVal === '—') currentVal = ''; const rowIndex = Number(td.getAttribute('data-mc-edit-row') || 0); if (typeof this.onCellEditClick === 'function') this.onCellEditClick({ editType, derivedKey, currentVal, rowIndex, td }); }); });
+    hostEl.querySelectorAll('.mc-preview-b313-pull-btn[data-mc-b313-pull-row]').forEach(btn => btn.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); this.onB313PullClick?.({rowIndex:Number(btn.dataset.mcB313PullRow),button:btn}); }));
     hostEl.querySelectorAll('.mc-preview-filldown-btn[data-mc-fill-field]:not(.mc-pd-filldown)').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const field = btn.getAttribute('data-mc-fill-field') || ''; const fromRow = Number(btn.getAttribute('data-mc-fill-from') || 0); const sourceTd = btn.closest('[data-mc-edit-type]'); const currentVal = sourceTd?.querySelector('.mc-preview-editable-val')?.textContent?.trim() || ''; if (typeof this.onFillDownClick === 'function') this.onFillDownClick({ field, fromRow, currentVal, sourceTd, btn }); }));
     hostEl.querySelectorAll('[data-mc-pc-source]').forEach(input=>input.addEventListener('change',()=>{if(input.checked)this.onClassSourceSelect?.({rowIndex:Number(input.dataset.mcPcRow),source:input.dataset.mcPcSource});}));
     hostEl.querySelectorAll('[data-mc-pd-field]').forEach(input => input.addEventListener('change', () => { const fieldKey = input.dataset.mcPdField; const lineKey = input.dataset.mcPdLinekey; const rowIndex = Number(input.dataset.mcPdRow || input.dataset.mcRow || 0); const value = input.value; if (typeof this.onProcessInputChange === 'function') this.onProcessInputChange({ fieldKey, lineKey, value, rowIndex, input }); }));

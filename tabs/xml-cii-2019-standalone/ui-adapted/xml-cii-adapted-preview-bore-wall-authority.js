@@ -13,6 +13,7 @@ import {
 import {
   resolveXmlCiiWallThicknessWithEvidence,
 } from '../../../converters/xml-cii2019-core/dtxr-wall-evidence-ledger.js';
+import { b313ReadAcceptedWall } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import {
   resolveXmlCiiBoreAuthority,
 } from '../../../converters/xml-cii2019-core/bore-authority.js';
@@ -253,6 +254,7 @@ function buildNodeBoreWallRows({
         endpoint: childText(node, 'Endpoint'),
         pipingClass,
         boreMm: bore.boreMm,
+        outsideDiameterMm: Number(childText(node, 'OutsideDiameter') || childText(node, 'OuterDiameter') || childText(node, 'OD')) || null,
         boreSource: bore.source,
         boreFallbackUsed: bore.fallbackUsed,
         boreTraceMismatch: bore.traceMismatch,
@@ -365,11 +367,23 @@ export function applyPreviewBoreWallAuthority({
     indexes,
     config,
   });
+  // Accepted Pull authority is applied only after the complete node ledger
+  // validates the original branch/node occurrence identities and dimensions.
+  // No class/DN-wide override or calculation-time write is used here.
+  const accepted = branchRows.map((row, index) =>
+    b313ReadAcceptedWall(config, row, index, nodeAuthority.rows));
+  const finalBranchRows = branchRows.map((row, index) => accepted[index]
+    ? { ...row, wallThickness: String(accepted[index].nominalWallMm), wallThicknessSource: 'b313-pulled', b313PullStatus: 'ACCEPTED' }
+    : row);
+  const finalNodeRows = nodeAuthority.rows.map((row) => {
+    const record = accepted[row.branchOccurrenceIndex];
+    return record ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' } : row;
+  });
   return {
     ...result,
-    branchRows,
-    nodeRows: correctNodeRows(result.nodeRows, nodeAuthority.rows, {requireSourceOrdinal}),
-    nodeBoreWallRows: nodeAuthority.rows,
+    branchRows: finalBranchRows,
+    nodeRows: correctNodeRows(result.nodeRows, finalNodeRows, {requireSourceOrdinal}),
+    nodeBoreWallRows: finalNodeRows,
     boreAuthorityDiagnostics: nodeAuthority.diagnostics,
   };
 }
