@@ -1,0 +1,78 @@
+name: Step 4 B31.3 Pull acceptance (v0.65)
+on:
+  push:
+    branches:
+      - feat/step4-b313-pull-cs-mm-tolerance
+  pull_request:
+    branches: [main]
+    paths:
+      - 'converters/xml-cii2019-core/b313-preview-*.js'
+      - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
+      - 'tests/xml-cii-b313-*.test.mjs'
+      - 'tests/xml-cii-issue-781-b313-*.test.mjs'
+      - '.github/workflows/step4-b313-pull-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  step4-unit:
+    name: Exact-head B31.3 / Preview regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify syntax
+        run: |
+          node --check converters/xml-cii2019-core/b313-preview-pull-authority.js
+          node --check converters/xml-cii2019-core/b313-preview-wall-update.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-bore-wall-authority.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-dryrun-core.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-facts-worker-entry.js
+      - name: Test Pull, B31.3 adapters, Preview and legacy custody
+        run: |
+          node --test \
+            tests/xml-cii-b313-preview-pull-v065.test.mjs \
+            tests/xml-cii-b313-preview-wall-update.test.mjs \
+            tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
+            tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
+            tests/xml-cii-b313-preview-pressure-unit.test.mjs \
+            tests/xml-cii-b313-preview-od-selection.test.mjs \
+            tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
+            tests/xml-cii-issue-781-b313-live-row-custody.test.js \
+            tests/xml-cii-b313-preview-ui-static.test.js
+  step4-chromium:
+    name: Browser Step 4 live Preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.52.0
+          npx playwright install --with-deps chromium
+      - name: Start local site
+        run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/b313-step4-http.log 2>&1 &
+      - name: Chromium B31.3 live Preview path
+        run: node scripts/run-xml-cii-b313-live-preview-e2e.mjs
+      - name: Upload site log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b313-step4-http-log
+          path: /tmp/b313-step4-http.log
+          if-no-files-found: warn
