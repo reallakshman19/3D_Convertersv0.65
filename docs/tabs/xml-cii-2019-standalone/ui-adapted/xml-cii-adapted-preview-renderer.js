@@ -1,5 +1,6 @@
 import {normalizePreviewInsulationThickness,normalizePreviewInsulationType} from '../../../converters/xml-cii2019-core/preview-insulation.js';
 import {runPreviewButtonSession} from './xml-cii-adapted-preview-facts-button-session.js';
+import { b313PullProposal } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { XmlCiiAdaptedEditablePreviewTable } from './xml-cii-adapted-editable-preview-table.js';
 import { renderBranchLineMapPanel } from './xml-cii-adapted-branch-line-map-panel.js';
 import { _xmlCiiLineListKeys } from './xml-cii-adapted-preview-diagnostics-audit.js?v=20261001-weight-output-2';
@@ -27,10 +28,11 @@ function pvCacheFingerprint(xmlText, cfg) {
   const fieldMapSig = JSON.stringify(cfg?.linelist?.fieldMap || {});
   const defaultSig = JSON.stringify(cfg?.processDefaults || {}).slice(0, 120);
   const overrideSig = JSON.stringify(cfg?.overrides || {});
+  const b313Sig = JSON.stringify(cfg?.b313WallUpdate || {});
   // Saved Format 1/2 click order and joiners change source identity.
   // Never reuse a Preview from a prior regex configuration.
   const regexSig = JSON.stringify(cfg?.regexTester?.formats ?? cfg?.formats ?? []);
-  return `pv6|${xmlSig}|${llSig}:${pcSig}|${fieldMapSig}|${defaultSig}|${overrideSig}|${regexSig}`;
+  return `pv7|${xmlSig}|${llSig}:${pcSig}|${fieldMapSig}|${defaultSig}|${overrideSig}|${b313Sig}|${regexSig}`;
 }
 
 function readCache(key) {
@@ -62,13 +64,14 @@ export function xml229PreviewLineKeyCandidateRows(rows = [], passes = []) {
   });
 }
 
-function publishPreviewResult(host, branchRows = [], nodeRows = [], formatPreviewPasses = []) {
+function publishPreviewResult(host, branchRows = [], nodeRows = [], formatPreviewPasses = [], nodeBoreWallRows = []) {
   const result = {
     branchRows: Array.isArray(branchRows) ? branchRows : [],
     nodeRows: Array.isArray(nodeRows) ? nodeRows : [],
+    nodeBoreWallRows: Array.isArray(nodeBoreWallRows) ? nodeBoreWallRows : [],
     formatPreviewPasses: Array.isArray(formatPreviewPasses) ? formatPreviewPasses : [],
   };
-  if (host) host.__xmlCiiPreviewResult = result;
+  if (host) { host.__xmlCiiPreviewResult = result; host.dataset.mcB313PreviewDirty = 'false'; }
   return result;
 }
 
@@ -324,11 +327,12 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
     return previewResult;
   }
 
-  let stagedSource, branchRows, nodeRows, formatPreviewPasses = [];
+  let stagedSource, branchRows, nodeRows, nodeBoreWallRows = [], formatPreviewPasses = [];
   if (_pvFromCache) {
     stagedSource = { text: '', label: '(from cache)' };
     branchRows = _pvCached.data.branchRows;
     nodeRows = _pvCached.data.nodeRows || [];
+    nodeBoreWallRows = _pvCached.data.nodeBoreWallRows || [];
     formatPreviewPasses = _pvCached.data.formatPreviewPasses || [];
   } else if (options.precomputedPreview) {
     // A Worker result is already computed; do not rerun 10k-master matching in UI.
@@ -342,13 +346,14 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
     }
     stagedSource = options.precomputedStagedSource || { text: '', label: '' };
     ({ branchRows, nodeRows } = prepared);
+    nodeBoreWallRows = prepared.nodeBoreWallRows || [];
     formatPreviewPasses = prepared.formatPreviewPasses || [];
   } else {
     stagedSource = await _resolvePreviewStagedJsonText(options, config);
-    ({ branchRows, nodeRows, formatPreviewPasses } =
+    ({ branchRows, nodeRows, nodeBoreWallRows, formatPreviewPasses } =
       xmlCiiDryRunPreview(xmlText, config, stagedSource.text));
   }
-  const previewResult = publishPreviewResult(host, branchRows, nodeRows, formatPreviewPasses);
+  const previewResult = publishPreviewResult(host, branchRows, nodeRows, formatPreviewPasses, nodeBoreWallRows);
 
   if (!branchRows.length) {
     host.innerHTML = `${_manualPreviewActionHtml('Build Preview', false, config)}<div class="model-converters-workflow-detail-note">No branches found in XML.</div>`;
@@ -418,6 +423,38 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         if(error?.rollbackError&&rebuilt)_markPreviewSaved(rebuilt,'Selection failed; rebuild required: '+_toText(error.message));
       });
     },
+    onB313PullClick: async ({ rowIndex, button }) => {
+      const preview = host.__xmlCiiPreviewResult;
+      if (host.dataset.mcB313PreviewDirty === 'true') {
+        window.alert('Preview edits are pending. Rebuild Preview before pulling B31.3 wall.');
+        return;
+      }
+      const row = preview?.branchRows?.[rowIndex];
+      const prepared = b313PullProposal(config, row, rowIndex, preview?.nodeBoreWallRows);
+      if (!prepared.ok) {
+        window.alert(`B31.3 Pull unavailable (${prepared.code}). Recalculate or review the basis first.`);
+        return;
+      }
+      const prior = _toText(row.wallThickness || 'not specified');
+      if (!window.confirm(`Pull calculated B31.3 wall for ${row.branchName}?\nCurrent: ${prior} mm\nSelected: ${prepared.record.nominalWallMm} mm\nSchedule: ${prepared.record.selectedSchedule || 'unreported'}\nThis updates qualifying pipe nodes only and is not Fill Down.`)) return;
+      button.disabled = true;
+      try {
+        const basis = config.b313WallUpdate || (config.b313WallUpdate = {});
+        basis.acceptedWallByBranch ||= {};
+        basis.acceptedWallByBranch[String(rowIndex)] = prepared.record;
+        await onSaveConfig?.(config);
+        await xmlCiiRebuildPreviewThroughWorker(rootEl, xmlText, config, options);
+        const latest = rootEl?.querySelector('#mc-preview-table-host');
+        const effective = latest?.__xmlCiiPreviewResult?.branchRows?.[rowIndex];
+        if (effective?.b313PullStatus !== 'ACCEPTED' || Number(effective.wallThickness) !== Number(prepared.record.nominalWallMm)) {
+          throw Error('Accepted B31.3 wall did not survive Preview rebuild. Output remains unverified.');
+        }
+        _markPreviewSaved(latest, 'B31.3 wall pulled into Preview pipe occurrences. Native output verification remains required.');
+      } catch (err) {
+        _markPreviewSaved(rootEl?.querySelector('#mc-preview-table-host'), `B31.3 Pull was not verified: ${_toText(err?.message || err)}`);
+        throw err;
+      } finally { button.disabled = false; }
+    },
     onWeightCandidateSelect: ({ key, weight }) => {
       const numeric = Number(weight);
       if (!key || !Number.isFinite(numeric) || numeric <= 0) return;
@@ -434,6 +471,7 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
           config,
           applyOverride: async () => {
             const savedKey = _savePreviewOverride({ config, ensureOverrides, editType, row, derivedKey, value: newVal });
+      host.dataset.mcB313PreviewDirty = 'true';
             markAdaptedPreviewOverrideManual({ config, ensureOverrides, field: editType, key: savedKey, value: newVal });
             return { savedKey, value: newVal };
           },
@@ -497,6 +535,7 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
       if (Object.keys(overrides.processData[lineKey]).length === 0) delete overrides.processData[lineKey];
       markAdaptedPreviewProcessManual({ config, ensureOverrides, field: actualField, lineKey, value: cleanVal });
       onSaveConfig(config);
+      host.dataset.mcB313PreviewDirty = 'true';
       const cell = input.closest('.mc-preview-pd-cell');
       if (cell) cell.className = cleanVal ? 'mc-preview-pd-cell mc-preview-pd-override' : 'mc-preview-pd-cell mc-preview-pd-empty';
       _markPreviewSaved(host, 'Process override saved. Click Rebuild Preview to recompute suggestions.');
@@ -562,7 +601,7 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
   if (defaultRows.length) host.insertAdjacentHTML('afterbegin', `<div class="model-converters-workflow-detail-note" style="margin:0 0 8px;border-color:#7f1d1d;color:#7f1d1d;background:#fff7f7;">${defaultRows.length} line${defaultRows.length === 1 ? '' : 's'} use config defaults. Default values are shown in dark red.</div>`);
 
   if (!_pvFromCache && !options.skipLegacyCache) {
-    writeCache(PV_CACHE_KEY, _pvFp, { branchRows, nodeRows, formatPreviewPasses });
+    writeCache(PV_CACHE_KEY, _pvFp, { branchRows, nodeRows, nodeBoreWallRows, formatPreviewPasses });
   }
 
   table.bind(host);
