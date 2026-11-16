@@ -4,6 +4,7 @@ import {
   resolvePreviewB313FactorBasis,
   resolvePreviewB313MaterialIdentity,
 } from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20260928-issue776-authority-1';
+import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { listPipeWallsForSize } from '../../../converters/pipe-wall-master/index.js';
 import { markAdaptedPreviewOverrideManual } from './xml-cii-adapted-preview-filldown.js';
 import { _xmlCiiFindLineListRow } from './xml-cii-adapted-preview-dryrun-core.js?v=20261001-weight-output-2';
@@ -36,7 +37,13 @@ function ensureBasisConfig(config) {
   if (!config.b313WallUpdate || typeof config.b313WallUpdate !== 'object' || Array.isArray(config.b313WallUpdate)) config.b313WallUpdate = {};
   const basis = config.b313WallUpdate;
   basis.schema = B313_PREVIEW_BASIS_SCHEMA;
-  basis.negativeMillTolerancePct = B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT;
+  if (!basis.millTolerance || typeof basis.millTolerance !== 'object') {
+    basis.millTolerance = { basis: 'percent', value: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT };
+  }
+  if (!basis.materialFallback || typeof basis.materialFallback !== 'object') {
+    basis.materialFallback = { enabled: true, family: 'CS', mode: 'PROPOSE_FOR_REVIEW' };
+  }
+  basis.proposalsByBranch ||= {};
   if (!basis.bases || typeof basis.bases !== 'object' || Array.isArray(basis.bases)) basis.bases = {};
   return basis;
 }
@@ -49,14 +56,27 @@ function temperatureText(row) {
   return text(row?.t1 ?? row?.designTemperature ?? '');
 }
 
-export function resolvePreviewB313MaterialFromRow(row) {
-  return resolvePreviewB313MaterialIdentity({
+export function resolvePreviewB313MaterialFromRow(row, config = {}) {
+  const resolved = resolvePreviewB313MaterialIdentity({
     material: materialText(row),
     materialSource: row?.materialSource || '',
     corroboratingMaterial: row?.materialCodeMatchedMaterial || '',
     corroboratingSource: row?.materialCodeSource || row?.materialCodeResolutionMethod || '',
     corroboratingNeedsReview: row?.materialCodeNeedsReview === true,
   });
+  if (resolved.ok) return resolved;
+  const fallback = config?.b313WallUpdate?.materialFallback || { enabled: true, family: 'CS' };
+  const raw = normalizedToken(materialText(row));
+  // An explicitly identified non-CS material must NEVER become CS merely
+  // because its exact grade is missing from the catalog.
+  if (fallback.enabled === false || !['B313_PREVIEW_MATERIAL_REQUIRED', 'B313_PREVIEW_MATERIAL_NOT_MAPPED'].includes(resolved.code)
+      || /\b(?:SS|STAINLESS|DSS|DUPLEX|SDSS|SUPERDUPLEX|LTCS|A312|A358|A789|A790|A333|A335|UNS)\b/.test(raw)
+      || /^SS\d|^S3\d|^TP\d/.test(raw)) return resolved;
+  const family = text(fallback.family || 'CS').toUpperCase();
+  if (family !== 'CS') return resolved;
+  const applied = resolvePreviewB313MaterialIdentity({ material: 'CS', materialSource: 'b313-config-fallback-cs' });
+  return applied.ok ? { ...applied, b313FallbackApplied: true, b313FallbackFamily: 'CS',
+    b313FallbackNeedsReview: true, fallbackOriginal: materialText(row) } : resolved;
 }
 
 function legacyPreviewB313BasisKey(row) {
@@ -218,9 +238,15 @@ function sameNumeric(left, right) {
   return Math.abs(a - b) <= scale * 1e-9;
 }
 
-export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}) {
+export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, previewOnly = false) {
   const explicit = normalizePressureUnit(basis.pressureUnit);
+  const fromPreview = normalizePressureUnit(row?.p1Unit);
+  if (explicit && fromPreview && explicit !== fromPreview) {
+    return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_CONFLICT', explicit, previewUnit: fromPreview };
+  }
   if (explicit) return { unit: explicit, source: 'design-basis' };
+  if (fromPreview) return { unit: fromPreview, source: row?.p1UnitSource || 'preview' };
+  if (previewOnly) return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
 
   const match = _xmlCiiFindLineListRow(row?.lineKey, config);
   const raw = match?.row || null;
@@ -341,13 +367,13 @@ function reportHtml(report) {
   const detailRows = rows.map((row) => {
     const result = row.result;
     const schedule = result?.equivalentSchedules?.join(' / ') || result?.selectedSchedule || '';
-    const detail = row.status === 'UPDATED'
+    const detail = row.status === 'CALCULATED' || row.status === 'UPDATED'
       ? `${esc(row.materialId)} · ${esc(row.factorBasisMode)} · OD ${result.outsideDiameterMm.toFixed(3)} mm · P ${result.designPressure} ${esc(result.pressureUnit)} · CA ${result.corrosionAllowanceMm} mm · required ${result.calculation.requiredNominalThicknessMm.toFixed(4)} mm · selected ${result.selectedNominalWallMm.toFixed(4)} mm · Sch ${esc(schedule)} · margin ${result.selectionMarginMm.toFixed(4)} mm`
       : esc(row.message || row.code || 'not updated');
     return `<tr><td style="padding:5px;border-bottom:1px solid #e2e8f0;">${esc(row.branchName)}</td><td style="padding:5px;border-bottom:1px solid #e2e8f0;font-weight:700;">${esc(row.status)}</td><td style="padding:5px;border-bottom:1px solid #e2e8f0;">${detail}</td></tr>`;
   }).join('');
   return `<details data-mc-b313-report open style="margin:8px 0;border:1px solid ${statusColor};border-radius:6px;background:${background};padding:8px;">
-    <summary style="cursor:pointer;font-weight:700;color:${statusColor};">B31.3 wall update audit — ${summary.updatedRows || 0} updated, ${summary.skippedRows || 0} not updated</summary>
+    <summary style="cursor:pointer;font-weight:700;color:${statusColor};">B31.3 wall calculation audit — ${summary.calculatedRows || 0} calculated, ${summary.skippedRows || 0} held; use ⤓ Pull to accept</summary>
     <div style="font-size:12px;margin:6px 0;">Preview Material → B31.3 material identity → strict active S/E/W/Y at T1. Manual S/E/W/Y is used only as an explicit fallback when the active master is incomplete. BENCHMARK_ONLY factor data is never enabled. Negative mill tolerance is fixed at 12.5%.</div>
     <div style="overflow:auto;max-height:300px;"><table style="border-collapse:collapse;width:100%;font-size:12px;"><thead><tr><th style="text-align:left;padding:5px;">Branch</th><th style="text-align:left;padding:5px;">Status</th><th style="text-align:left;padding:5px;">Material / factor basis / result</th></tr></thead><tbody>${detailRows}</tbody></table></div>
   </details>`;
@@ -431,13 +457,17 @@ function failureRow(row, code, message, details = {}) {
 
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
-  const sourceXml = parseSourceXml(xmlText);
+  // Calculation reads only the effective Step 4 Preview snapshot.
+  // Source XML and master matching are upstream responsibilities of Build Preview.
+  const previewNodeRows = Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
+    ? host.__xmlCiiPreviewResult.nodeBoreWallRows : [];
+  const sourceXml = { pressureUnit: '', byBranch: new Map() };
   const basisConfig = ensureBasisConfig(config || {});
   const results = [];
   let updated = 0;
 
   branchRows.forEach((row, rowIndex) => {
-    const materialIdentity = resolvePreviewB313MaterialFromRow(row);
+    const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
     if (!materialIdentity.ok) {
       results.push(failureRow(row, materialIdentity.code, materialIdentity.message || 'Preview Material could not be linked to B31.3 Material Factors.', { materialIdentity }));
       return;
@@ -468,7 +498,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, 'B313_PREVIEW_CORROSION_REQUIRED', 'Preview corrosion allowance is unavailable.', { materialIdentity, factorBasis }));
       return;
     }
-    const pressureBasis = inferPreviewPressureUnit(row, config, sourceXml, basis);
+    const pressureBasis = inferPreviewPressureUnit(row, config, sourceXml, basis, true);
     if (!pressureBasis.unit) {
       results.push(failureRow(row, 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED', 'Pressure unit could not be resolved. Set P unit explicitly in the B31.3 design basis.', { materialIdentity, factorBasis }));
       return;
@@ -478,7 +508,22 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, 'B313_PREVIEW_DIMENSION_STANDARD_UNRESOLVED', 'Pipe dimension standard could not be resolved. Set it explicitly in the B31.3 design basis.', { materialIdentity, factorBasis }));
       return;
     }
-    const odBasis = resolvePreviewOutsideDiameter(row, sourceXml, dimensionBasis.standard);
+    const scopedNodes = previewNodeRows.filter((n) =>
+      Number(n.branchOccurrenceIndex) === rowIndex && /^PIPE(?:LINE)?$/i.test(text(n.componentType)));
+    const outsideDiameters = [...new Set(scopedNodes.map((n) => positive(n.outsideDiameterMm)).filter(Boolean))];
+    const referenceOd = masterOutsideDiameterMm(row?.sizeMm ?? row?.boreMm, dimensionBasis.standard);
+    const selectedOd = outsideDiameters.length === 1 ? outsideDiameters[0] : null;
+    const toleranceMm = referenceOd ? Math.max(1.5, referenceOd * 0.02) : null;
+    const odBasis = !scopedNodes.length
+      ? { ok: false, code: 'B313_PREVIEW_PIPE_NODES_UNAVAILABLE' }
+      : !selectedOd
+        ? { ok: false, code: 'B313_PREVIEW_MIXED_OR_MISSING_PIPE_OD', outsideDiameters }
+        : !referenceOd
+          ? { ok: false, code: 'B313_PREVIEW_MASTER_OD_UNAVAILABLE' }
+          : Math.abs(selectedOd - referenceOd) > toleranceMm
+            ? { ok: false, code: 'B313_PREVIEW_ROW_OD_PARITY_MISMATCH', selectedOd, referenceOd, toleranceMm }
+            : { ok: true, outsideDiameterMm: selectedOd, source: 'step4-preview-node-ledger',
+                referenceOdMm: referenceOd, parityDeltaMm: Math.abs(selectedOd - referenceOd), toleranceMm };
     if (!odBasis.ok) {
       results.push(failureRow(row, odBasis.code, 'A reliable row outside diameter could not be established from source XML against the DN master reference.', { ...odBasis, materialIdentity, factorBasis }));
       return;
@@ -496,6 +541,10 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       weldStrengthReductionW: factorBasis.weldStrengthReductionW,
       coefficientY: factorBasis.coefficientY,
       dimensionStandard: dimensionBasis.standard,
+      negativeMillTolerance: basis.negativeMillTolerance || basisConfig.millTolerance,
+      mechanicalAllowanceMm: basis.mechanicalAllowanceMm ?? 0,
+      erosionAllowanceMm: basis.erosionAllowanceMm ?? 0,
+      otherAllowanceMm: basis.otherAllowanceMm ?? 0,
       edition: '2024',
     });
     if (!result.ok) {
@@ -503,62 +552,50 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       return;
     }
 
-    const overrideKey = wallOverrideKey(row);
-    if (!overrideKey) {
-      results.push(failureRow(row, 'B313_PREVIEW_WALL_OVERRIDE_KEY_UNAVAILABLE', 'Wall-thickness override key is unavailable.', { materialIdentity, factorBasis }));
-      return;
-    }
-    const overrides = ensureOverrides(config);
-    if (!overrides.wallThickness || typeof overrides.wallThickness !== 'object' || Array.isArray(overrides.wallThickness)) overrides.wallThickness = {};
-    if (!overrides.__b313WallEvidence || typeof overrides.__b313WallEvidence !== 'object' || Array.isArray(overrides.__b313WallEvidence)) overrides.__b313WallEvidence = {};
-    overrides.wallThickness[overrideKey] = Number(result.selectedNominalWallMm.toPrecision(8)).toString();
-    if (overrides.__dtxrWallKeys && typeof overrides.__dtxrWallKeys === 'object') delete overrides.__dtxrWallKeys[overrideKey];
-
+    const proposalKey = String(rowIndex);
     const evidence = {
-      schema: 'xml-cii-b313-wall-evidence/v2',
-      basisKey: key,
-      basisStorageSource: stored.source,
-      previewMaterial: materialText(row),
-      previewMaterialSource: row?.materialSource || '',
-      previewMaterialCode: row?.materialCode || '',
-      previewMaterialCodeSource: row?.materialCodeSource || '',
-      previewMaterialCodeMatchedMaterial: row?.materialCodeMatchedMaterial || '',
-      materialIdentity,
-      materialId: materialIdentity.material.materialId,
-      materialIdentitySource: materialIdentity.resolutionSource || materialIdentity.requestMode,
+      schema: 'xml-cii-b313-wall-evidence/v3',
+      basisKey: key, basisStorageSource: stored.source,
+      previewMaterial: materialText(row), previewMaterialSource: row?.materialSource || '',
+      materialIdentity, materialId: materialIdentity.material.materialId,
+      materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
       designTemperature: temperatureText(row),
       factorBasisMode: factorBasis.mode,
       factorSources: factorBasis.factorSources,
       factorDesignAuthority: factorBasis.designAuthority === true,
-      strictFactorResult: factorBasis.strictResult,
       fallbackSourceReference: factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK' ? factorBasis.sourceReference : '',
-      allowableStress: factorBasis.allowableStress,
-      stressUnit: factorBasis.stressUnit,
-      qualityFactorE: factorBasis.qualityFactorE,
-      weldStrengthReductionW: factorBasis.weldStrengthReductionW,
-      coefficientY: factorBasis.coefficientY,
       pressureSource: row?.p1Source || '',
       pressureUnitSource: pressureBasis.source,
       dimensionStandardSource: dimensionBasis.source,
       outsideDiameterSource: odBasis.source,
       outsideDiameterReferenceMm: odBasis.referenceOdMm,
       outsideDiameterParityDeltaMm: odBasis.parityDeltaMm,
-      negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
-      calculation: result.calculation,
-      selection: result.selection,
+      negativeMillTolerance: result.calculation.manufacturingTolerance,
+      calculation: result.calculation, selection: result.selection,
     };
-    overrides.__b313WallEvidence[overrideKey] = evidence;
-    markAdaptedPreviewOverrideManual({ config, ensureOverrides, field: 'wallThickness', key: overrideKey, value: overrides.wallThickness[overrideKey] });
-    updateVisibleWallCell(host, rowIndex, result);
+    const manualReviewed = factorBasis.mode === 'ACTIVE_MASTER_STRICT'
+      || (basis.designApproved === true && text(basis.sourceReference)
+          && !/^USER_ACCEPTED_PREVIEW_FALLBACK|^B313_ACTIVE_MASTER_CANDIDATE_SEED/.test(text(basis.sourceReference)));
+    const csReviewed = materialIdentity.b313FallbackApplied !== true || basis.csFallbackReviewed === true;
+    basisConfig.proposalsByBranch[proposalKey] = {
+      schema: 'xml-cii-b313-proposal/v1',
+      inputSignature: b313PreviewInputSignature(row, config),
+      nodeScope: scopedNodes.map(b313PreviewNodeSignature),
+      nominalWallMm: result.selectedNominalWallMm,
+      selectedSchedule: result.selectedSchedule,
+      factorBasisMode: factorBasis.mode,
+      materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
+      materialFallbackReviewed: csReviewed,
+      manualFactorsReviewed: manualReviewed,
+      result, evidence,
+    };
+    updateVisibleMaterialCell(host, rowIndex, materialIdentity, factorBasis);
     results.push({
       branchName: row.branchName || '',
       lineKey: row.lineKey || '',
-      status: 'UPDATED',
-      overrideKey,
+      status: 'CALCULATED', proposalKey,
       materialId: materialIdentity.material.materialId,
-      factorBasisMode: factorBasis.mode,
-      result,
-      evidence,
+      factorBasisMode: factorBasis.mode, result, evidence,
     });
     updated += 1;
   });
@@ -572,7 +609,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
     materialFactorPolicy: 'PREVIEW_MATERIAL_TO_ACTIVE_B313_STRICT_THEN_MANUAL_FALLBACK',
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
-    summary: { inputRows: branchRows.length, updatedRows: updated, skippedRows: branchRows.length - updated },
+    summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
     rows: results,
   };
 }
