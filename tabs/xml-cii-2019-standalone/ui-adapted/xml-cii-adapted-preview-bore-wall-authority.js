@@ -392,7 +392,7 @@ export function applyAcceptedB313PullAuthority(result, config = {}) {
     : row);
   const nodeBoreWallRows = ledger.map((row) => {
     const record = accepted[row.branchOccurrenceIndex];
-    return record && /^PIPE(?:LINE)?$/i.test(text(row.componentType))
+    return record
       ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' }
       : row;
   });
