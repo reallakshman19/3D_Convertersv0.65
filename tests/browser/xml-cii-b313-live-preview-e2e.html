@@ -85,9 +85,9 @@ try {
   const nodeLedger = host.__xmlCiiPreviewResult.nodeBoreWallRows;
   assert(Array.isArray(nodeLedger) && nodeLedger.length > 0, 'Worker did not publish the complete Step 4 pipe ledger');
   const effectiveRows = host.__xmlCiiPreviewResult.branchRows;
-  const pipeNode = (n) => /^(PIPE|PIPELINE)$/i.test(String(n.componentType || ''));
+  const wallApplicableNode = (n) => Number(n.outsideDiameterMm) > 0;
   const targetIndex = effectiveRows.findIndex((row, index) => {
-    const pipes = nodeLedger.filter((n) => Number(n.branchOccurrenceIndex) === index && pipeNode(n));
+    const pipes = nodeLedger.filter((n) => Number(n.branchOccurrenceIndex) === index && wallApplicableNode(n));
     const odValues = [...new Set(pipes.map((n) => Number(n.outsideDiameterMm)).filter((n) => n > 0))];
     return pipes.length > 0 && odValues.length === 1 && Number(row.wallThickness || 0) >= 0
       && Number(row.wallThickness || 0) + 1 < odValues[0] * 0.35;
@@ -95,7 +95,7 @@ try {
   assert(targetIndex >= 0, 'No unambiguous valid pipe occurrence is available for synthetic Pull wiring test');
   const sourceRow = effectiveRows[targetIndex];
   const branchLedger = nodeLedger.filter((n) => Number(n.branchOccurrenceIndex) === targetIndex);
-  const pipeLedger = branchLedger.filter(pipeNode);
+  const pipeLedger = branchLedger.filter(wallApplicableNode);
   const currentWall = Number(sourceRow.wallThickness || 0);
   const proposedWall = Number((currentWall + 1).toFixed(4));
   const basis = config.b313WallUpdate || (config.b313WallUpdate = {});
@@ -126,16 +126,16 @@ try {
   for (const node of pipeLedger) {
     const after = pulledNodes.find((candidate) => candidate.nodeOrdinal === node.nodeOrdinal);
     assert(after && Number(after.wallThickness) === proposedWall && after.wallThicknessSource === 'b313-pulled',
-      'Pipe node wall did not propagate into effective Preview');
+      'Same-OD node wall did not propagate into effective Preview');
   }
-  for (const node of branchLedger.filter((n) => !pipeNode(n))) {
+  for (const node of branchLedger.filter((n) => !wallApplicableNode(n))) {
     const after = pulledNodes.find((candidate) => candidate.nodeOrdinal === node.nodeOrdinal);
     assert(after && String(after.wallThickness) === String(node.wallThickness),
-      'Pull changed a non-pipe component wall');
+      'Pull changed a zero-OD component wall');
   }
   assert(pulled.branchRows[targetIndex].wallThicknessSource === 'b313-pulled', 'Accepted wall source not shown in 4 Preview');
-  done({ ok: true, syntheticPullAccepted: true, pipeNodesUpdated: pipeLedger.length,
-    nonPipeNodesProtected: branchLedger.length - pipeLedger.length,
+  done({ ok: true, syntheticPullAccepted: true, sameOdNodesUpdated: pipeLedger.length,
+    zeroOdNodesProtected: branchLedger.length - pipeLedger.length,
     branchCount: rows.length, a106Material: a106?.material || '',
     firstLineKey: rows[0]?.lineKey || '', firstT1: rows[0]?.t1 || '',
     autoPanelCount: host.querySelectorAll('[data-mc-b313-auto-basis-panel]').length,
