@@ -500,6 +500,7 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         return;
       }
       const savedKey = _savePreviewOverride({ config, ensureOverrides, editType, row, derivedKey, value: newVal });
+      host.dataset.mcB313PreviewDirty = 'true';
       markAdaptedPreviewOverrideManual({ config, ensureOverrides, field: editType, key: savedKey, value: newVal });
       if (editType === 'rating' && row.lineKey) markAdaptedPreviewProcessManual({ config, ensureOverrides, field: 'rating', lineKey: row.lineKey, value: newVal });
       onSaveConfig(config);
