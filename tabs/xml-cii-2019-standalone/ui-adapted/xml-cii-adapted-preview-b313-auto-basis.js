@@ -448,19 +448,44 @@ function bindRefresh(panel, host, config, models, options) {
 function applyT1Guard(host, models) {
   const button = host?.querySelector?.('[data-mc-b313-wall-update]');
   if (!button) return;
-  const hasMissingT1 = models.some((model) => model.statusCode === 'B313_PREVIEW_T1_REQUIRED');
-  if (hasMissingT1) {
-    if (!button.dataset.mcB313AutoBasisOriginalTitle) button.dataset.mcB313AutoBasisOriginalTitle = button.title || '';
-    button.dataset.mcB313AutoBasisT1Guard = 'true';
-    button.disabled = true;
-    button.title = 'Resolve Preview T1 before running the B31.3 wall update. Blank T1 is never treated as 0 °C.';
-    return;
-  }
-  if (button.dataset.mcB313AutoBasisT1Guard === 'true') {
-    button.disabled = false;
-    button.title = button.dataset.mcB313AutoBasisOriginalTitle || button.title;
-    delete button.dataset.mcB313AutoBasisT1Guard;
-  }
+  const missing = models.filter((model) => model.statusCode === 'B313_PREVIEW_T1_REQUIRED').length;
+  // A missing T1 holds that model only; it must not disable unrelated rows.
+  // Blank T1 is never treated as 0 °C.
+  if (!button.dataset.mcB313AutoBasisOriginalTitle) button.dataset.mcB313AutoBasisOriginalTitle = button.title || '';
+  button.title = missing
+    ? `${missing} material/T1 group(s) require T1; other valid Preview rows can still be calculated.`
+    : button.dataset.mcB313AutoBasisOriginalTitle;
+}
+function bindMillAndCsControls(panel, host, config, rows, options) {
+  const tolerance = config.b313WallUpdate || (config.b313WallUpdate = {});
+  const type = panel.querySelector?.('[data-b313-mill-basis]');
+  const value = panel.querySelector?.('[data-b313-mill-value]');
+  const cs = panel.querySelector?.('[data-b313-cs-fallback]');
+  const save = async () => {
+    const mode = text(type?.value) === 'absolute' ? 'absolute' : 'percent';
+    const raw = text(value?.value);
+    const number = raw === '' ? NaN : Number(raw);
+    if (!Number.isFinite(number) || number < 0 || (mode === 'percent' && number >= 100)) {
+      value?.setCustomValidity?.('Enter a valid nonnegative mill tolerance; percentage must be below 100.');
+      value?.reportValidity?.();
+      return;
+    }
+    value?.setCustomValidity?.('');
+    tolerance.millTolerance = mode === 'percent'
+      ? { basis: 'percent', value: number }
+      : { basis: 'absolute', value: number, unit: 'mm' };
+    tolerance.materialFallback = {
+      ...(tolerance.materialFallback || {}),
+      enabled: cs?.checked !== false, family: 'CS', mode: 'PROPOSE_FOR_REVIEW'
+    };
+    await options?.onSaveConfigPreservePreview?.(config);
+  };
+  type?.addEventListener('change', async () => {
+    if (value) value.value = type.value === 'absolute' ? '1.5' : '12.5';
+    await save();
+  });
+  value?.addEventListener('change', save);
+  cs?.addEventListener('change', save);
 }
 
 function watchLivePreviewRows({ host, config, rows, options }) {
@@ -517,6 +542,7 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
     bindTableLinks(panel);
     bindInfoPopups(panel);
     bindRefresh(panel, host, config, models, options);
+    bindMillAndCsControls(panel, host, config, rows, options);
   }
   applyT1Guard(host, models);
   return models;
