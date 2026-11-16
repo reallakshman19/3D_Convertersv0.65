@@ -377,7 +377,9 @@ export function applyPreviewBoreWallAuthority({
     : row);
   const finalNodeRows = nodeAuthority.rows.map((row) => {
     const record = accepted[row.branchOccurrenceIndex];
-    return record ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' } : row;
+    return record && /^PIPE(?:LINE)?$/i.test(text(row.componentType))
+      ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' }
+      : row;
   });
   return {
     ...result,
