@@ -68,10 +68,24 @@ globalThis.addEventListener('message',async (event)=>{
     timings.sourceCoverageMs=Number((clock()-checkedAt).toFixed(3));
     timings.totalWorkerMs=Number((clock()-started).toFixed(3));
     progress(stage,3);
+    // Transport only the fields required for Step 4 B31.3 Pull. The full
+    // evidence-rich ledger remains inside the Worker/native Preview pipeline.
+    const compactPipeLedger = result.nodeBoreWallRows.map((node) => ({
+      branchOccurrenceIndex: node.branchOccurrenceIndex,
+      nodeOrdinal: node.nodeOrdinal,
+      nodeNumber: node.nodeNumber,
+      componentType: node.componentType,
+      componentRefNo: node.componentRefNo,
+      endpoint: node.endpoint,
+      boreMm: node.boreMm,
+      outsideDiameterMm: node.outsideDiameterMm,
+      wallThickness: node.wallThickness,
+      wallThicknessSource: node.wallThicknessSource,
+    }));
     // Legacy nodeRows are only review-eligible nodes: never equate their count to
     // all source nodes. Original sourceOccurrences survive separately, losslessly.
     post({state:'completed',stage:'local-engineering',completed:3,total:3,
-      result:{branchRows:result.branchRows,nodeRows:result.nodeRows,nodeBoreWallRows:result.nodeBoreWallRows,
+      result:{branchRows:result.branchRows,nodeRows:result.nodeRows,nodeBoreWallRows:compactPipeLedger,
         sourceOccurrences:original,
         coverage:{sourceBranchCount:original.branchCount,
           originalNodeCount:original.nodeCount,
