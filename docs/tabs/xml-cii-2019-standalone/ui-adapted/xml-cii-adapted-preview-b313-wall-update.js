@@ -85,9 +85,9 @@ function legacyPreviewB313BasisKey(row) {
   return material ? `${material}|T1=${temperature || '?'}` : '';
 }
 
-export function previewB313BasisKey(row) {
+export function previewB313BasisKey(row, config = {}) {
   const temperature = normalizedToken(temperatureText(row));
-  const materialIdentity = resolvePreviewB313MaterialFromRow(row);
+  const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
   if (materialIdentity.ok) return `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
   const legacy = legacyPreviewB313BasisKey(row);
   return legacy ? `RAW:${legacy}` : '';
@@ -103,9 +103,9 @@ function basisForRow(cfg, row, key = previewB313BasisKey(row)) {
 function uniqueBasisGroups(rows, cfg) {
   const map = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
-    const key = previewB313BasisKey(row);
+    const key = previewB313BasisKey(row, { b313WallUpdate: cfg });
     if (!key || map.has(key)) continue;
-    const materialIdentity = resolvePreviewB313MaterialFromRow(row);
+    const materialIdentity = resolvePreviewB313MaterialFromRow(row, { b313WallUpdate: cfg });
     const stored = basisForRow(cfg, row, key);
     const factorBasis = materialIdentity.ok
       ? resolvePreviewB313FactorBasis({
@@ -473,7 +473,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       return;
     }
 
-    const key = previewB313BasisKey(row);
+    const key = previewB313BasisKey(row, { b313WallUpdate: basisConfig });
     const stored = basisForRow(basisConfig, row, key);
     const basis = stored.basis || {};
     const factorBasis = resolvePreviewB313FactorBasis({
