@@ -1,7 +1,7 @@
 import {
   xmlCiiBuildAndRenderPreview as buildLegacyPreview,
   xmlCiiRenderPreviewPhase,
-} from './xml-cii-adapted-preview-renderer.js?v=20261001-weight-output-2';
+} from './xml-cii-adapted-preview-renderer.js?v=20261116-b313-pull-v065';
 import {
   XML_CII_PREVIEW_CACHE_SCHEMA,
   XML_CII_PREVIEW_LEGACY_CACHE_KEY,
