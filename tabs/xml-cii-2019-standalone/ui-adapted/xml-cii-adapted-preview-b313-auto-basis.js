@@ -421,7 +421,8 @@ function bindRefresh(panel, host, config, models, options) {
       dimensionStandard: text(rowEl?.querySelector?.('[data-b313-auto-field="dimensionStandard"]')?.value || 'AUTO'),
     };
     const status = rowEl.querySelector?.('[data-b313-auto-status]');
-    if (!validateFallbackRecord(record) || !text(record.sourceReference)) {
+    const strictReady = model.factorBasis?.ok && model.factorBasis?.mode === 'ACTIVE_MASTER_STRICT';
+    if ((!strictReady && !validateFallbackRecord(record)) || (!strictReady && !text(record.sourceReference))) {
       if (status) {
         status.textContent = 'INVALID FALLBACK VALUES';
         status.style.color = '#fca5a5';
@@ -485,7 +486,10 @@ function bindMillAndCsControls(panel, host, config, rows, options) {
     await save();
   });
   value?.addEventListener('change', save);
-  cs?.addEventListener('change', save);
+  cs?.addEventListener('change', async () => {
+    await save();
+    installPreviewB313AutoBasisPanel({ host, config, rows, options, watchLive: false });
+  });
 }
 
 function watchLivePreviewRows({ host, config, rows, options }) {
