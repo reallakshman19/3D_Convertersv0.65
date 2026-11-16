@@ -457,6 +457,12 @@ function failureRow(row, code, message, details = {}) {
 
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
+  if (host?.dataset?.mcB313PreviewDirty === 'true') {
+    return { schema: B313_PREVIEW_REPORT_SCHEMA, action: B313_PREVIEW_ACTION_LABEL,
+      summary: { inputRows: branchRows.length, calculatedRows: 0, updatedRows: 0, skippedRows: branchRows.length },
+      rows: branchRows.map((row) => failureRow(row, 'B313_PREVIEW_REBUILD_REQUIRED',
+        'Step 4 inputs were edited. Rebuild Preview before B31.3 calculation.')) };
+  }
   // Calculation reads only the effective Step 4 Preview snapshot.
   // Source XML and master matching are upstream responsibilities of Build Preview.
   const previewNodeRows = Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
@@ -562,6 +568,11 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       designTemperature: temperatureText(row),
       factorBasisMode: factorBasis.mode,
       factorSources: factorBasis.factorSources,
+      allowableStress: factorBasis.allowableStress,
+      stressUnit: factorBasis.stressUnit,
+      qualityFactorE: factorBasis.qualityFactorE,
+      weldStrengthReductionW: factorBasis.weldStrengthReductionW,
+      coefficientY: factorBasis.coefficientY,
       factorDesignAuthority: factorBasis.designAuthority === true,
       fallbackSourceReference: factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK' ? factorBasis.sourceReference : '',
       pressureSource: row?.p1Source || '',
