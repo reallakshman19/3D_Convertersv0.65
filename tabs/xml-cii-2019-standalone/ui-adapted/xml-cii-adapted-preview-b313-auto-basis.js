@@ -408,7 +408,7 @@ function bindRefresh(panel, host, config, models, options) {
       designTemperature: model.t1,
       manufacturingRoute: model.route,
       allowableStress: numericField(rowEl, 'allowableStress'),
-      stressUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="stressUnit"]')?.value || model.fallback.stressUnit),
+      stressUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="stressUnit"]')?.value || model.fallback?.stressUnit),
       qualityFactorE: numericField(rowEl, 'qualityFactorE'),
       weldStrengthReductionW: numericField(rowEl, 'weldStrengthReductionW'),
       coefficientY: numericField(rowEl, 'coefficientY'),
