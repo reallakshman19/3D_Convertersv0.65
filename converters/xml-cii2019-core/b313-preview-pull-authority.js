@@ -5,6 +5,7 @@
  */
 const txt = (value) => value === undefined || value === null ? '' : String(value).trim();
 const finitePositive = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+const isPipeNode = (node) => /^(?:PIPE|PIPELINE)$/i.test(txt(node?.componentType));
 
 export function b313PreviewInputSignature(row = {}, config = {}) {
   const basis = config?.b313WallUpdate || {};
@@ -44,7 +45,7 @@ export function b313ReadAcceptedWall(config = {}, branchRow = {}, branchOccurren
   const record = config?.b313WallUpdate?.acceptedWallByBranch?.[String(branchOccurrenceIndex)];
   if (!record || !finitePositive(record.nominalWallMm)) return null;
   if (record.inputSignature !== b313PreviewInputSignature(branchRow, config)) return null;
-  const actual = (nodeRows || []).filter((n) => Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex));
+  const actual = (nodeRows || []).filter((n) => Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex) && isPipeNode(n));
   if (!actual.length || !Array.isArray(record.nodeScope) || actual.length !== record.nodeScope.length) return null;
   for (let i = 0; i < actual.length; i += 1) {
     if (JSON.stringify(b313PreviewNodeSignature(actual[i])) !== JSON.stringify(record.nodeScope[i])) return null;
@@ -55,7 +56,7 @@ export function b313ReadAcceptedWall(config = {}, branchRow = {}, branchOccurren
 /**
  * Validate a saved calculation proposal against the exact current Step 4
  * snapshot and promote it only after the caller obtains explicit confirmation.
- * This does not modify class/DN-wide legacy overrides or global Fill-Down. The physical scope is the complete, unambiguous Preview branch node group.
+ * This does not modify class/DN-wide legacy overrides or global Fill-Down. The physical scope is the complete, unambiguous PIPE node group for the selected branch.
  */
 export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIndex, nodeRows = []) {
   const basis = config?.b313WallUpdate || {};
@@ -66,7 +67,7 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
     return { ok: false, code: 'B313_PULL_STALE_PREVIEW' };
   }
   const actual = (nodeRows || []).filter((n) =>
-    Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex));
+    Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex) && isPipeNode(n));
   if (!actual.length || actual.length !== proposal.nodeScope?.length) {
     return { ok: false, code: 'B313_PULL_SCOPE_CHANGED' };
   }
