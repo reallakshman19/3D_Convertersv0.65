@@ -292,7 +292,7 @@ export function resolvePreviewB313FactorBasis({
   if (!materialIdentity?.ok || !materialIdentity?.material?.materialId) {
     return failure('B313_PREVIEW_MATERIAL_IDENTITY_REQUIRED', 'A resolved B31.3 material identity is required before design factors can be selected.', { materialIdentity });
   }
-  const temperature = Number(designTemperatureC);
+  const temperature = text(designTemperatureC) === '' ? NaN : Number(designTemperatureC);
   if (!Number.isFinite(temperature)) {
     return failure('B313_PREVIEW_T1_REQUIRED', 'Preview T1 must be a finite design temperature in °C.');
   }
@@ -382,6 +382,10 @@ export function calculateAndSelectPreviewB313Wall({
   weldStrengthReductionW,
   coefficientY,
   dimensionStandard,
+  negativeMillTolerance = { basis: 'percent', value: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT },
+  mechanicalAllowanceMm = 0,
+  erosionAllowanceMm = 0,
+  otherAllowanceMm = 0,
   edition = '2024',
 } = {}) {
   const normalizedDn = positive(dn);
@@ -415,10 +419,10 @@ export function calculateAndSelectPreviewB313Wall({
       weldStrengthReductionW: normalizedW,
       coefficientY: normalizedY,
       corrosionAllowance: normalizedCorrosion,
-      negativeMillTolerance: {
-        basis: 'percent',
-        value: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
-      },
+      mechanicalAllowance: mechanicalAllowanceMm,
+      erosionAllowance: erosionAllowanceMm,
+      otherAllowance: otherAllowanceMm,
+      negativeMillTolerance,
     },
     inputUnits: {
       designPressure: String(pressureUnit),
@@ -456,7 +460,8 @@ export function calculateAndSelectPreviewB313Wall({
     designPressure: normalizedPressure,
     pressureUnit: String(pressureUnit),
     corrosionAllowanceMm: normalizedCorrosion,
-    negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
+    negativeMillTolerance: calculation.manufacturingTolerance,
+    negativeMillTolerancePct: calculation.manufacturingTolerance?.basis === 'percent' ? calculation.manufacturingTolerance.percent : null,
     dimensionStandard: selection.selected.dimensionStandard,
     calculation,
     engineeringCalculation: {
