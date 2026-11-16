@@ -473,6 +473,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
   let updated = 0;
 
   branchRows.forEach((row, rowIndex) => {
+    // A previous proposal must never remain pullable after this row fails revalidation.
+    delete basisConfig.proposalsByBranch[String(rowIndex)];
     const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
     if (!materialIdentity.ok) {
       results.push(failureRow(row, materialIdentity.code, materialIdentity.message || 'Preview Material could not be linked to B31.3 Material Factors.', { materialIdentity }));
@@ -514,7 +516,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, 'B313_PREVIEW_DIMENSION_STANDARD_UNRESOLVED', 'Pipe dimension standard could not be resolved. Set it explicitly in the B31.3 design basis.', { materialIdentity, factorBasis }));
       return;
     }
-    const scopedNodes = previewNodeRows.filter((n) => Number(n.branchOccurrenceIndex) === rowIndex);
+    const scopedNodes = previewNodeRows.filter((n) => Number(n.branchOccurrenceIndex) === rowIndex
+      && /^(?:PIPE|PIPELINE)$/i.test(text(n.componentType)));
     const outsideDiameters = [...new Set(scopedNodes.map((n) => positive(n.outsideDiameterMm)).filter(Boolean))];
     const referenceOd = masterOutsideDiameterMm(row?.sizeMm ?? row?.boreMm, dimensionBasis.standard);
     const selectedOd = outsideDiameters.length === 1 ? outsideDiameters[0] : null;
