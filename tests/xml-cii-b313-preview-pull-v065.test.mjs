@@ -20,7 +20,7 @@ const node = {
   boreMm: 150, outsideDiameterMm: 168.3,
 };
 const other = { ...node, branchOccurrenceIndex: 1, nodeNumber: '200', componentRefNo: 'REF02' };
-const nonPipe = { ...node, nodeOrdinal: 1, nodeNumber: '101', componentType: 'ELBO', componentRefNo: 'EL01' };
+const nonPipe = { ...node, nodeOrdinal: 1, nodeNumber: '101', componentType: 'ELBO', componentRefNo: 'EL01', outsideDiameterMm: 0 };
 const config = {
   b313WallUpdate: {
     millTolerance: { basis: 'percent', value: 12.5 },
@@ -40,7 +40,7 @@ config.b313WallUpdate.proposalsByBranch['0'] = {
   result: { selectedNominalWallMm: 8.18 },
 };
 assert.equal(b313PullProposal(config, src, 0, [node, other, nonPipe]).ok, true,
-  'Fittings must not be included in the accepted pipe scope');
+  'Zero-OD nodes must not be included in the accepted wall scope');
 assert.equal(b313PullProposal(config, { ...src, p1: '14' }, 0, [node]).code, 'B313_PULL_STALE_PREVIEW');
 assert.equal(b313PullProposal(config, src, 0, [{ ...node, outsideDiameterMm: 180 }]).code, 'B313_PULL_SCOPE_CHANGED');
 assert.equal(b313PullProposal(config, src, 1, [node, other]).code, 'B313_PULL_PROPOSAL_REQUIRED');
