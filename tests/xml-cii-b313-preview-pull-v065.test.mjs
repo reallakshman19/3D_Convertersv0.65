@@ -20,6 +20,7 @@ const node = {
   boreMm: 150, outsideDiameterMm: 168.3,
 };
 const other = { ...node, branchOccurrenceIndex: 1, nodeNumber: '200', componentRefNo: 'REF02' };
+const nonPipe = { ...node, nodeOrdinal: 1, nodeNumber: '101', componentType: 'ELBO', componentRefNo: 'EL01' };
 const config = {
   b313WallUpdate: {
     millTolerance: { basis: 'percent', value: 12.5 },
@@ -38,14 +39,20 @@ config.b313WallUpdate.proposalsByBranch['0'] = {
   materialFallbackApplied: false,
   result: { selectedNominalWallMm: 8.18 },
 };
-assert.equal(b313PullProposal(config, src, 0, [node, other]).ok, true);
+assert.equal(b313PullProposal(config, src, 0, [node, other, nonPipe]).ok, true,
+  'Fittings must not be included in the accepted pipe scope');
 assert.equal(b313PullProposal(config, { ...src, p1: '14' }, 0, [node]).code, 'B313_PULL_STALE_PREVIEW');
 assert.equal(b313PullProposal(config, src, 0, [{ ...node, outsideDiameterMm: 180 }]).code, 'B313_PULL_SCOPE_CHANGED');
 assert.equal(b313PullProposal(config, src, 1, [node, other]).code, 'B313_PULL_PROPOSAL_REQUIRED');
 const accepted = b313PullProposal(config, src, 0, [node]);
 config.b313WallUpdate.acceptedWallByBranch = { '0': accepted.record };
-assert.equal(b313ReadAcceptedWall(config, src, 0, [node])?.nominalWallMm, 8.18);
+assert.equal(b313ReadAcceptedWall(config, src, 0, [node, nonPipe])?.nominalWallMm, 8.18);
+assert.equal(b313PullProposal(config, { ...src, wallThickness: '10.97' }, 0, [node, nonPipe]).code,
+  'B313_PULL_WALL_REDUCTION_REVIEW_REQUIRED');
+assert.equal(b313PullProposal(config, { ...src, p1Unit: 'KPA' }, 0, [node]).code,
+  'B313_PULL_STALE_PREVIEW');
 assert.equal(b313ReadAcceptedWall(config, { ...src, t1: '140' }, 0, [node]), null);
+assert.equal(b313ReadAcceptedWall(config, { ...src, p1Unit: 'KPA' }, 0, [node]), null);
 assert.equal(b313ReadAcceptedWall(config, src, 0, [{ ...node, outsideDiameterMm: 170 }]), null);
 
 const proposal = config.b313WallUpdate.proposalsByBranch['0'];
