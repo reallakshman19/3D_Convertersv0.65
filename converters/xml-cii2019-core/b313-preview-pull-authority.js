@@ -44,7 +44,7 @@ export function b313ReadAcceptedWall(config = {}, branchRow = {}, branchOccurren
   const record = config?.b313WallUpdate?.acceptedWallByBranch?.[String(branchOccurrenceIndex)];
   if (!record || !finitePositive(record.nominalWallMm)) return null;
   if (record.inputSignature !== b313PreviewInputSignature(branchRow, config)) return null;
-  const actual = (nodeRows || []).filter((n) => Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex) && /^PIPE(?:LINE)?$/i.test(txt(n.componentType)));
+  const actual = (nodeRows || []).filter((n) => Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex));
   if (!actual.length || !Array.isArray(record.nodeScope) || actual.length !== record.nodeScope.length) return null;
   for (let i = 0; i < actual.length; i += 1) {
     if (JSON.stringify(b313PreviewNodeSignature(actual[i])) !== JSON.stringify(record.nodeScope[i])) return null;
@@ -55,7 +55,7 @@ export function b313ReadAcceptedWall(config = {}, branchRow = {}, branchOccurren
 /**
  * Validate a saved calculation proposal against the exact current Step 4
  * snapshot and promote it only after the caller obtains explicit confirmation.
- * This does not modify class/DN-wide legacy overrides or global Fill-Down.
+ * This does not modify class/DN-wide legacy overrides or global Fill-Down. The physical scope is the complete, unambiguous Preview branch node group.
  */
 export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIndex, nodeRows = []) {
   const basis = config?.b313WallUpdate || {};
@@ -66,8 +66,7 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
     return { ok: false, code: 'B313_PULL_STALE_PREVIEW' };
   }
   const actual = (nodeRows || []).filter((n) =>
-    Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex)
-    && /^PIPE(?:LINE)?$/i.test(txt(n.componentType)));
+    Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex));
   if (!actual.length || actual.length !== proposal.nodeScope?.length) {
     return { ok: false, code: 'B313_PULL_SCOPE_CHANGED' };
   }
