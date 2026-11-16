@@ -3,11 +3,11 @@ import {
   calculateAndSelectPreviewB313Wall,
   resolvePreviewB313FactorBasis,
   resolvePreviewB313MaterialIdentity,
-} from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20260928-issue776-authority-1';
+} from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20261116-b313-pull-v065';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { listPipeWallsForSize } from '../../../converters/pipe-wall-master/index.js';
 import { markAdaptedPreviewOverrideManual } from './xml-cii-adapted-preview-filldown.js';
-import { _xmlCiiFindLineListRow } from './xml-cii-adapted-preview-dryrun-core.js?v=20261001-weight-output-2';
+import { _xmlCiiFindLineListRow } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 export const B313_PREVIEW_ACTION_LABEL = 'Update wall thickness as per B31.3 Sec II';
