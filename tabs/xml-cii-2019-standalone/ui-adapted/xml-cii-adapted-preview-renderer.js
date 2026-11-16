@@ -436,11 +436,12 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         return;
       }
       const prior = _toText(row.wallThickness || 'not specified');
-      if (!window.confirm(`Pull calculated B31.3 wall for ${row.branchName}?\nCurrent: ${prior} mm\nSelected: ${prepared.record.nominalWallMm} mm\nSchedule: ${prepared.record.selectedSchedule || 'unreported'}\nThis updates qualifying pipe nodes only and is not Fill Down.`)) return;
+      if (!window.confirm(`Pull calculated B31.3 wall for ${row.branchName}?\nCurrent: ${prior} mm\nSelected: ${prepared.record.nominalWallMm} mm\nSchedule: ${prepared.record.selectedSchedule || 'unreported'}\nThis updates the validated same-OD branch node group, not Fill Down.`)) return;
+      const basis = config.b313WallUpdate || (config.b313WallUpdate = {});
+      basis.acceptedWallByBranch ||= {};
+      const before = basis.acceptedWallByBranch[String(rowIndex)];
       button.disabled = true;
       try {
-        const basis = config.b313WallUpdate || (config.b313WallUpdate = {});
-        basis.acceptedWallByBranch ||= {};
         basis.acceptedWallByBranch[String(rowIndex)] = prepared.record;
         await onSaveConfig?.(config);
         await xmlCiiRebuildPreviewThroughWorker(rootEl, xmlText, config, options);
@@ -451,8 +452,11 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         }
         _markPreviewSaved(latest, 'B31.3 wall pulled into Preview pipe occurrences. Native output verification remains required.');
       } catch (err) {
-        _markPreviewSaved(rootEl?.querySelector('#mc-preview-table-host'), `B31.3 Pull was not verified: ${_toText(err?.message || err)}`);
-        throw err;
+        if (before) basis.acceptedWallByBranch[String(rowIndex)] = before;
+        else delete basis.acceptedWallByBranch[String(rowIndex)];
+        try { await onSaveConfig?.(config); } catch { /* Preserve visible failure state. */ }
+        _markPreviewSaved(rootEl?.querySelector('#mc-preview-table-host'), `B31.3 Pull rolled back: ${_toText(err?.message || err)}`);
+        window.alert(`B31.3 Pull was rolled back because Preview verification failed: ${_toText(err?.message || err)}`);
       } finally { button.disabled = false; }
     },
     onWeightCandidateSelect: ({ key, weight }) => {
