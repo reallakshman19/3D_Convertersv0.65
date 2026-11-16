@@ -461,7 +461,43 @@ export function xmlCiiDryRunPreview(xmlText, config, stagedJsonText, runtime = {
     const ratingSource = manualRating ? 'override' : _overrideSource(config.overrides, 'rating', lineKey);
     const pdOverride = (lineKey && config?.overrides?.processData?.[lineKey]) || {};
 
+
+/**
+ * A resolved P1 and its unit travel together in the effective Preview row.
+ * The B31.3 calculator does not re-match the Line List or parse XML.
+ */
+function previewP1Unit(lineRow, p1) {
+  const numbers = (value) => {
+    const raw = String(value ?? '').replace(/,/g, '').trim();
+    if (!raw) return null;
+    const n = Number(raw.match(/[-+]?\\d*\\.?\\d+(?:[Ee][-+]?\\d+)?/)?.[0]);
+    return Number.isFinite(n) ? n : null;
+  };
+  const p = numbers(p1);
+  if (p === null) return { unit: '', source: 'unresolved' };
+  const found = [];
+  for (const row of [lineRow?._raw, lineRow]) {
+    for (const [header, value] of Object.entries(row || {})) {
+      const h = String(header).toUpperCase();
+      if (!/PRESSURE|\\bP1\\b/.test(h)) continue;
+      let unit = '';
+      if (/\\bKPA\\b|KPA\\(/.test(h)) unit = 'KPA';
+      else if (/\\bMPA\\b|MPA\\(/.test(h)) unit = 'MPA';
+      else if (/\\bBARG\\b/.test(h)) unit = 'BARG';
+      else if (/\\bBAR\\b/.test(h)) unit = 'BAR';
+      else if (/\\bPSIG\\b/.test(h)) unit = 'PSIG';
+      else if (/\\bPSI\\b/.test(h)) unit = 'PSI';
+      if (!unit) continue;
+      const v = numbers(value);
+      if (v !== null && Math.abs(v - p) <= Math.max(1, Math.abs(p)) * 1e-9) found.push({ unit, source: `line-list-column:${header}` });
+    }
+  }
+  const distinct = [...new Set(found.map((r) => r.unit))];
+  return distinct.length === 1 ? found[0] : { unit: '', source: distinct.length ? 'conflicting-line-list-units' : 'unresolved' };
+}
+
     const p1 = _xmlCiiProcessValue(pdOverride, lineListMatch, 'p1', ['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'], config);
+    const p1UnitBasis = previewP1Unit(lineListMatch, p1);
     const hydroPressure = _xmlCiiProcessValue(pdOverride, lineListMatch, 'hydroPressure', ['hydroPressure', 'hydro_pressure', 'HydroPressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Test Pressure', 'Pressure2', 'Hydro/Test Pressure'], config);
     const _hydroPressureSrcRaw = _xmlCiiProcessSource(pdOverride, lineListMatch, 'hydroPressure', ['hydroPressure', 'hydro_pressure', 'HydroPressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Test Pressure', 'Pressure2', 'Hydro/Test Pressure'], config);
     const hydroPressureFinal = hydroPressure || '0';
@@ -545,6 +581,8 @@ export function xmlCiiDryRunPreview(xmlText, config, stagedJsonText, runtime = {
       ratingDerived: resolved.rating || _deriveRatingFromPipingClass(resolved.pipingClass, config) || rowRating || '',
       ratingSource,
       p1,
+      p1Unit: p1UnitBasis.unit,
+      p1UnitSource: p1UnitBasis.source,
       hydroPressure: hydroPressureFinal,
       t1,
       t2,
