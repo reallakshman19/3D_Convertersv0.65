@@ -52,7 +52,7 @@ assert(auditController.includes('selectPreviewB313AuditRows'));
 assert(auditController.includes('derivePreviewB313AuditSummary'));
 assert(auditController.includes('renderPreviewB313WallAuditHtml'));
 assert(auditController.includes('event.stopImmediatePropagation()'));
-assert(auditController.includes('BENCHMARK_ONLY factors'));
+assert(auditController.includes('BENCHMARK_ONLY / SCREENING factors'));
 assert(auditController.includes('Audit counters were recomputed from row evidence'));
 
 console.log('XML/CII Preview B31.3 material-factor action and stable audit wiring checks passed.');
