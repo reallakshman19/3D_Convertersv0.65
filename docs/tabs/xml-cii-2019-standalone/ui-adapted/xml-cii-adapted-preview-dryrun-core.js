@@ -470,7 +470,7 @@ function previewP1Unit(lineRow, p1) {
   const numbers = (value) => {
     const raw = String(value ?? '').replace(/,/g, '').trim();
     if (!raw) return null;
-    const n = Number(raw.match(/[-+]?\\d*\\.?\\d+(?:[Ee][-+]?\\d+)?/)?.[0]);
+    const n = Number(raw.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
     return Number.isFinite(n) ? n : null;
   };
   const p = numbers(p1);
@@ -479,14 +479,14 @@ function previewP1Unit(lineRow, p1) {
   for (const row of [lineRow?._raw, lineRow]) {
     for (const [header, value] of Object.entries(row || {})) {
       const h = String(header).toUpperCase();
-      if (!/PRESSURE|\\bP1\\b/.test(h)) continue;
+      if (!/PRESSURE|\bP1\b/.test(h)) continue;
       let unit = '';
-      if (/\\bKPA\\b|KPA\\(/.test(h)) unit = 'KPA';
-      else if (/\\bMPA\\b|MPA\\(/.test(h)) unit = 'MPA';
-      else if (/\\bBARG\\b/.test(h)) unit = 'BARG';
-      else if (/\\bBAR\\b/.test(h)) unit = 'BAR';
-      else if (/\\bPSIG\\b/.test(h)) unit = 'PSIG';
-      else if (/\\bPSI\\b/.test(h)) unit = 'PSI';
+      if (/\bKPA\b|KPA\(/.test(h)) unit = 'KPA';
+      else if (/\bMPA\b|MPA\(/.test(h)) unit = 'MPA';
+      else if (/\bBARG\b/.test(h)) unit = 'BARG';
+      else if (/\bBAR\b/.test(h)) unit = 'BAR';
+      else if (/\bPSIG\b/.test(h)) unit = 'PSIG';
+      else if (/\bPSI\b/.test(h)) unit = 'PSI';
       if (!unit) continue;
       const v = numbers(value);
       if (v !== null && Math.abs(v - p) <= Math.max(1, Math.abs(p)) * 1e-9) found.push({ unit, source: `line-list-column:${header}` });
