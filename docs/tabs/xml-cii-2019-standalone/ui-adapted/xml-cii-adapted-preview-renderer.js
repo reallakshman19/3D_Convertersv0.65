@@ -16,7 +16,7 @@ import {
   _uniqueKeys,
   _hasOwn,
   xmlCiiDryRunPreview
-} from './xml-cii-adapted-preview-dryrun.js?v=20261001-weight-output-2';
+} from './xml-cii-adapted-preview-dryrun.js?v=20261116-b313-pull-v065';
 
 const PV_CACHE_KEY = 'xml-cii-pv-cache-v9-class-insulation';
 const _PV_CACHE_MAX_BYTES = 2500000;
