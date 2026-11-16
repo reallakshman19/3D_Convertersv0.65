@@ -11,6 +11,7 @@ import {
 import { installPreviewB313WallUpdateAuditController } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
 import { installPreviewB313AutoBasisPanel } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
+import { applyStandaloneProcessParity } from '../../tabs/xml-cii-2019-standalone/xml-cii-standalone-run-parity.js';
 
 const done = (result) => {
   globalThis.__B313_LIVE_PREVIEW_RESULT__ = result;
@@ -134,8 +135,28 @@ try {
       'Pull changed a zero-OD component wall');
   }
   assert(pulled.branchRows[targetIndex].wallThicknessSource === 'b313-pulled', 'Accepted wall source not shown in 4 Preview');
+  // Real standalone parity writer must carry the accepted Preview wall into
+  // enriched XML. This verifies the native-engine INPUT, not emitted CII.
+  const parityDiagnostics = [];
+  const nativeInput = await applyStandaloneProcessParity(xmlText, config, '', parityDiagnostics);
+  assert(nativeInput.branchRows[targetIndex]?.b313PullStatus === 'ACCEPTED',
+    'Standalone parity did not accept the same Step 4 Pull authority');
+  const parityDoc = new DOMParser().parseFromString(nativeInput.xmlText, 'application/xml');
+  const originalBranches = [...parityDoc.getElementsByTagName('*')].filter((element) => element.localName === 'Branch');
+  const nativeBranch = originalBranches[targetIndex];
+  assert(nativeBranch, 'Native enriched XML branch occurrence was not preserved');
+  const nativeNodes = [...nativeBranch.children].filter((element) => element.localName === 'Node');
+  for (const scoped of pipeLedger) {
+    const nativeNode = nativeNodes[scoped.nodeOrdinal];
+    assert(nativeNode, 'Accepted node ordinal missing from native enriched XML');
+    const wall = [...nativeNode.children].find((element) => element.localName === 'WallThickness');
+    assert(wall && Number(wall.textContent) === proposedWall,
+      'Accepted Step 4 wall did not propagate to native enriched XML');
+  }
+
   done({ ok: true, syntheticPullAccepted: true, sameOdNodesUpdated: pipeLedger.length,
     zeroOdNodesProtected: branchLedger.length - pipeLedger.length,
+    nativeParityFields: nativeInput.appliedFields, nativeWallNodesVerified: pipeLedger.length,
     branchCount: rows.length, a106Material: a106?.material || '',
     firstLineKey: rows[0]?.lineKey || '', firstT1: rows[0]?.t1 || '',
     autoPanelCount: host.querySelectorAll('[data-mc-b313-auto-basis-panel]').length,
