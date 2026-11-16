@@ -1,13 +1,13 @@
 import {
   resolvePreviewB313FactorBasis,
-} from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20260928-issue776-authority-1';
+} from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20261116-b313-pull-v065';
 import {
   suggestPreviewB313FallbackBasis,
 } from '../../../converters/xml-cii2019-core/b313-preview-fallback-seed.js?v=20260930-issue781-fallback-seed-1';
 import {
   previewB313BasisKey,
   resolvePreviewB313MaterialFromRow,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261001-weight-output-2';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261116-b313-pull-v065';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
