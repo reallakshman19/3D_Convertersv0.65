@@ -31,7 +31,8 @@ assert(ui.includes('B313_PREVIEW_ROW_OD_PARITY_MISMATCH'));
 assert(!ui.includes('P*D /'), 'Preview UI must not duplicate the B31.3 equation.');
 assert(!ui.includes('20000'), 'Preview UI must not hardcode the A106 benchmark allowable stress.');
 
-assert(composer.includes('calculateB313Thickness'));
+assert(composer.includes('calculateEngineering'));
+assert(composer.includes("calculationId: 'PIPE.B313.THICKNESS'"));
 assert(composer.includes('selectPipeWallForCalculation'));
 assert(composer.includes('resolveB313MaterialIdentity'));
 assert(composer.includes('resolveB313DesignFactors'));
