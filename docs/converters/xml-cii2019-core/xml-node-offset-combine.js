@@ -1,0 +1,144 @@
+import { captureModeBSourceConfig } from './mode-b-source-config.js?v=20261113-x5a-2';
+import { captureModeBSourceRestraints, assertModeBRestraintsConserved, assertModeBRunXmlRestraintsPreserved, modeBRestraintRefusal } from './mode-b-restraint-conservation.js?v=20261113-x4-1';
+
+const name = (node) => String(node?.localName || node?.nodeName || '').replace(/^.*:/, '');
+const text = (node) => String(node?.textContent || '').trim();
+const children = (node) => [...(node?.childNodes || [])].filter((child) => child.nodeType === 1);
+
+function engineeringHeader(root) {
+  const keys = new Set(['Units', 'RestrainOpenEnds', 'AmbientTemperature']);
+  return children(root).filter((child) => keys.has(name(child))).map((child) => [name(child),
+    children(child).length ? children(child).map((field) => [name(field), text(field)]).sort() : text(child),
+  ]).sort();
+}
+
+function parseSource(source) {
+  const document = new DOMParser().parseFromString(String(source.xmlText || ''), 'application/xml');
+  if (document.getElementsByTagName('parsererror').length) throw new Error(`${source.fileName}: invalid XML.`);
+  const root = document.documentElement;
+  if (name(root) !== 'PipeStressExport') throw new Error(`${source.fileName}: Mode B requires PSI116 PipeStressExport XML.`);
+  const pipes = children(root).filter((child) => name(child) === 'Pipe');
+  if (!pipes.length) throw new Error(`${source.fileName}: no Pipe content to combine.`);
+  const numbers = [...root.getElementsByTagName('*')].filter((node) => name(node) === 'NodeNumber');
+  const positive = new Set();
+  for (const node of numbers) {
+    if (!/^-?\d+$/.test(text(node)) || !Number.isSafeInteger(Number(text(node)))) throw new Error(`${source.fileName}: invalid NodeNumber ${text(node)}.`);
+    if (Number(text(node)) > 0) positive.add(Number(text(node)));
+  }
+  for (const node of [...root.getElementsByTagName('*')]) {
+    if (name(node) !== 'NodeNumber' && /(?:node.*(?:number|id)|(?:from|to)node)$/i.test(name(node)) && text(node)) {
+      throw new Error(`${source.fileName}: unsupported node reference field ${name(node)}; offset cannot be applied safely.`);
+    }
+  }
+  return { source, document, root, pipes, positive, header: engineeringHeader(root) };
+}
+
+function planOffset(parsed, step, previousMaximum, index) {
+  const offset = index === 0 ? 0 : Math.ceil(previousMaximum / step) * step;
+  const values = [...parsed.positive];
+  const maximum = values.reduce((max, number) => Math.max(max, number), 0);
+  if (!Number.isSafeInteger(offset + maximum)) throw new Error('Node offsets exceed safe integer range.');
+  return { offset, outputMaximum: offset + maximum };
+}
+
+// File order is explicit input authority. Repeated positive IDs inside one
+// source remain shared; separate sources receive disjoint ID namespaces.
+export function combineXmlWithNodeOffsets(sources, { offsetStep = 100000 } = {}) {
+  if (typeof DOMParser === 'undefined' || typeof XMLSerializer === 'undefined') throw new Error('Native XML DOM is required.');
+  if (!Array.isArray(sources) || sources.length < 2) throw new Error('Mode B needs at least two enabled XML sources.');
+  const step = Number(offsetStep);
+  if (!Number.isSafeInteger(step) || step <= 0) throw new Error('Node offset step must be a positive integer.');
+  const parsed = sources.map(parseSource);
+  requireCompatibleHeaders(parsed);
+  const output = new DOMParser().parseFromString(String(sources[0].xmlText), 'application/xml');
+  const root = output.documentElement;
+  for (const pipe of children(root).filter((child) => name(child) === 'Pipe')) root.removeChild(pipe);
+  let previousMaximum = 0;
+  const records = [];
+  for (const [index, entry] of parsed.entries()) {
+    const plan = planOffset(entry, step, previousMaximum, index);
+    const numberMap = [...entry.positive].sort((a, b) => a - b).map((sourceNumber) => ({ sourceNumber, outputNumber: sourceNumber + plan.offset }));
+    for (const pipe of entry.pipes) {
+      const clone = output.importNode(pipe, true);
+      for (const node of [...clone.getElementsByTagName('*')].filter((node) => name(node) === 'NodeNumber')) {
+        if (Number(text(node)) > 0) node.textContent = String(Number(text(node)) + plan.offset);
+      }
+      root.appendChild(clone);
+    }
+    previousMaximum = Math.max(previousMaximum, plan.outputMaximum);
+    records.push({ sourceId: entry.source.sourceId || '', fileName: entry.source.fileName,
+      basis: entry.source.basis || 'source', offset: plan.offset, positiveIdCount: entry.positive.size,
+      pipeCount: entry.pipes.length, numberMap, restraintInventory: captureModeBSourceRestraints(entry.root),
+      sourceConfig: captureModeBSourceConfig(entry.source.supportConfigJson, entry.source.fileName) });
+  }
+  const result = { xmlText: new XMLSerializer().serializeToString(output),
+    manifest: { restraintInventoryVersion: 2, sourceConfigVersion: 1, schema: 'xml-node-offset-combine/v1', offsetStep: step, headerSource: sources[0].fileName,
+      sourceCount: records.length, sourceOrder: records, automaticCrossSourceJoins: 0 } };
+  assertModeBRestraintsConserved(result.xmlText, result.manifest);
+  return result;
+}
+
+// The support-config block the converter reads to keep Mode B sources apart:
+// each source owns the output node numbers it was given, and the island join
+// never connects two sources (RCA-03). Ids are made unique by file position.
+export function modeBSupportConfigBlock(manifest) {
+  if (manifest?.schema !== 'xml-node-offset-combine/v1' || !Array.isArray(manifest.sourceOrder)) {
+    throw new Error('MODE_B_MANIFEST_REQUIRED: a node-offset manifest is required.');
+  }
+  const sources = manifest.sourceOrder.map((row, index) => {
+    const numbers = (row.numberMap || []).map((entry) => Number(entry.outputNumber));
+    if (!numbers.length) return null;
+    if (!numbers.every(Number.isSafeInteger)) throw new Error(`${row.fileName}: invalid node map.`);
+    return { sourceId: `${index + 1}:${row.sourceId || row.fileName}`, fileName: row.fileName,
+      offset: row.offset, minNode: Math.min(...numbers), maxNode: Math.max(...numbers) };
+  }).filter(Boolean);
+  return { schema: 'xml-cii-mode-b-sources/v1', offsetStep: manifest.offsetStep, sources };
+}
+
+// Each source's own staged JSON, with the same ids and node ranges as
+// modeBSupportConfigBlock, so the Run can close restraints per source (RCA-01).
+// stagedTexts follows manifest.sourceOrder.
+export function modeBStagedSourcesFromManifest(manifest, stagedTexts = []) {
+  const block = modeBSupportConfigBlock(manifest);
+  return manifest.sourceOrder.map((row, index) => {
+    const range = block.sources.find((entry) => entry.sourceId === `${index + 1}:${row.sourceId || row.fileName}`);
+    return range ? { sourceId: range.sourceId, fileName: row.fileName, minNode: range.minNode,
+      maxNode: range.maxNode, stagedJsonText: String(stagedTexts[index] || '') } : null;
+  }).filter(Boolean);
+}
+
+function requireCompatibleHeaders(parsed) {
+  const header = JSON.stringify(parsed[0].header);
+  for (const entry of parsed) {
+    if (entry.root.namespaceURI !== parsed[0].root.namespaceURI || JSON.stringify(entry.header) !== header) {
+      throw new Error(`${entry.source.fileName}: XML namespace, units or root engineering settings differ from the first source.`);
+    }
+  }
+}
+
+// The Run receives the same manifest held in Single state. A configured Mode B
+// run without that independently captured baseline cannot release output.
+export function assertModeBRunRestraints(job, xmlText, stage, options) {
+  const block = JSON.parse(job.supportConfigJson || '{}')?.modeB;
+  const manifest = job.modeBManifest;
+  if (!block && !manifest) return;
+  if (!block || !manifest) throw modeBRestraintRefusal('Mode B Run lacks its source manifest or source config; combine again.');
+  let expected;
+  try { expected = modeBSupportConfigBlock(manifest); }
+  catch (error) { throw modeBRestraintRefusal(`invalid source manifest: ${error.message}`); }
+  if (block.schema !== expected.schema || block.offsetStep !== expected.offsetStep
+      || !Array.isArray(block.sources) || block.sources.length !== expected.sources.length
+      || expected.sources.some((row, i) => Object.keys(row).some((key) => row[key] !== block.sources[i]?.[key]))) {
+    throw modeBRestraintRefusal('Mode B Run source config does not match the node-offset manifest.');
+  }
+  assertModeBRestraintsConserved(xmlText, manifest, stage, options);
+}
+
+export function assertModeBRunResult(job, result, engineInputXml = job.sourceText) {
+  if (!result?.ok || (!job.modeBManifest && !JSON.parse(job.supportConfigJson || '{}')?.modeB)) return;
+  // CII-only runs do not emit XML. Verify the exact combined XML supplied
+  // to the converter; this is not a CII record-level validation.
+  const after = result.enrichedText || (job.options?.outputMode === 'cii-only' ? engineInputXml : '');
+  assertModeBRunRestraints(job, after, 'Run combined XML result', { allowAdditions: true });
+  assertModeBRunXmlRestraintsPreserved(engineInputXml, after, job.modeBManifest);
+}

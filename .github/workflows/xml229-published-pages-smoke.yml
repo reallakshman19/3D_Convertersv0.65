@@ -1,0 +1,106 @@
+name: XML229 Published Pages Full Browser Smoke
+on:
+  workflow_run:
+    workflows: ["Deploy app to GitHub Pages"]
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  inspect-published-source:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Verify publisher recorded exact commit and public fixture
+        shell: bash
+        env:
+          PUBLIC_APP: https://reallakshman19.github.io/3D_Converters
+          SOURCE_HEAD: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          curl --fail --location --retry 7 --retry-delay 5 --retry-all-errors "$PUBLIC_APP/index.html?source=$SOURCE_HEAD" -o /tmp/xml229-public-index.html
+          grep -q '<title>3D converters</title>' /tmp/xml229-public-index.html
+          curl --fail --location --retry 7 --retry-delay 5 --retry-all-errors "$PUBLIC_APP/tests/fixtures/xml229/BC4.LineList.json?source=$SOURCE_HEAD" -o /tmp/xml229-pages-bc4.json
+          curl --fail --location --retry 7 --retry-delay 5 --retry-all-errors "$PUBLIC_APP/tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-p4-verified-weight-panel.js?source=$SOURCE_HEAD" -o /tmp/xml229-pages-weight-panel.js
+          curl --fail --location --retry 7 --retry-delay 5 --retry-all-errors "$PUBLIC_APP/tabs/xml-cii-2019-standalone/ui-adapted/xml229-owner-basis-custody-export.mjs?source=$SOURCE_HEAD" -o /tmp/xml229-pages-custody.mjs
+          curl --fail --location --retry 7 --retry-delay 5 --retry-all-errors "$PUBLIC_APP/tabs/xml-cii-2019-standalone/ui-adapted/xml229-p4-source-wide-suggestion-action.mjs?source=$SOURCE_HEAD" -o /tmp/xml229-pages-suggestion-action.mjs
+          curl --fail --location --retry 7 --retry-delay 5 --retry-all-errors "$PUBLIC_APP/tabs/xml-cii-2019-standalone/ui-adapted/xml229-p4-skip-weight-drafts.mjs?source=$SOURCE_HEAD" -o /tmp/xml229-pages-skip-planner.mjs
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          fixture=Path('/tmp/xml229-pages-bc4.json').read_bytes()
+          assert hashlib.sha256(fixture).hexdigest()=='53b322405795dc7a74c1154043c31bf9c8b2a1763f207cabf0c7f1888fd9c1bb'
+          o=json.loads(fixture)
+          assert o['rowCount']==len(o['rows'])==385
+          assert not o['engineeringApproval'] and not o['nativeCiiReleaseAuthorized']
+          # Verify the actually deployed bytes against the exact successful
+          # deployment commit, not only a marker that may move in a refactor.
+          # The deploy workflow uploads the repository root (path: .).
+          asset_root=Path('tabs/xml-cii-2019-standalone/ui-adapted')
+          names={
+              'weight-panel':'xml-cii-adapted-p4-verified-weight-panel.js',
+              'custody':'xml229-owner-basis-custody-export.mjs',
+              'suggestion-action':'xml229-p4-source-wide-suggestion-action.mjs',
+              'skip-planner':'xml229-p4-skip-weight-drafts.mjs',
+          }
+          downloads={
+              'weight-panel':'/tmp/xml229-pages-weight-panel.js',
+              'custody':'/tmp/xml229-pages-custody.mjs',
+              'suggestion-action':'/tmp/xml229-pages-suggestion-action.mjs',
+              'skip-planner':'/tmp/xml229-pages-skip-planner.mjs',
+          }
+          for kind,name in names.items():
+              deployed=Path(downloads[kind]).read_bytes()
+              expected=(asset_root/name).read_bytes()
+              assert deployed==expected, (
+                  f'Published Pages asset differs from deployed source commit: {name}; '
+                  f'published_sha256={hashlib.sha256(deployed).hexdigest()} '
+                  f'expected_sha256={hashlib.sha256(expected).hexdigest()}'
+              )
+          panel=Path(downloads['weight-panel']).read_text()
+          action=Path(downloads['suggestion-action']).read_text()
+          planner=Path(downloads['skip-planner']).read_text()
+          custody=Path(downloads['custody']).read_text()
+          assert 'applyXml229BlankWeightDrafts' in panel
+          assert './xml229-p4-source-wide-suggestion-action.mjs' in panel
+          assert 'planXml229SkipWeightDrafts(' in action
+          assert './xml229-p4-skip-weight-drafts.mjs' in action
+          assert 'export async function planXml229SkipWeightDrafts(' in planner
+          assert 'OwnerLocalEffectiveBasisCustody' in custody
+          print('PUBLIC_PAGES_EXACT_HEAD_BC4_AND_WEIGHT_IMPORT_CHAIN_PASS')
+          PY
+  published-bc4-real-browser:
+    needs: inspect-published-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium for the actual deployed Pages site
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.52.0
+          npx playwright install --with-deps chromium
+      - name: Public 41-branch original XML/JSON + BC4 real deployed browser and safe CII paths
+        env:
+          EXACT_HEAD: ${{ github.event.workflow_run.head_sha }}
+          XML229_E2E_LINELIST_VARIANT: bc4-json
+          XML229_E2E_BASE_URL: https://reallakshman19.github.io/3D_Converters/index.html
+        run: node scripts/xml229-ef05-native-output-e2e.mjs
+      - name: Publish only aggregate-safe syntax and E2E receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xml229-published-github-pages-41-branch-bc4-e2e
+          path: |
+            ValidationRecords/xml229-ef05-native-output-e2e-bc4.json
+            ValidationRecords/xml229-ef05-browser-downloaded-cii-syntax-bc4.json
+          if-no-files-found: warn
+          retention-days: 21
