@@ -39,7 +39,7 @@ function temperatureText(row) {
 function storedBasisForRow(config, row, materialId, t1) {
   const bases = config?.b313WallUpdate?.bases;
   if (!bases || typeof bases !== 'object' || Array.isArray(bases)) return {};
-  const key = previewB313BasisKey(row);
+  const key = previewB313BasisKey(row, config);
   if (key && bases[key] && typeof bases[key] === 'object') return bases[key];
   return Object.values(bases).find((basis) => (
     basis
@@ -128,8 +128,8 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const material = text(row?.material || row?.materialName || row?.resolvedMaterial || row?.materialCode || '');
   const materialSource = text(row?.materialSource || '');
   const t1 = temperatureText(row);
-  const materialIdentity = resolvePreviewB313MaterialFromRow(row);
-  const basisKey = previewB313BasisKey(row);
+  const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
+  const basisKey = previewB313BasisKey(row, config);
 
   if (!materialIdentity?.ok) {
     return {
@@ -236,6 +236,8 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     routeSource,
     factorBasis,
     fallback,
+    storedBasis,
+    materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
     tableContext: {
       materialId,
       temperatureC: Number.isFinite(Number(t1)) ? Number(t1) : undefined,
@@ -280,8 +282,7 @@ function infoButton(model, factor) {
 }
 
 function fallbackInputCell(model, factor, field, options = {}) {
-  const fallback = model.fallback;
-  if (!fallback?.ok) return '<span style="color:#64748b;">—</span>';
+  const fallback = model.fallback?.ok ? model.fallback : (model.storedBasis || {});
   const value = fallback[field] ?? '';
   const min = options.min ?? '';
   const max = options.max ?? '';
@@ -290,12 +291,13 @@ function fallbackInputCell(model, factor, field, options = {}) {
 }
 
 function stressUnitCell(model) {
-  if (!model.fallback?.ok) return '<span style="color:#64748b;">—</span>';
-  const current = text(model.fallback.stressUnit || 'MPa').toUpperCase();
+  const current = text(model.fallback?.stressUnit || model.storedBasis?.stressUnit || 'MPa').toUpperCase();
   return `<select data-b313-auto-field="stressUnit" style="background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${['MPa','ksi','psi'].map((unit) => `<option value="${unit}" ${current === unit.toUpperCase() ? 'selected' : ''}>${unit}</option>`).join('')}</select>`;
 }
 
-function panelHtml(models) {
+function panelHtml(models, config = {}) {
+  const tolerance = config?.b313WallUpdate?.millTolerance || { basis: 'percent', value: 12.5 };
+  const csFallback = config?.b313WallUpdate?.materialFallback?.enabled !== false;
   const rowsHtml = models.map((model) => {
     const source = model.materialSource ? `source ${esc(model.materialSource)}` : 'source unknown';
     const t1 = model.t1 ? `${esc(model.t1)} °C` : 'unresolved';
@@ -305,7 +307,7 @@ function panelHtml(models) {
     const seedHint = model.fallback?.ok && model.statusCode !== 'CONTROLLED_FALLBACK_READY'
       ? `<div style="font-size:9px;color:#fbbf24;margin-top:2px;">Seed ${esc(model.fallback.seedTemperatureC)} °C · ${esc(model.fallback.selectionDirection || '')} · no interpolation</div>`
       : '';
-    const refreshDisabled = model.fallback?.ok ? '' : 'disabled';
+    const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1}</div></td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${seedHint}</td>
@@ -315,6 +317,13 @@ function panelHtml(models) {
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'E', 'qualityFactorE', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'W', 'weldStrengthReductionW', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'Y', 'coefficientY', { min: 0, max: 1 })}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:260px;">
+        <div style="display:flex;gap:4px;"><select data-b313-auto-field="pressureUnit" aria-label="Design pressure unit"><option value="AUTO">P unit AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.pressureUnit)===u?'selected':''}>${u}</option>`).join('')}</select>
+        <select data-b313-auto-field="dimensionStandard" aria-label="Pipe dimension standard"><option value="AUTO">Dimension AUTO</option>${['ASME B36.10M','ASME B36.19M'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.dimensionStandard)===u?'selected':''}>${u}</option>`).join('')}</select></div>
+        <input type="text" data-b313-auto-source-reference placeholder="Qualified source reference (required)" value="${esc(model.storedBasis?.sourceReference || '')}" style="margin-top:4px;width:98%;">
+        <label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-design-approved ${model.storedBasis?.designApproved === true ? 'checked' : ''}> Qualified manual basis reviewed</label>
+        ${model.materialFallbackApplied ? `<label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-cs-reviewed ${model.storedBasis?.csFallbackReviewed === true ? 'checked' : ''}> Confirm CS fallback applies</label>` : ''}
+      </td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;text-align:center;vertical-align:middle;white-space:nowrap;"><button type="button" data-b313-auto-refresh ${refreshDisabled} aria-label="Accept current fallback and recalculate" title="Accept current fallback values and recalculate B31.3 wall" style="width:24px;height:24px;padding:0;border:1px solid #64748b;border-radius:4px;background:#111827;color:#fbbf24;cursor:pointer;font-size:16px;line-height:22px;">↻</button> <button type="button" data-b313-auto-open-material ${iconDisabled} aria-label="Open B31.3 Material Factors table" title="Open B31.3 Material Factors table" style="width:24px;height:24px;padding:0;border:1px solid #64748b;border-radius:4px;background:#111827;color:#e2e8f0;cursor:pointer;font-size:14px;line-height:22px;">▦</button></td>
     </tr>`;
   }).join('');
@@ -322,7 +331,13 @@ function panelHtml(models) {
   return `<div data-mc-b313-auto-basis-panel style="margin:8px 0;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;padding:8px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>B31.3 automatic basis</strong><span style="font-size:10px;color:#94a3b8;">${models.length} material-temperature group${models.length === 1 ? '' : 's'}</span></div>
     <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path remains strict VERIFIED / PROJECT_APPROVED factors at Preview T1. When exact strict factors are unavailable, S/E/W/Y below are a non-interpolated controlled fallback seed from one common active-master temperature. Values do not become calculation input until ↻ is clicked. A106 carbon steel defaults to SEAMLESS.</div>
-    <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1180px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
+      <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
+      <input type="number" step="any" min="0" data-b313-mill-value value="${esc(tolerance.value ?? 12.5)}" style="width:80px;">
+      <label><input type="checkbox" data-b313-cs-fallback ${csFallback?'checked':''}> Use CS fallback for unknown material</label>
+      <small>Changed tolerance requires recalculation; qualified factors are still mandatory.</small>
+    </div>
+    <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th>Basis / source / review</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
   </div>`;
 }
 
@@ -384,9 +399,10 @@ function bindRefresh(panel, host, config, models, options) {
     const rowEl = button.closest('[data-b313-auto-key]');
     const key = text(rowEl?.dataset?.b313AutoKey);
     const model = byKey.get(key);
-    if (!model?.fallback?.ok || !key) return;
+    if (!model?.tableContext?.materialId || !key) return;
 
     const record = {
+      ...(ensureBasisBucket(config)[key] || {}),
       material: model.material,
       materialId: model.materialId,
       designTemperature: model.t1,
@@ -396,12 +412,16 @@ function bindRefresh(panel, host, config, models, options) {
       qualityFactorE: numericField(rowEl, 'qualityFactorE'),
       weldStrengthReductionW: numericField(rowEl, 'weldStrengthReductionW'),
       coefficientY: numericField(rowEl, 'coefficientY'),
-      fallbackSeedTemperatureC: model.fallback.seedTemperatureC,
-      fallbackSeedEvidence: model.fallback.factorSources || {},
-      sourceReference: `USER_ACCEPTED_PREVIEW_FALLBACK | ${text(model.fallback.sourceReference || `B313_ACTIVE_MASTER_CANDIDATE_SEED | ${model.materialId}`)}`,
+      fallbackSeedTemperatureC: model.fallback?.seedTemperatureC ?? null,
+      fallbackSeedEvidence: model.fallback?.factorSources || {},
+      sourceReference: text(rowEl?.querySelector?.('[data-b313-auto-source-reference]')?.value),
+      designApproved: rowEl?.querySelector?.('[data-b313-auto-design-approved]')?.checked === true,
+      csFallbackReviewed: rowEl?.querySelector?.('[data-b313-auto-cs-reviewed]')?.checked === true,
+      pressureUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="pressureUnit"]')?.value || 'AUTO'),
+      dimensionStandard: text(rowEl?.querySelector?.('[data-b313-auto-field="dimensionStandard"]')?.value || 'AUTO'),
     };
     const status = rowEl.querySelector?.('[data-b313-auto-status]');
-    if (!validateFallbackRecord(record)) {
+    if (!validateFallbackRecord(record) || !text(record.sourceReference)) {
       if (status) {
         status.textContent = 'INVALID FALLBACK VALUES';
         status.style.color = '#fca5a5';
@@ -414,7 +434,7 @@ function bindRefresh(panel, host, config, models, options) {
       ensureBasisBucket(config)[key] = record;
       await options?.onSaveConfigPreservePreview?.(config);
       if (status) {
-        status.textContent = 'CONTROLLED FALLBACK ACCEPTED — RECALCULATING';
+        status.textContent = 'MANUAL FACTOR BASIS SAVED — RECALCULATING';
         status.style.color = '#93c5fd';
       }
       const wallButton = host?.querySelector?.('[data-mc-b313-wall-update]');
@@ -428,19 +448,44 @@ function bindRefresh(panel, host, config, models, options) {
 function applyT1Guard(host, models) {
   const button = host?.querySelector?.('[data-mc-b313-wall-update]');
   if (!button) return;
-  const hasMissingT1 = models.some((model) => model.statusCode === 'B313_PREVIEW_T1_REQUIRED');
-  if (hasMissingT1) {
-    if (!button.dataset.mcB313AutoBasisOriginalTitle) button.dataset.mcB313AutoBasisOriginalTitle = button.title || '';
-    button.dataset.mcB313AutoBasisT1Guard = 'true';
-    button.disabled = true;
-    button.title = 'Resolve Preview T1 before running the B31.3 wall update. Blank T1 is never treated as 0 °C.';
-    return;
-  }
-  if (button.dataset.mcB313AutoBasisT1Guard === 'true') {
-    button.disabled = false;
-    button.title = button.dataset.mcB313AutoBasisOriginalTitle || button.title;
-    delete button.dataset.mcB313AutoBasisT1Guard;
-  }
+  const missing = models.filter((model) => model.statusCode === 'B313_PREVIEW_T1_REQUIRED').length;
+  // A missing T1 holds that model only; it must not disable unrelated rows.
+  // Blank T1 is never treated as 0 °C.
+  if (!button.dataset.mcB313AutoBasisOriginalTitle) button.dataset.mcB313AutoBasisOriginalTitle = button.title || '';
+  button.title = missing
+    ? `${missing} material/T1 group(s) require T1; other valid Preview rows can still be calculated.`
+    : button.dataset.mcB313AutoBasisOriginalTitle;
+}
+function bindMillAndCsControls(panel, host, config, rows, options) {
+  const tolerance = config.b313WallUpdate || (config.b313WallUpdate = {});
+  const type = panel.querySelector?.('[data-b313-mill-basis]');
+  const value = panel.querySelector?.('[data-b313-mill-value]');
+  const cs = panel.querySelector?.('[data-b313-cs-fallback]');
+  const save = async () => {
+    const mode = text(type?.value) === 'absolute' ? 'absolute' : 'percent';
+    const raw = text(value?.value);
+    const number = raw === '' ? NaN : Number(raw);
+    if (!Number.isFinite(number) || number < 0 || (mode === 'percent' && number >= 100)) {
+      value?.setCustomValidity?.('Enter a valid nonnegative mill tolerance; percentage must be below 100.');
+      value?.reportValidity?.();
+      return;
+    }
+    value?.setCustomValidity?.('');
+    tolerance.millTolerance = mode === 'percent'
+      ? { basis: 'percent', value: number }
+      : { basis: 'absolute', value: number, unit: 'mm' };
+    tolerance.materialFallback = {
+      ...(tolerance.materialFallback || {}),
+      enabled: cs?.checked !== false, family: 'CS', mode: 'PROPOSE_FOR_REVIEW'
+    };
+    await options?.onSaveConfigPreservePreview?.(config);
+  };
+  type?.addEventListener('change', async () => {
+    if (value) value.value = type.value === 'absolute' ? '1.5' : '12.5';
+    await save();
+  });
+  value?.addEventListener('change', save);
+  cs?.addEventListener('change', save);
 }
 
 function watchLivePreviewRows({ host, config, rows, options }) {
@@ -488,7 +533,7 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
 
   host.querySelector?.('[data-mc-b313-auto-basis-panel]')?.remove?.();
   if (models.length) {
-    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models));
+    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config));
     else {
       const actionBar = host.querySelector?.('[data-mc-preview-build]')?.parentElement;
       actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models));
@@ -497,6 +542,7 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
     bindTableLinks(panel);
     bindInfoPopups(panel);
     bindRefresh(panel, host, config, models, options);
+    bindMillAndCsControls(panel, host, config, rows, options);
   }
   applyT1Guard(host, models);
   return models;
