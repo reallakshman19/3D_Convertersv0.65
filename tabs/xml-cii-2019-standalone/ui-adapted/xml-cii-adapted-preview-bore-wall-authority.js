@@ -367,15 +367,30 @@ export function applyPreviewBoreWallAuthority({
     indexes,
     config,
   });
-  // Accepted Pull authority is applied only after the complete node ledger
-  // validates the original branch/node occurrence identities and dimensions.
-  // No class/DN-wide override or calculation-time write is used here.
-  const accepted = branchRows.map((row, index) =>
-    b313ReadAcceptedWall(config, row, index, nodeAuthority.rows));
-  const finalBranchRows = branchRows.map((row, index) => accepted[index]
-    ? { ...row, wallThickness: String(accepted[index].nominalWallMm), wallThicknessSource: 'b313-pulled', b313PullStatus: 'ACCEPTED' }
+  return {
+    ...result,
+    branchRows,
+    nodeRows: correctNodeRows(result.nodeRows, nodeAuthority.rows, {requireSourceOrdinal}),
+    nodeBoreWallRows: nodeAuthority.rows,
+    boreAuthorityDiagnostics: nodeAuthority.diagnostics,
+  };
+}
+
+/**
+ * Apply Pull AFTER final Preview material/rating resolution. Proposal
+ * fingerprints are computed from the same effective rows shown to the user.
+ */
+export function applyAcceptedB313PullAuthority(result, config = {}) {
+  if (!result || !Array.isArray(result.branchRows) || !Array.isArray(result.nodeBoreWallRows)) return result;
+  const ledger = result.nodeBoreWallRows;
+  const accepted = result.branchRows.map((row, index) =>
+    b313ReadAcceptedWall(config, row, index, ledger));
+  if (!accepted.some(Boolean)) return result;
+  const branchRows = result.branchRows.map((row, index) => accepted[index]
+    ? { ...row, wallThickness: String(accepted[index].nominalWallMm),
+        wallThicknessSource: 'b313-pulled', b313PullStatus: 'ACCEPTED' }
     : row);
-  const finalNodeRows = nodeAuthority.rows.map((row) => {
+  const nodeBoreWallRows = ledger.map((row) => {
     const record = accepted[row.branchOccurrenceIndex];
     return record && /^PIPE(?:LINE)?$/i.test(text(row.componentType))
       ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' }
@@ -383,9 +398,8 @@ export function applyPreviewBoreWallAuthority({
   });
   return {
     ...result,
-    branchRows: finalBranchRows,
-    nodeRows: correctNodeRows(result.nodeRows, finalNodeRows, {requireSourceOrdinal}),
-    nodeBoreWallRows: finalNodeRows,
-    boreAuthorityDiagnostics: nodeAuthority.diagnostics,
+    branchRows,
+    nodeRows: correctNodeRows(result.nodeRows, nodeBoreWallRows, {requireSourceOrdinal: true}),
+    nodeBoreWallRows,
   };
 }
