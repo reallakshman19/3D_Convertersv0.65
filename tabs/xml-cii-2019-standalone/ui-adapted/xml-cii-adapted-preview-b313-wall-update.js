@@ -503,7 +503,11 @@ function renderBasisEditor(host, config, rows, options) {
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="qualityFactorE" type="number" step="any" min="0" max="1" value="${esc(basis.qualityFactorE)}" placeholder="E" style="width:65px;"></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="weldStrengthReductionW" type="number" step="any" min="0" max="1" value="${esc(basis.weldStrengthReductionW)}" placeholder="W" style="width:65px;"></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="coefficientY" type="number" step="any" min="0" max="1" value="${esc(basis.coefficientY)}" placeholder="Y" style="width:65px;"></td>
-      <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="manufacturingRoute" type="text" value="${esc(basis.manufacturingRoute)}" placeholder="optional route" style="width:95px;"></td>
+      <td style="padding:5px;border-bottom:1px solid #334155;">
+        <input data-b313-field="manufacturingRoute" type="text" value="${esc(basis.manufacturingRoute)}" placeholder="physical route" style="width:115px;">
+        <input data-b313-field="manufacturingRouteSourceReference" type="text" value="${esc(basis.manufacturingRouteSourceReference)}" placeholder="Pipe spec/MTR evidence" style="min-width:160px;">
+        <label style="display:block;font-size:10px;"><input data-b313-field="manufacturingRouteEvidenceReviewed" type="checkbox" ${basis.manufacturingRouteEvidenceReviewed===true?'checked':''}> Route evidence reviewed</label>
+      </td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><select data-b313-field="pressureUnit">${['AUTO','PA','KPA','MPA','BAR','BARG','PSI','PSIG'].map((unit) => `<option value="${unit}" ${normalizedToken(basis.pressureUnit || 'AUTO') === normalizedToken(unit) ? 'selected' : ''}>${unit}</option>`).join('')}</select></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><select data-b313-field="dimensionStandard">${['AUTO','ASME B36.10M','ASME B36.19M'].map((standard) => `<option value="${standard}" ${normalizedToken(basis.dimensionStandard || 'AUTO') === normalizedToken(standard) ? 'selected' : ''}>${standard}</option>`).join('')}</select></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="sourceReference" type="text" value="${esc(basis.sourceReference)}" placeholder="required for manual fallback" style="min-width:190px;"></td>
@@ -544,7 +548,9 @@ function renderBasisEditor(host, config, rows, options) {
       materialId: group?.materialIdentity?.ok ? group.materialIdentity.material.materialId : '',
       designTemperature: group?.designTemperature || '',
     };
-    rowEl.querySelectorAll('[data-b313-field]').forEach((field) => { record[field.dataset.b313Field] = field.value; });
+    rowEl.querySelectorAll('[data-b313-field]').forEach((field) => {
+      record[field.dataset.b313Field] = field.type === 'checkbox' ? field.checked : field.value;
+    });
     cfg.bases[key] = record;
     await options?.onSaveConfigPreservePreview?.(config);
   }));
