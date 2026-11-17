@@ -337,31 +337,48 @@ function sameNumeric(left, right) {
   return Math.abs(a - b) <= scale * 1e-9;
 }
 
+/**
+ * A physical Step-4 P1 from a selected Line List may inherit its pressure
+ * unit ONLY from the SAME exact line and a header that expressly denotes
+ * design/maximum P1 pressure, and whose numerical cell equals Preview P1.
+ * Hydro/test columns, unrelated numeric cells, guesses from pressure magnitude
+ * and a header of unknown unit are excluded. No master data is changed here.
+ */
+export function resolvePreviewP1LineListHeaderUnit(row = {}, config = {}) {
+  if (!/LINELIST|LINE.LIST/.test(normalizedToken(row.p1Source)) || !text(row.lineKey)
+      || !text(row.p1)) return { unit: '', source: 'P1_NOT_LINE_LIST_SOURCED' };
+  const selected = _xmlCiiFindLineListRow(row.lineKey, config);
+  const raw = selected?.row;
+  if (!raw || typeof raw !== 'object') return { unit: '', source: 'NO_SELECTED_LINE_LIST_ROW' };
+  const matches = [];
+  for (const [key, value] of Object.entries(raw)) {
+    const header = normalizedToken(key);
+    if (!( /\bP1\b/.test(header) || (/\bPRESSURE\b/.test(header) && /\b(?:DESIGN|MAX|MAXIMUM)\b/.test(header)) )
+        || /(?:\bHYDRO\b|\bTEST\b)/.test(header)) continue;
+    const unit = pressureUnitFromColumnName(key);
+    if (unit && sameNumeric(value, row.p1)) matches.push({ unit, source: `line-list-column:${key}` });
+  }
+  const unique = [...new Set(matches.map(item => item.unit))];
+  if (unique.length > 1) return { unit: '', source: 'LINE_LIST_P1_UNIT_CONFLICT',
+    candidates: matches.map(item => item.source) };
+  if (unique.length === 1) return matches[0];
+  return { unit: '', source: 'LINE_LIST_P1_HEADER_NOT_EXPLICIT_OR_VALUE_MISMATCH' };
+}
+
 export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, previewOnly = false) {
   const explicit = normalizePressureUnit(basis.pressureUnit);
   const fromPreview = normalizePressureUnit(row?.p1Unit);
-  if (explicit && fromPreview && explicit !== fromPreview) {
-    return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_CONFLICT', explicit, previewUnit: fromPreview };
-  }
+  const fromHeader = resolvePreviewP1LineListHeaderUnit(row, config);
+  if (fromHeader.source === 'LINE_LIST_P1_UNIT_CONFLICT') return fromHeader;
+  const supplied = [explicit, fromPreview, fromHeader.unit].filter(Boolean);
+  if (new Set(supplied).size > 1) return {
+    unit: '', source: 'P1_UNIT_AUTHORITIES_CONFLICT',
+    designBasis: explicit, previewUnit: fromPreview, lineListUnit: fromHeader.unit,
+  };
   if (explicit) return { unit: explicit, source: 'design-basis' };
   if (fromPreview) return { unit: fromPreview, source: row?.p1UnitSource || 'preview' };
+  if (fromHeader.unit) return fromHeader;
   if (previewOnly) return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
-
-  const match = _xmlCiiFindLineListRow(row?.lineKey, config);
-  const raw = match?.row || null;
-  if (raw && typeof raw === 'object') {
-    const preferred = [];
-    const fallback = [];
-    for (const [key, value] of Object.entries(raw)) {
-      const unit = pressureUnitFromColumnName(key);
-      if (!unit) continue;
-      const item = { unit, source: `line-list-column:${key}` };
-      if (sameNumeric(value, row?.p1)) preferred.push(item); else fallback.push(item);
-    }
-    if (preferred.length === 1) return preferred[0];
-    if (!preferred.length && fallback.length === 1 && normalizedToken(row?.p1Source).startsWith('LINELIST')) return fallback[0];
-  }
-
   if (normalizedToken(row?.p1Source).includes('XML')) {
     const unit = normalizePressureUnit(sourceXml?.pressureUnit);
     if (unit) return { unit, source: 'source-xml-units' };
@@ -601,6 +618,49 @@ export function collectPreviewB313IndependentIssues(row = {}, config = {}) {
   return issues;
 }
 
+
+/** Select the physical exact-DN class wall, never an unauthorized free schedule. */
+export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
+  if (!calc.ok || !calc.calculation?.ok) return { ok:false,code:'B313_PREVIEW_CALCULATION_REQUIRED' };
+  const cls=text(row.pipingClass);
+  if (!cls) return { ok:true,authority:'PIPE_WALL_MASTER_NO_CLASS',selectedNominalWallMm:calc.selectedNominalWallMm,selectedSchedule:calc.selectedSchedule,marginMm:calc.selectionMarginMm };
+  const dn=positive(row.sizeMm ?? row.boreMm);
+  const classDn=positive(row.pipingClassPipeDnMm);
+  const wall=positive(row.pipingClassPipeWallMm);
+  const schedule=text(row.pipingClassPipeSchedule);
+  const product=text(row.pipingClassPipeMaterial);
+  const sourceRow=text(row.pipingClassPipeSourceRow);
+  if (!dn || !classDn || Math.abs(dn-classDn)>1e-6 || !wall || !schedule || !product || !sourceRow) {
+    return {ok:false,code:'B313_PREVIEW_CLASS_EXACT_DN_WALL_EVIDENCE_REQUIRED',
+      message:'Exact-DN Piping Class product, schedule, wall or source row missing. Do not substitute an unapproved schedule.',
+      details:{cls,dn,classDn,wall,schedule,product,sourceRow}};
+  }
+  const listed=listPipeWallsForSize({ dimensionStandard:calc.dimensionStandard, dn });
+  const normalizedSchedule=(value)=>text(value).toUpperCase().replace(/^SCH(?:EDULE)?\s*/,'').replace(/\s+/g,'');
+  const matching=listed.ok ? listed.rows.filter(item=>
+    normalizedSchedule(item.schedule)===normalizedSchedule(schedule)) : [];
+  if (!matching.length) return {ok:false,code:'B313_PREVIEW_CLASS_SCHEDULE_NOT_IN_MASTER',
+    message:'Exact-DN class schedule is not present for the selected dimension standard. Confirm class schedule/standard; do not substitute a different schedule.',
+    details:{cls,dn,schedule,dimensionStandard:calc.dimensionStandard}};
+  if (!matching.some(item=>Math.abs(Number(item.nominalWallMm)-wall)<=0.08)) {
+    return {ok:false,code:'B313_PREVIEW_CLASS_WALL_DIMENSION_CONFLICT',
+      message:'Exact-DN class nominal wall conflicts with the pipe-wall master for the same schedule and dimension standard.',
+      details:{cls,dn,schedule,classWallMm:wall,referenceWallsMm:matching.map(item=>item.nominalWallMm)}};
+  }
+  if (wall>=Number(calc.outsideDiameterMm)/2) return {
+    ok:false,code:'B313_PREVIEW_CLASS_WALL_GEOMETRY_INVALID',
+    message:'Class wall is geometrically inconsistent with actual pipe OD.'};
+  const required=positive(calc.calculation.requiredNominalThicknessMm);
+  if (!required) return {ok:false,code:'B313_PREVIEW_REQUIRED_NOMINAL_MISSING'};
+  if (wall+1e-7<required) return {ok:false,code:'B313_PREVIEW_CLASS_WALL_INSUFFICIENT',
+    message:'Class specified wall fails B31.3 required nominal wall. Engineering must revise/approve class; no silent schedule upgrade.',
+    details:{cls,dn,product,schedule,sourceRow,classNominalWallMm:wall,requiredNominalWallMm:required,deficitMm:required-wall,masterCandidateSchedule:calc.selectedSchedule}};
+  return {ok:true,authority:'PIPING_CLASS_EXACT_DN_PRODUCT',
+    selectedNominalWallMm:wall,selectedSchedule:schedule,marginMm:wall-required,
+    cls,dn,product,sourceRow,requiredNominalWallMm:required,
+    masterCandidateSchedule:calc.selectedSchedule,masterCandidateWallMm:calc.selectedNominalWallMm};
+}
+
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
@@ -744,6 +804,15 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, result.code, result.message || result.code, { result, odBasis, pressureBasis, dimensionBasis, basisKey: key, materialIdentity, factorBasis }));
       return;
     }
+    const classSelection = qualifyPreviewB313ClassWall(row, result);
+    if (!classSelection.ok) {
+      results.push(failureRow(row, classSelection.code, classSelection.message || classSelection.code,
+        { result, classSelection, odBasis, pressureBasis, dimensionBasis, basisKey: key, materialIdentity, factorBasis }));
+      return;
+    }
+    const governed = { ...result, selectedNominalWallMm: classSelection.selectedNominalWallMm,
+      selectedSchedule: classSelection.selectedSchedule, selectionMarginMm: classSelection.marginMm,
+      classSelection };
 
     const proposalKey = String(rowIndex);
     const evidence = {
@@ -763,13 +832,14 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       factorDesignAuthority: factorBasis.designAuthority === true,
       fallbackSourceReference: factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK' ? factorBasis.sourceReference : '',
       pressureSource: row?.p1Source || '',
+      pressureUnit: pressureBasis.unit,
       pressureUnitSource: pressureBasis.source,
       dimensionStandardSource: dimensionBasis.source,
       outsideDiameterSource: odBasis.source,
       outsideDiameterReferenceMm: odBasis.referenceOdMm,
       outsideDiameterParityDeltaMm: odBasis.parityDeltaMm,
       negativeMillTolerance: result.calculation.manufacturingTolerance,
-      calculation: result.calculation, selection: result.selection,
+      calculation: result.calculation, selection: result.selection, classSelection,
     };
     const manualReviewed = factorBasis.mode === 'ACTIVE_MASTER_STRICT'
       || (basis.designApproved === true && text(basis.sourceReference)
@@ -782,8 +852,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       schema: 'xml-cii-b313-proposal/v1',
       inputSignature: b313PreviewInputSignature(row, config),
       nodeScope: scopedNodes.map(b313PreviewNodeSignature),
-      nominalWallMm: result.selectedNominalWallMm,
-      selectedSchedule: result.selectedSchedule,
+      nominalWallMm: governed.selectedNominalWallMm,
+      selectedSchedule: governed.selectedSchedule,
       factorBasisMode: factorBasis.mode,
       materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
       materialFallbackReviewed: csReviewed,
@@ -798,7 +868,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       lineKey: row.lineKey || '',
       status: 'CALCULATED', proposalKey,
       materialId: materialIdentity.material.materialId,
-      factorBasisMode: factorBasis.mode, result, evidence,
+      factorBasisMode: factorBasis.mode, result: governed, evidence,
     });
     updated += 1;
   });

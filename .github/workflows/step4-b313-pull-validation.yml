@@ -80,6 +80,7 @@ jobs:
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
             tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
+            tests/xml-cii-b313-preview-source-pressure-class-wall.test.mjs \
             tests/xml-cii-b313-preview-od-selection.test.mjs \
             tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
             tests/xml-cii-issue-781-b313-live-row-custody.test.js \

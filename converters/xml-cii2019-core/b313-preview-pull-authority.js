@@ -1,4 +1,5 @@
 import { B313_MATERIAL_FACTOR_MASTER, B313_GOVERNED_CODE_RULE_PACK } from '../b313-material-factors/index.js';
+import { verifyB313PreviewPressureUnitReceipt } from './b313-preview-line-list-pressure-receipt.js';
 
 /**
  * Detect changed active factor tables across deploys: cached Preview/Pull
@@ -93,6 +94,7 @@ export function b313PreviewNodeSignature(node = {}) {
 export function b313ReadAcceptedWall(config = {}, branchRow = {}, branchOccurrenceIndex, nodeRows = []) {
   const record = config?.b313WallUpdate?.acceptedWallByBranch?.[String(branchOccurrenceIndex)];
   if (!record || !finitePositive(record.nominalWallMm)) return null;
+  if (!verifyB313PreviewPressureUnitReceipt(branchRow, config, record.pressureUnitReceipt).ok) return null;
   if (record.inputSignature !== b313PreviewInputSignature(branchRow, config)) return null;
   const actual = (nodeRows || []).filter((n) => Number(n.branchOccurrenceIndex) === Number(branchOccurrenceIndex) && isApplicableWallNode(n));
   if (!actual.length || !Array.isArray(record.nodeScope) || actual.length !== record.nodeScope.length) return null;
@@ -111,6 +113,11 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
   const basis = config?.b313WallUpdate || {};
   const proposal = basis.proposalsByBranch?.[String(branchOccurrenceIndex)];
   if (!proposal) return { ok: false, code: 'B313_PULL_PROPOSAL_REQUIRED' };
+  const source = txt(proposal.evidence?.pressureUnitSource);
+  const pressureUnitReceipt = source.startsWith('line-list-column:')
+    ? { source, unit: txt(proposal.evidence?.pressureUnit) } : null;
+  const pressureProof = verifyB313PreviewPressureUnitReceipt(branchRow, config, pressureUnitReceipt);
+  if (!pressureProof.ok) return { ok:false, code:pressureProof.code };
   if (!finitePositive(proposal.nominalWallMm)) return { ok: false, code: 'B313_PULL_WALL_INVALID' };
   if (proposal.inputSignature !== b313PreviewInputSignature(branchRow, config)) {
     return { ok: false, code: 'B313_PULL_STALE_PREVIEW' };
@@ -153,6 +160,7 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
       nominalWallMm: proposal.nominalWallMm,
       selectedSchedule: proposal.selectedSchedule,
       factorBasisMode: proposal.factorBasisMode,
+      pressureUnitReceipt,
       materialIdentityNeedsReview: proposal.materialIdentityNeedsReview === true,
       materialIdentityReviewed: proposal.materialIdentityReviewed === true,
       materialFallbackApplied: proposal.materialFallbackApplied === true,

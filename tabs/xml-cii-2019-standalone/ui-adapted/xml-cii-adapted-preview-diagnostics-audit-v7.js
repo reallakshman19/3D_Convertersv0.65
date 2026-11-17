@@ -7,8 +7,8 @@ import {
   xmlCiiRenderPreviewPhase,
 } from './xml-cii-adapted-preview-renderer-v7.js?v=20261001-weight-output-2';
 import { clearPreviewCachesV7 } from './xml-cii-adapted-preview-cache-v7.js';
-import { installPreviewB313WallUpdateAuditController } from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261117-b313-unified-review-1';
-import { installPreviewB313AutoBasisPanel } from './xml-cii-adapted-preview-b313-auto-basis.js?v=20261117-b313-unified-review-1';
+import { installPreviewB313WallUpdateAuditController } from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261117-b313-source-unit-class-1';
+import { installPreviewB313AutoBasisPanel } from './xml-cii-adapted-preview-b313-auto-basis.js?v=20261117-b313-source-unit-class-1';
 import { materializeXmlCiiDatasetBackedConfig } from '../xml-cii-dataset-backed-config.js?v=20261001-weight-output-2';
 import {openXml229P4VerifiedSession,getXml229CurrentWorkerHeldReview}
  from './xml-cii-adapted-p4-verified-weight-panel.js?v=20261113-x5a-2';
