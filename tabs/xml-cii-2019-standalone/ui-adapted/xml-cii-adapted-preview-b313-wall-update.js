@@ -636,7 +636,7 @@ export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
       details:{cls,dn,classDn,wall,schedule,product,sourceRow}};
   }
   const listed=listPipeWallsForSize({ dimensionStandard:calc.dimensionStandard, dn });
-  const normalizedSchedule=(value)=>text(value).toUpperCase().replace(/^SCH(?:EDULE)?\\s*/,'').replace(/\\s+/g,'');
+  const normalizedSchedule=(value)=>text(value).toUpperCase().replace(/^SCH(?:EDULE)?\s*/,'').replace(/\s+/g,'');
   const matching=listed.ok ? listed.rows.filter(item=>
     normalizedSchedule(item.schedule)===normalizedSchedule(schedule)) : [];
   if (!matching.length) return {ok:false,code:'B313_PREVIEW_CLASS_SCHEDULE_NOT_IN_MASTER',
