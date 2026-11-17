@@ -3,6 +3,11 @@ import { B313_GOVERNED_CODE_RULE_PACK } from './default-b313-code-rule-data.js';
 const norm = value => String(value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
 const present = value => String(value ?? '').trim() !== '';
 const validStatus = new Set(['VERIFIED', 'PROJECT_APPROVED']);
+const sha256 = value => /^[a-f0-9]{64}$/i.test(String(value ?? ''));
+const validReview = row => sha256(row.sourceDocumentSha256)
+  && present(row.sourceReviewedBy)
+  && /^20\d{2}-\d{2}-\d{2}$/.test(String(row.sourceReviewDate ?? ''))
+  && present(row.sourceRevision);
 
 /**
  * Pure code-rule evaluator. Rules must be drawn from a controlled pack at the
@@ -28,6 +33,7 @@ export function resolveB313GovernedCodeFactor({
     if (norm(r.factor) !== f || String(r.edition) !== String(edition)
         || !validStatus.has(r.status) || !present(r.sourceAuthority)
         || !present(r.sourceReference) || !present(r.codeClause)
+        || !validReview(r)
         || /SCREENING|BENCHMARK|CANDIDATE/i.test(String(r.sourceAuthority))
         || (r.status === 'PROJECT_APPROVED' && !present(r.approvalReference))
         || norm(r.productForm) !== form) return false;
@@ -40,7 +46,8 @@ export function resolveB313GovernedCodeFactor({
       if (!route || norm(r.manufacturingRoute) !== route) return false;
     } else if (r.routeApplicability !== 'ALL_ROUTES_CODE_CONFIRMED') return false;
     // E cannot be inferred without positive evidence of the construction route.
-    if (f === 'E' && (!route || r.routeApplicability !== 'EXACT')) return false;
+    if (f === 'E' && (!route || ['UNKNOWN','UNVERIFIED','UNRESOLVED','NONE','N/A'].includes(route)
+      || r.routeApplicability !== 'EXACT')) return false;
     if (r.temperatureApplicability === 'EXACT_T') return Number(r.temperatureC) === t;
     if (r.temperatureApplicability === 'CONSTANT_RANGE') {
       if (!present(r.validFromC) || !present(r.validToC)) return false;
@@ -69,6 +76,10 @@ export function resolveB313GovernedCodeFactor({
       edition:String(row.edition),codeClause:row.codeClause,
       sourceAuthority:row.sourceAuthority,sourceReference:row.sourceReference,
       approvalReference:row.approvalReference||null,scope:row.scope,
+      sourceDocumentSha256:row.sourceDocumentSha256,
+      sourceReviewedBy:row.sourceReviewedBy,
+      sourceReviewDate:row.sourceReviewDate,
+      sourceRevision:row.sourceRevision,
       manufacturingRoute:route||null,productForm:form,
       temperatureC:t,temperatureApplicability:row.temperatureApplicability,
       ruleId:row.ruleId||null,
