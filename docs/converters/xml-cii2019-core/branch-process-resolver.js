@@ -65,6 +65,25 @@ function classRowMaterial(row) {
   return readAny(row, ['materialName', 'Material_Name', 'Material Name', 'Material', 'material', 'MATERIAL', 'Mat', 'MAT', 'MOC']);
 }
 
+/**
+ * A reviewed, exact Step 8 Piping Class mapping may corroborate a broad
+ * process material for B31.3. This does not assign or alter the governing
+ * Line List Material or Material Code.
+ */
+export function resolveXmlCiiB313ClassMaterialEvidence({ pipingClass, config = {} } = {}) {
+  const matched = resolveConfiguredMaterialCode({ pipingClass, config });
+  const candidate = text(matched?.materialName);
+  return {
+    materialCodeCorroborationCandidate: candidate,
+    materialCodeCorroborationSource: candidate ? 'piping-class-material-code-config' : '',
+    materialCodeCorroborationMethod: matched?.method || '',
+    materialCodeCorroborationConfidence: matched?.confidence ?? null,
+    materialCodeCorroborationNeedsReview: !!candidate && (
+      matched?.method !== 'exact' || Number(matched?.confidence) < 90
+    ),
+  };
+}
+
 function directMaterialCode(row) {
   return cleanMaterialCode(readAny(row, [
     'materialCode', 'Material Code', 'MATERIAL_CODE', 'MAT_CODE',
@@ -524,14 +543,9 @@ export function resolveBranchProcessData({
   });
   // An exact Step 8 class material can corroborate a broad Line List family
   // for B31.3 without changing the governing Line List material/code.
-  const configuredMaterialEvidence = resolveConfiguredMaterialCode({
+  const configuredMaterialEvidence = resolveXmlCiiB313ClassMaterialEvidence({
     pipingClass: resolvedPipingClass, config,
   });
-  const configuredGrade = text(configuredMaterialEvidence?.materialName);
-  const configuredGradeNeedsReview = !!configuredGrade && (
-    configuredMaterialEvidence?.method !== 'exact'
-    || Number(configuredMaterialEvidence?.confidence) < 90
-  );
   const corrosion = resolveCorrosionFromPipingClass({
     lineRow: resolverLineRow,
     boreMm,
@@ -570,11 +584,7 @@ export function resolveBranchProcessData({
       ? classRowMaterial(material.matchedRow)
       : '',
     materialCodeEvidenceSource: material.source,
-    materialCodeCorroborationCandidate: configuredGrade,
-    materialCodeCorroborationSource: configuredGrade ? 'piping-class-material-code-config' : '',
-    materialCodeCorroborationMethod: configuredMaterialEvidence?.method || '',
-    materialCodeCorroborationConfidence: configuredMaterialEvidence?.confidence ?? null,
-    materialCodeCorroborationNeedsReview: configuredGradeNeedsReview,
+    ...configuredMaterialEvidence,
     materialCodeNeedsReview: material.needsReview === true || !!material.conflict || !material.materialCode,
     materialCodeConflict: material.conflict || null,
     corrosionAllowanceMm: corrosion.corrosionAllowanceMm,
