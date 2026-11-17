@@ -8,7 +8,7 @@ import { applyPreviewDtxrRatingOverrides } from './xml-cii-adapted-preview-ratin
 import {
   B313_PREVIEW_ACTION_LABEL,
   buildPreviewB313WallUpdateReport,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261001-weight-output-2';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-source-unit-class-1';
 import { xmlCiiEnrichedConfigFromState } from './xml-cii-adapted-state.js?v=20261001-weight-output-2';
 import { replaceModeAState } from './xml-cii-adapted-mode-a-state.js?v=20261001-weight-output-2';
 import {
