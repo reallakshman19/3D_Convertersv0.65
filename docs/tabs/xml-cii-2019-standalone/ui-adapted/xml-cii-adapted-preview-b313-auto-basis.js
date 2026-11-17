@@ -196,9 +196,13 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const routeReference = text(storedBasis.manufacturingRouteSourceReference);
   const routeEvidenceReviewed = storedBasis.manufacturingRouteEvidenceReviewed === true;
   const confirmedA106Pipe = b313SourceConfirmsA106Seamless(row, materialIdentity);
+  const a106RouteConflict = confirmedA106Pipe && !!explicitRoute
+    && explicitRoute.toUpperCase() !== 'SEAMLESS';
   // Route entries are candidates until a real pipe-spec/MTR source is
   // independently reviewed. Factor table options do not prove construction.
-  const reviewedExplicitRoute = explicitRoute && ((routeReference && routeEvidenceReviewed) || confirmedA106Pipe)
+  // Explicit A106 routes contradicting its seamless specification fail closed.
+  const reviewedExplicitRoute = explicitRoute && !a106RouteConflict
+    && ((routeReference && routeEvidenceReviewed) || confirmedA106Pipe)
     ? explicitRoute : '';
 
   if (!t1 || text(row?.t1Source).toLowerCase() === 'default') {
@@ -257,6 +261,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const fallback = strictReady ? null : fallbackFromStoredOrSeed(storedBasis, seed);
   const status = materialIdentityNeedsReview && !materialIdentityReviewed
     ? { code: 'GRADE_REVIEW_REQUIRED', label: 'GRADE REVIEW REQUIRED' }
+    : a106RouteConflict ? { code: 'B313_ROUTE_PRODUCT_CONFLICT', label: 'PRODUCT / ROUTE CONFLICT' }
     : routeNeedsReview ? { code: 'B313_ROUTE_EVIDENCE_REQUIRED', label: 'ROUTE EVIDENCE REQUIRED' }
     : strictReady
       ? { code: 'AUTO_READY', label: 'AUTO READY ✓' }
@@ -277,8 +282,10 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     factorBasisCode: factorBasis?.code || '',
     statusCode: status.code,
     statusLabel: status.label,
-    factorSummary: routeNeedsReview
-      ? 'Confirm the physical pipe manufacturing route against a controlled pipe spec/MTR and explicitly review the source; code-table route options are not construction evidence.'
+    factorSummary: a106RouteConflict
+      ? 'The selected route contradicts the exact ASTM A106 seamless pipe specification. Resolve the physical product/route conflict before calculation.'
+      : routeNeedsReview
+        ? 'Confirm the physical pipe manufacturing route against a controlled pipe spec/MTR and explicitly review the source; code-table route options are not construction evidence.'
       : strictReady ? strictFactorSummary(factorBasis)
       : storedFallbackReady && fallback?.ok
         ? fallbackFactorSummary(fallback, true)
