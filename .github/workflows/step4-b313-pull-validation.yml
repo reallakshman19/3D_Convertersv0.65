@@ -7,6 +7,9 @@ on:
     branches: [main]
     paths:
       - 'converters/b313-material-factors/index.js'
+      - 'docs/Masters/b313-material-factor-master.json'
+      - 'tabs/b313-material-factors-tab.js'
+      - 'scripts/generate-b313-material-factors.mjs'
       - 'converters/xml-cii2019-core/b313-preview-*.js'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
       - 'tests/b313-material-factors.test.mjs'
@@ -33,6 +36,8 @@ jobs:
       - name: Verify syntax
         run: |
           node --check converters/b313-material-factors/index.js
+          node --check scripts/generate-b313-material-factors.mjs
+          node --check tabs/b313-material-factors-tab.js
           node --check converters/xml-cii2019-core/b313-preview-pull-authority.js
           node --check converters/xml-cii2019-core/b313-preview-wall-update.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer.js
@@ -41,6 +46,8 @@ jobs:
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-facts-worker-entry.js
+      - name: Check active B31.3 master generation and qualification gate
+        run: node scripts/generate-b313-material-factors.mjs --check
       - name: Test Pull, B31.3 adapters, Preview and legacy custody
         run: |
           node --test \
