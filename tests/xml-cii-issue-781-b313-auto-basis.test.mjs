@@ -5,6 +5,7 @@ import {
   buildPreviewB313AutoBasisRows,
   derivePreviewB313AutoBasisRow,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
+import { previewB313BasisKey } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const a106Row = {
   material: 'ASTM A106-B',
@@ -49,6 +50,22 @@ const wildcardDss = derivePreviewB313AutoBasisRow({
   materialCodeNeedsReview: true, t1: '120',
 }, {});
 assert.equal(wildcardDss.materialIdentityNeedsReview, true);
+
+
+const dssLineA = { material: 'DSS', t1: '120', branchOccurrenceIndex: 0, branchName: 'DSS-01', lineKey: 'L-A' };
+const dssLineB = { material: 'DSS', t1: '120', branchOccurrenceIndex: 1, branchName: 'DSS-02', lineKey: 'L-B' };
+const keyA = previewB313BasisKey(dssLineA, {});
+const keyB = previewB313BasisKey(dssLineB, {});
+assert.notEqual(keyA, keyB, 'Unconfirmed family-grade approval must not share a material/T1 key');
+assert.match(keyA, /GRADE_SCOPE/);
+const scopedReview = { b313WallUpdate: { bases: { [keyA]: { identityReviewed: true } } } };
+assert.equal(derivePreviewB313AutoBasisRow(dssLineA, scopedReview).materialIdentityReviewed, true);
+assert.equal(derivePreviewB313AutoBasisRow(dssLineB, scopedReview).materialIdentityReviewed, false);
+const legacySharedReview = { b313WallUpdate: { bases: {
+  'MATID:DSS-A790-S31803|T1=120': { identityReviewed: true }
+} } };
+assert.equal(derivePreviewB313AutoBasisRow(dssLineA, legacySharedReview).materialIdentityReviewed, false,
+  'Legacy shared material/T1 approval must not authorize a different physical line');
 
 const explicitRoute = derivePreviewB313AutoBasisRow(a106Row, {
   b313WallUpdate: {
