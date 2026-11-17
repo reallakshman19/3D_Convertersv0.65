@@ -178,3 +178,22 @@ published pack still contains zero approved rows), approved effective PSI-02
 configuration, and real full-row Pull-to-native-CII parity. Do not claim a
 nonzero production GLRD thickness result until those are supplied and
 independently reviewed. This is not a release authorization.
+
+## 2026-11-17 — R3 factor-source hardening and route evidence implementation
+
+The user authorized the fix in the existing `8 Config → Piping Class exact DN → 4 Preview → B31.3 → Pull` flow. The following changes are committed in **draft PR #5**.
+
+### Software changes and custody
+
+- Strict qualified `S/E/W/Y` records now require the active code edition, controlled source-document SHA-256, independent reviewer, review date and source revision. `PROJECT_APPROVED` additionally needs an approval reference; BENCHMARK/SCREENING remain excluded. E cannot resolve from a missing/unverified route or a generic route-less material record; E/W must satisfy `0 < value <= 1`, Y `0 <= value <= 1`. Qualified code rules need the same provenance.
+- The **existing Factors tab** now has the additional provenance columns and candidate-draft validation. The Factors tab's own numerical preview uses explicitly **non-authoritative manual mode**; it never changes the active factor tables.
+- Step 4 B31.3's existing route cell now supports an actual route, pipe-spec/MTR source reference and reviewer checkbox. Route-only saves are permitted independently of factor overrides; a typed route without reviewed physical evidence receives `B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED`.
+- ASTM A106 seamless inference requires an exact physical product; generic CS/class-family fallback cannot infer a manufacturing route. Contradictory A106+ERW metadata produces `B313_PREVIEW_MANUFACTURING_ROUTE_PRODUCT_CONFLICT`.
+- The `glrd-b313-qualification-readiness.mjs` tool generates a JSON readiness artifact for the authentic, source-ordered 30 PSI-02 branches and three provisional groups (26 DSS/120, 2 LTCS/120, 2 LTCS/82), including individual missing S/E/W/Y, unverified manufacturing route, project edition/config/pressure authority and the two LTCS-vs-class-93833 conflicts. The reporter can **never** mark an audit-only row as Pull-ready.
+- Dedicated CI tests for source provenance, published generator parity, GLRD branch group custody, route-specific negative controls and live Chromium now gate this integration.
+
+### What is intentionally NOT asserted
+
+This delivery does **not** contain approved Appendix A S records for the actual DSS/LTCS product contexts, a signed code-verified E/W/Y rule pack, or a real PSI-02 effective config and original owner-approved Pull-to-native-CII parity. There is no source permission to copy candidate SCREENING numbers into production. The `0 qualified / 0 Pull-ready` outcome is an honest engineering HOLD, **not** evidence that the controlled numeric inputs have been supplied.
+
+**Exact acceptance remaining:** (1) source-authorized governing 2024 edition/project approval, (2) exact product/manufacturing-route documents, (3) independently verified applicable B31.3 tables/notes and approved factor-pack release, (4) authentic effective Preview run with P1/T1 units, and (5) accepted Pull → native CII field parity for every eligible GLRD pipe. Do not merge/deploy while these are missing.
