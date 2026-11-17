@@ -62,9 +62,13 @@ export function resolveB313QualifiedTemperatureFactor({
     // project-approved rows also need an explicit approval reference.
     && String(row.sourceAuthority || '').trim()
     && String(row.sourceReference || '').trim()
+    && /^[a-f0-9]{64}$/i.test(String(row.sourceDocumentSha256||''))
+    && String(row.sourceReviewedBy||'').trim()
+    && /^20\d{2}-\d{2}-\d{2}$/.test(String(row.sourceReviewDate||''))
+    && String(row.sourceRevision||'').trim()
     && !/SCREENING|BENCHMARK|CANDIDATE/i.test(String(row.sourceAuthority))
     && (row.status !== 'PROJECT_APPROVED' || String(row.approvalReference || '').trim())
-    && (row.edition == null || String(row.edition) === String(edition))
+    && String(row.edition) === String(edition)
     && (!row.productForm || norm(row.productForm) === norm(productForm)));
   const routeRows = candidates.filter(row => f === 'E'
     ? !!row.manufacturingRoute && norm(row.manufacturingRoute) === route
