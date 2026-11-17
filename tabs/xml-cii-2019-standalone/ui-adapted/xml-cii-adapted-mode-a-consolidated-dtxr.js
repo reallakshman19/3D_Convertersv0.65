@@ -55,13 +55,17 @@ function requestRebuild(panel) {
   panel.querySelector('[data-mode-a-consolidated-build="preview"]')?.click();
 }
 
-function previewRowsForExecution(entry) {
+function previewResultForExecution(entry) {
   const config = xmlCiiEnrichedConfigFromState(entry.state);
-  const result = xmlCiiDryRunPreview(
+  return xmlCiiDryRunPreview(
     entry.state.sourceText || '',
     config,
     entry.state.stagedJsonText || '',
   ) || {};
+}
+
+function previewRowsForExecution(entry) {
+  const result = previewResultForExecution(entry);
   return Array.isArray(result.branchRows) ? result.branchRows : [];
 }
 
@@ -76,6 +80,7 @@ export function applyModeAConsolidatedDtxrWall(stateRef) {
   const snapshots = sourceSnapshots(stateRef, executions.map((entry) => entry.source.sourceId));
   let applied = 0;
   let available = 0;
+  let manualProtected = 0;
   let sourceCount = 0;
 
   for (const entry of executions) {
@@ -97,6 +102,13 @@ export function applyModeAConsolidatedDtxrWall(stateRef) {
       if (!candidate) continue;
       const key = text(row.wallThicknessKey || _classSizeKey(row) || row.lineKey || row.branchName);
       if (!key) continue;
+      // DTXR can refresh a prior DTXR-owned value, but cannot replace a
+      // manually authored wall or a previously accepted B31.3 Pull.
+      if (row.b313PullStatus === 'ACCEPTED' || row.wallThicknessSource === 'b313-pulled' ||
+          (Object.hasOwn(wallThickness, key) && dtxrKeys[key] !== true)) {
+        manualProtected += 1;
+        continue;
+      }
       wallThickness[key] = candidate.value;
       dtxrKeys[key] = true;
       markWallManual(overrides, key);
@@ -111,19 +123,25 @@ export function applyModeAConsolidatedDtxrWall(stateRef) {
   }
 
   if (applied) setUndo(stateRef, `DTXR Wall (${applied} override${applied === 1 ? '' : 's'})`, snapshots);
-  return { changed: applied > 0, applied, available, sourceCount };
+  return { changed: applied > 0, applied, available, manualProtected, sourceCount };
 }
 
 export function applyModeAConsolidatedB313Wall(stateRef) {
   const executions = modeAExecutionRows(stateRef);
-  const snapshots = sourceSnapshots(stateRef, executions.map((entry) => entry.source.sourceId));
+  let calculated = 0;
   let updated = 0;
   let skipped = 0;
   let sourceCount = 0;
   const reports = [];
 
   for (const entry of executions) {
-    const rows = previewRowsForExecution(entry);
+    // The full dry run carries the exact physical node/OD ledger. Omitting
+    // that ledger (the old host:null path) made otherwise eligible rows fail
+    // with B313_PREVIEW_SOURCE_NODE_OD_UNAVAILABLE.
+    const preview = previewResultForExecution(entry);
+    const rows = Array.isArray(preview.branchRows) ? preview.branchRows : [];
+    const nodeBoreWallRows = Array.isArray(preview.nodeBoreWallRows)
+      ? preview.nodeBoreWallRows : [];
     const sourceRef = createModeASourceProcessingRef(stateRef, entry.source.sourceId);
     const current = sourceRef.current;
     const config = parseConfig(current.supportConfigJson);
@@ -131,18 +149,21 @@ export function applyModeAConsolidatedB313Wall(stateRef) {
       rows,
       config,
       xmlText: current.sourceText || entry.state.sourceText || '',
-      host: null,
+      host: { dataset: {}, __xmlCiiPreviewResult: { branchRows: rows, nodeBoreWallRows } },
     });
-    const sourceUpdated = Number(report?.summary?.updatedRows || 0);
+    const sourceCalculated = Number(report?.summary?.calculatedRows || 0);
     const sourceSkipped = Number(report?.summary?.skippedRows || 0);
     reports.push({
       sourceId: entry.source.sourceId,
       fileName: entry.source.fileName || entry.source.name || entry.source.sourceId,
       report,
     });
-    updated += sourceUpdated;
+    calculated += sourceCalculated;
     skipped += sourceSkipped;
-    if (sourceUpdated > 0) {
+
+    // Calculation is deliberately PROPOSAL ONLY. Save source-local proposals
+    // for explicit per-occurrence Pull, never update overrides.wallThickness.
+    if (sourceCalculated > 0) {
       sourceRef.current = {
         ...current,
         supportConfigJson: JSON.stringify(config, null, 2),
@@ -151,9 +172,7 @@ export function applyModeAConsolidatedB313Wall(stateRef) {
       sourceCount += 1;
     }
   }
-
-  if (updated) setUndo(stateRef, `B31.3 Wall (${updated} override${updated === 1 ? '' : 's'})`, snapshots);
-  return { changed: updated > 0, updated, skipped, sourceCount, reports };
+  return { changed: false, calculated, updated, skipped, sourceCount, reports };
 }
 
 export function applyModeAConsolidatedDtxrRating(stateRef) {
@@ -221,7 +240,7 @@ export function installModeAConsolidatedDtxrTools(panel, stateRef) {
   const wall = document.createElement('button');
   wall.type = 'button';
   wall.textContent = 'Update Wall thickness based on DTXR';
-  wall.title = 'Apply the existing DTXR schedule/bore wall-thickness authority independently inside each XML source.';
+  wall.title = 'Apply DTXR-derived wall only where there is no existing manual override or accepted B31.3 Pull. Source-local authority; no pressure calculation.';
   styleButton(wall);
 
   const rating = document.createElement('button');
@@ -233,12 +252,12 @@ export function installModeAConsolidatedDtxrTools(panel, stateRef) {
   const b313 = document.createElement('button');
   b313.type = 'button';
   b313.textContent = B313_PREVIEW_ACTION_LABEL;
-  b313.title = 'Run the existing governed B31.3 Preview wall-update authority independently for each enabled XML source. Design basis and overrides remain source-local.';
+  b313.title = 'Calculate B31.3 proposals using each source physical node/OD ledger. Does NOT update walls; explicitly Pull eligible proposals in that source Individual Preview / Review.';
   styleButton(b313);
 
   const individualNote = document.createElement('span');
   individualNote.className = 'xml-cii-phase-help';
-  individualNote.textContent = 'B31.3 uses each XML source independently; blocked rows remain NOT_UPDATED with their source-local reason.';
+  individualNote.textContent = 'DTXR may update source walls, without replacing manual/Pull values. B31.3 calculates proposals only: use Individual Preview / Review to inspect and Pull.';
 
   const rightNote = [...toolbar.querySelectorAll('.xml-cii-phase-help')].find((node) => node.style.marginLeft === 'auto');
   for (const node of [label, wall, rating, b313, individualNote]) {
@@ -251,8 +270,8 @@ export function installModeAConsolidatedDtxrTools(panel, stateRef) {
     const result = applyModeAConsolidatedDtxrWall(stateRef);
     const status = statusNode(toolbar);
     status.textContent = result.changed
-      ? `DTXR Wall: ${result.applied} override(s) across ${result.sourceCount} XML source(s).`
-      : `DTXR Wall: no applicable schedule/bore match found (${result.available} candidate row(s)).`;
+      ? `DTXR Wall: ${result.applied} override(s) across ${result.sourceCount} XML source(s) · ${result.manualProtected} manual/Pull protected.`
+      : `DTXR Wall: no new override · ${result.manualProtected} manual/Pull protected · ${result.available} candidate row(s).`;
     if (result.changed) requestRebuild(panel);
   });
 
@@ -265,13 +284,12 @@ export function installModeAConsolidatedDtxrTools(panel, stateRef) {
   });
 
   b313.addEventListener('click', () => {
-    if (typeof confirm === 'function' && !confirm('Run the governed B31.3 wall-thickness update independently for all enabled Mode A XML sources? Blocked rows will remain unchanged.')) return;
+    if (typeof confirm === 'function' && !confirm('Calculate read-only B31.3 proposals independently for all enabled Mode A XML sources? Nothing is pulled or applied automatically. Review and Pull per source.')) return;
     const result = applyModeAConsolidatedB313Wall(stateRef);
     const status = statusNode(toolbar);
-    status.textContent = result.changed
-      ? `B31.3 Wall: ${result.updated} updated · ${result.skipped} blocked/skipped across ${result.sourceCount} changed XML source(s).`
-      : `B31.3 Wall: no row updated · ${result.skipped} blocked/skipped. Expand Individual Preview / Review for detailed source-local blocker evidence.`;
-    if (result.changed) requestRebuild(panel);
+    status.textContent = `B31.3: ${result.calculated} CALCULATED proposal(s) awaiting explicit Pull · ${result.skipped} held/skipped · 0 walls automatically updated. Expand Individual Preview / Review for source-local audit and Pull.`;
+    // Never rebuild from a consolidated Calculate action: it has not
+    // accepted any wall and must not discard saved manual overrides.
   });
 
   return true;
