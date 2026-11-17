@@ -571,7 +571,7 @@ function failureRow(row, code, message, details = {}) {
  */
 export function collectPreviewB313IndependentIssues(row = {}, config = {}) {
   const issues = [];
-  const cfg = ensureBasisConfig(config);
+  const cfg = config?.b313WallUpdate || { bases: {} };
   const key = previewB313BasisKey(row, config);
   const basis = basisForRow(cfg, row, key).basis || {};
   const rawP1 = text(row?.p1);
