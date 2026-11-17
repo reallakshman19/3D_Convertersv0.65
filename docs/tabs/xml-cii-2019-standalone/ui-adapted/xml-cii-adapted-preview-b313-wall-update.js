@@ -595,6 +595,9 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       || (basis.designApproved === true && text(basis.sourceReference)
           && !/^USER_ACCEPTED_PREVIEW_FALLBACK|^B313_ACTIVE_MASTER_CANDIDATE_SEED/.test(text(basis.sourceReference)));
     const csReviewed = materialIdentity.b313FallbackApplied !== true || basis.csFallbackReviewed === true;
+    const identityNeedsReview = materialIdentity.b313IdentityNeedsReview === true;
+    const identityReviewed = !identityNeedsReview || basis.identityReviewed === true
+      || (materialIdentity.b313FallbackApplied === true && basis.csFallbackReviewed === true);
     basisConfig.proposalsByBranch[proposalKey] = {
       schema: 'xml-cii-b313-proposal/v1',
       inputSignature: b313PreviewInputSignature(row, config),
@@ -604,6 +607,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       factorBasisMode: factorBasis.mode,
       materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
       materialFallbackReviewed: csReviewed,
+      materialIdentityNeedsReview: identityNeedsReview,
+      materialIdentityReviewed: identityReviewed,
       manualFactorsReviewed: manualReviewed,
       result, evidence,
     };
