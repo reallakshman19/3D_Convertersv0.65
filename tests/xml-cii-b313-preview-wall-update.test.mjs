@@ -10,7 +10,10 @@ import {
   resolveMaterialCodeFromLineMaterial,
   resolveXmlCiiB313ClassMaterialEvidence,
 } from '../converters/xml-cii2019-core/branch-process-resolver.js';
-import { resolvePreviewB313MaterialFromRow } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
+import {
+  resolvePreviewB313MaterialFromRow,
+  buildPreviewB313WallUpdateReport,
+} from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const base = {
   dn: 250,
@@ -242,5 +245,28 @@ const exactGradeConflict = resolvePreviewB313MaterialIdentity({
 });
 assert.equal(exactGradeConflict.ok, false);
 assert.equal(exactGradeConflict.code, 'B313_PREVIEW_MATERIAL_CONFLICT');
+
+// No Line List design T1 may be fabricated by material CS fallback, a
+// configuration default, or a neighboring temperature record. These are
+// row-level holds, not batch-wide exceptions.
+const tempRow = { branchName:'BR-1', lineKey:'L-1', material:'LTCS',
+  t1:'', t1Source:'none', p1:'10', p1Source:'linelist', corrosion:'1.5' };
+function reported(row) {
+  const r=buildPreviewB313WallUpdateReport({rows:[row],config:{b313WallUpdate:{bases:{},proposalsByBranch:{}}}});
+  assert.equal(r.summary.calculatedRows,0);
+  assert.equal(r.summary.skippedRows,1);
+  return r.rows[0];
+}
+const missingT1=reported(tempRow);
+assert.equal(missingT1.code,'B313_PREVIEW_T1_REQUIRED');
+assert.equal(missingT1.details.nextAction,'EDIT_STEP4_T1_AND_REBUILD');
+const defaultT1=reported({...tempRow,t1:'120',t1Source:'default'});
+assert.equal(defaultT1.code,'B313_PREVIEW_T1_SOURCE_UNVERIFIED');
+assert.equal(reported({...tempRow,t1:'-100000',t1Source:'linelist'}).code,'B313_PREVIEW_T1_REQUIRED');
+const defaultP1=reported({...tempRow,t1:'82',t1Source:'linelist',p1Source:'default'});
+assert.equal(defaultP1.code,'B313_PREVIEW_P1_SOURCE_UNVERIFIED');
+const actual82=reported({...tempRow,t1:'82',t1Source:'linelist'});
+assert.equal(actual82.code,'B313_PREVIEW_FACTOR_BASIS_UNAVAILABLE',
+  'Qualified factors still required at actual T1; no screening or neighboring data promoted');
 
 console.log('XML/CII Preview B31.3 material-factor and wall API composition checks passed.');
