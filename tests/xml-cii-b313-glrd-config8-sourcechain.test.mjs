@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolveXmlCiiB313ClassMaterialEvidence } from '../converters/xml-cii2019-core/branch-process-resolver.js';
-import { resolvePreviewB313MaterialFromRow, buildPreviewB313WallUpdateReport }
+import { resolvePreviewB313MaterialFromRow, buildPreviewB313WallUpdateReport,
+  previewB313BasisKey, b313SourceConfirmsA106Seamless }
   from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import { previewB313SourceTrace, derivePreviewB313AutoBasisRow }
   from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
@@ -113,4 +114,40 @@ test('any material/master class provenance change invalidates a saved Pull signa
    {pipingClassPipeCorrosionMm:'3'},
    {pipingClassPipeSourceRow:999},
  ])assert.notEqual(before,b313PreviewInputSignature({...a,...change},cfg));
+});
+
+test('typing a DSS manufacturing route cannot bypass physical evidence review',()=>{
+ const r=effective(cls93833,200,'DSS','/GLRD-1000-4"-P4110001-93833-01/B6');
+ const key=previewB313BasisKey(r,{});
+ const config=basis=>({b313WallUpdate:{bases:{[key]:basis}}});
+ const unverified=buildPreviewB313WallUpdateReport({
+   rows:[r],config:config({manufacturingRoute:'SEAMLESS'})});
+ assert.equal(unverified.rows[0].code,'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED');
+ const sourcedButNotReviewed=buildPreviewB313WallUpdateReport({
+   rows:[r],config:config({manufacturingRoute:'SEAMLESS',manufacturingRouteSourceReference:'MTR-FILE-PLACEHOLDER'})});
+ assert.equal(sourcedButNotReviewed.rows[0].code,'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED');
+ const sourced=buildPreviewB313WallUpdateReport({
+   rows:[r],config:config({manufacturingRoute:'SEAMLESS',
+     manufacturingRouteSourceReference:'CONTROLLED-PIPE-SPEC-TEST-ONLY',
+     manufacturingRouteEvidenceReviewed:true})});
+ assert.notEqual(sourced.rows[0].code,'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED');
+ assert.equal(sourced.rows[0].status,'NOT_UPDATED');
+ assert.equal(sourced.summary.calculatedRows,0,'Route proof does not qualify missing S/E/W/Y');
+});
+test('exact ASTM A106 product corroborates seamless; generic CS family does not',()=>{
+ const a={material:'ASTM A106-B',materialSource:'process-linelist-material'};
+ const ia=resolvePreviewB313MaterialFromRow(a,{});
+ assert.equal(ia.ok,true);
+ assert.equal(b313SourceConfirmsA106Seamless(a,ia),true);
+ const family={material:'CS',materialSource:'process-linelist-material'};
+ const im=resolvePreviewB313MaterialFromRow(family,{});
+ assert.equal(b313SourceConfirmsA106Seamless(family,im),false);
+});
+test('existing Step 4 automatic panel exposes editable pipe route source and review',()=>{
+ const src=readFileSync(new URL('../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js',import.meta.url),'utf8');
+ assert.match(src,/data-b313-auto-route-source/);
+ assert.match(src,/data-b313-auto-route-reviewed/);
+ assert.match(src,/data-b313-auto-route/);
+ assert.match(src,/routeOnly/);
+ assert.match(src,/ROUTE EVIDENCE REQUIRED/);
 });
