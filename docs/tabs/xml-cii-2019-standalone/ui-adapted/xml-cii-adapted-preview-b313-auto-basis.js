@@ -8,7 +8,7 @@ import {
   previewB313BasisKey,
   resolvePreviewB313MaterialFromRow,
   b313SourceConfirmsA106Seamless,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-unified-review-1';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-source-unit-class-1';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
@@ -649,6 +649,19 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
       actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models, config, rows.length));
     }
     const panel = host.querySelector?.('[data-mc-b313-auto-basis-panel]');
+    // The audit may run before this lazy-rendered editor mounts. In that case
+    // the legacy renderer placed it above the editor as a sibling. Physically
+    // MOVE the existing report (rather than copying or displaying two reports)
+    // into the sole B31.3 review workspace.
+    const slot = panel?.querySelector?.('[data-mc-b313-unified-audit-slot]');
+    if (slot) {
+      const reports = [...(host.querySelectorAll?.('[data-mc-b313-report]') || [])];
+      if (reports.length) {
+        const latest = reports[reports.length - 1];
+        slot.replaceChildren(latest);
+        reports.slice(0, -1).forEach((other) => other.remove());
+      }
+    }
     bindTableLinks(panel);
     bindInfoPopups(panel);
     bindRefresh(panel, host, config, models, options);
