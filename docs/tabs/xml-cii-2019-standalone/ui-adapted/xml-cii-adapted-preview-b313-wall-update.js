@@ -425,9 +425,13 @@ function updateVisibleMaterialCell(host, rowIndex, materialIdentity, factorBasis
     badge = cell.querySelector('[data-b313-material-badge]');
   }
   const active = factorBasis?.ok && factorBasis.mode === 'ACTIVE_MASTER_STRICT';
-  badge.textContent = active ? 'B31.3 MASTER ✓' : 'B31.3 ID ✓';
+  const gradeReview = materialIdentity.b313IdentityNeedsReview === true;
+  // Identity-only is not an approved S/E/W/Y calculation. Only the
+  // separately qualified factor basis receives a success checkmark.
+  badge.textContent = active ? 'B31.3 FACTORS ✓'
+    : gradeReview ? 'B31.3 GRADE REVIEW' : 'B31.3 ID ONLY';
   badge.className = `mc-preview-badge ${active ? 'exact' : ''}`.trim();
-  badge.title = `Preview Material → ${materialIdentity.material.materialId}. Identity source: ${materialIdentity.resolutionSource || materialIdentity.requestMode}. Factor basis: ${factorBasis?.ok ? factorBasis.mode : factorBasis?.code || 'unavailable'}.`;
+  badge.title = `Preview Material → ${materialIdentity.material.materialId}. Identity source: ${materialIdentity.resolutionSource || materialIdentity.requestMode}. Factor basis: ${factorBasis?.ok ? factorBasis.mode : factorBasis?.code || 'unavailable'}. Identity lookup alone does not qualify S/E/W/Y.`;
 }
 
 function factorBasisLabel(factorBasis) {
