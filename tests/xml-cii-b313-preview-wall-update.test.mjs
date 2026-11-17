@@ -256,9 +256,9 @@ const unresolvedClassConflict = resolvePreviewB313MaterialFromRow({
   materialCodeCorroborationNeedsReview: false,
   pipingClassConflict: 'FORMAT1_FORMAT2_DIFFER',
 }, {});
-assert.equal(unresolvedClassConflict.ok, true);
-assert.equal(unresolvedClassConflict.b313IdentityNeedsReview, true,
-  'A conflicting selected Piping Class cannot establish exact material grade');
+assert.equal(unresolvedClassConflict.ok, false);
+assert.equal(unresolvedClassConflict.code, 'B313_PREVIEW_PIPING_CLASS_AUTHORITY_UNRESOLVED',
+  'An unreviewed class source conflict must HOLD rather than silently accept a family grade');
 const unreviewedWildcard = resolvePreviewB313MaterialFromRow({
   material: 'LTCS', materialCodeCorroborationCandidate: 'ASTM A333-6',
   materialCodeCorroborationNeedsReview: true,
