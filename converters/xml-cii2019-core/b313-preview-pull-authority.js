@@ -93,11 +93,11 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
     return { ok: false, code: 'B313_PULL_WALL_REDUCTION_REVIEW_REQUIRED',
       existingWallMm: existingNominal, proposedWallMm: proposal.nominalWallMm };
   }
-  if (proposal.materialIdentityNeedsReview === true && proposal.materialIdentityReviewed !== true) {
-    return { ok: false, code: 'B313_PULL_MATERIAL_GRADE_REVIEW_REQUIRED' };
-  }
   if (proposal.materialFallbackApplied && proposal.materialFallbackReviewed !== true) {
     return { ok: false, code: 'B313_PULL_CS_FALLBACK_REVIEW_REQUIRED' };
+  }
+  if (proposal.materialIdentityNeedsReview === true && proposal.materialIdentityReviewed !== true) {
+    return { ok: false, code: 'B313_PULL_MATERIAL_GRADE_REVIEW_REQUIRED' };
   }
   if (proposal.factorBasisMode !== 'ACTIVE_MASTER_STRICT' && proposal.manualFactorsReviewed !== true) {
     return { ok: false, code: 'B313_PULL_MANUAL_FACTORS_REVIEW_REQUIRED' };
