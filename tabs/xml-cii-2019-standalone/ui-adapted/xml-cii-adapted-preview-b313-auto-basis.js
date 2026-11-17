@@ -158,7 +158,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const storedBasis = storedBasisForRow(config, row, materialId, t1);
   const explicitRoute = text(storedBasis.manufacturingRoute);
 
-  if (!t1) {
+  if (!t1 || text(row?.t1Source).toLowerCase() === 'default') {
     const defaultRoute = materialId === 'CS-A106-B' ? 'SEAMLESS' : '';
     return {
       schema: B313_PREVIEW_AUTO_BASIS_SCHEMA,
@@ -168,9 +168,11 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       t1,
       materialId,
       identityCode: materialIdentity.code,
-      statusCode: 'B313_PREVIEW_T1_REQUIRED',
-      statusLabel: 'T1 REQUIRED',
-      factorSummary: 'S/E/W/Y not evaluated until Preview T1 is resolved',
+      statusCode: !t1 ? 'B313_PREVIEW_T1_REQUIRED' : 'B313_PREVIEW_T1_SOURCE_UNVERIFIED',
+      statusLabel: !t1 ? 'T1 REQUIRED' : 'T1 SOURCE REVIEW',
+      factorSummary: !t1
+        ? 'Enter design T1 in existing 4 Preview, then Rebuild Preview. No fallback temperature is assumed.'
+        : 'T1 came from a configuration default, not verified design evidence. Confirm T1 in 4 Preview and rebuild.',
       route: explicitRoute || defaultRoute,
       routeSource: explicitRoute
         ? 'controlled Preview basis'
@@ -280,8 +282,11 @@ function sourceInfo(model, factor) {
     if (!availability) return `${factor}: no candidate or qualified source record is available.`;
     return [
       `${factor}: ${availability.status || 'UNAVAILABLE'}`,
-      availability.candidateStatuses?.length ? `candidate statuses: ${availability.candidateStatuses.join(', ')}` : '',
-      availability.availableTemperaturesC?.length ? `source temperatures: ${availability.availableTemperaturesC.join(', ')} °C` : '',
+      availability.candidateStatuses?.length ? `candidate statuses at T1: ${availability.candidateStatuses.join(', ')}` : '',
+      availability.nearbySourceStatuses?.length ? `nearby data status: ${availability.nearbySourceStatuses.join(', ')}` : '',
+      availability.nearbyTemperaturesC?.length ? `neighbor temperatures: ${availability.nearbyTemperaturesC.join(', ')} °C` : '',
+      availability.qualifiedSourceTemperaturesC?.length ? `qualified resolution points: ${availability.qualifiedSourceTemperaturesC.join(', ')} °C` : '',
+      availability.availableTemperaturesC?.length ? `all source temperatures: ${availability.availableTemperaturesC.join(', ')} °C` : '',
       availability.availableManufacturingRoutes?.length ? `routes: ${availability.availableManufacturingRoutes.join(', ')}` : '',
       'No qualified factor has been selected at the effective Preview temperature.',
     ].filter(Boolean).join(' · ');
