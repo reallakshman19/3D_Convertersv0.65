@@ -18,6 +18,11 @@ export function b313PreviewInputSignature(row = {}, config = {}) {
     material: txt(row.material),
     materialCode: txt(row.materialCode),
     materialCodeMatchedMaterial: txt(row.materialCodeMatchedMaterial),
+    materialCodeNeedsReview: row.materialCodeNeedsReview === true,
+    materialCodeSource: txt(row.materialCodeSource),
+    materialCodeResolutionMethod: txt(row.materialCodeResolutionMethod),
+    materialCodeConfidence: txt(row.materialCodeConfidence),
+    materialCodeConflict: row.materialCodeConflict || null,
     p1: txt(row.p1),
     p1Source: txt(row.p1Source),
     p1Unit: txt(row.p1Unit),
@@ -88,6 +93,9 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
     return { ok: false, code: 'B313_PULL_WALL_REDUCTION_REVIEW_REQUIRED',
       existingWallMm: existingNominal, proposedWallMm: proposal.nominalWallMm };
   }
+  if (proposal.materialIdentityNeedsReview === true && proposal.materialIdentityReviewed !== true) {
+    return { ok: false, code: 'B313_PULL_MATERIAL_GRADE_REVIEW_REQUIRED' };
+  }
   if (proposal.materialFallbackApplied && proposal.materialFallbackReviewed !== true) {
     return { ok: false, code: 'B313_PULL_CS_FALLBACK_REVIEW_REQUIRED' };
   }
@@ -104,6 +112,8 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
       nominalWallMm: proposal.nominalWallMm,
       selectedSchedule: proposal.selectedSchedule,
       factorBasisMode: proposal.factorBasisMode,
+      materialIdentityNeedsReview: proposal.materialIdentityNeedsReview === true,
+      materialIdentityReviewed: proposal.materialIdentityReviewed === true,
       materialFallbackApplied: proposal.materialFallbackApplied === true,
       calculation: proposal.result,
       status: 'USER_ACCEPTED_PENDING_OUTPUT_VERIFICATION',
