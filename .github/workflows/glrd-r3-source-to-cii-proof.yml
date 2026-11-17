@@ -1,0 +1,74 @@
+name: GLRD R3 physical-source to CII proof (nonreleasing)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/glrd-r3-source-ledger.py'
+      - 'scripts/glrd-r3-cii-parity-oracle.py'
+      - 'tests/test_glrd_r3_source_to_cii.py'
+      - 'scripts/inspect-glrd-b313-linelist-workbook.py'
+      - 'tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs'
+      - 'engineering/b313/**'
+      - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-*.js'
+      - 'converters/xml-cii2019-core/b313-preview-*.js'
+      - '.github/workflows/glrd-r3-source-to-cii-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-provenance-and-output:
+    name: Pinned PSI02 source ledger + independent CII negative controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install only independent worksheet reader dependency
+        run: python -m pip install 'openpyxl==3.1.5'
+      - name: Verify independent source/receipt and native CII negative controls
+        run: python -m unittest discover -s tests -p test_glrd_r3_source_to_cii.py -v
+      - name: Verify 23 missing physical P1/T1 fields with 0 automatic Pull
+        run: node --test tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs
+      - name: Fetch exact pinned original PSI-02 and BM2 source/masters and verify SHA-256
+        run: python scripts/verify-glrd-b313-authentic-inputs.py --fetch --output out/glrd-b313-source-custody.json
+      - name: Independently inspect actual pinned Line List workbook sheets
+        run: python scripts/inspect-glrd-b313-linelist-workbook.py --output out/glrd-b313-linelist-workbook-census.json
+      - name: Produce 30-row canonical physical evidence ledger (engineering HOLD where appropriate)
+        run: python scripts/glrd-r3-source-ledger.py --out-dir out/glrd-r3-source-to-cii
+      - name: Execute native PSI-02 CII converter with synthetic wall; verify no unrelated field changes
+        run: python scripts/verify-glrd-b313-native-writer-parity.py --output out/glrd-r3-source-to-cii/synthetic-native-wall-parity.json
+      - name: Assert real engineering Pull is not falsely reported as qualified
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('out/glrd-r3-source-to-cii/source-to-cii-acceptance.json'))
+          assert x['physicalOccurrences']==30
+          assert x['distinctLineKeys']==22
+          assert x['rowsWithIndependentlyVerifiedSourceCells']==0
+          assert x['rowsWithLineListHold']==30
+          assert x['nativeApprovedPullCiiParity']=='HOLD_NO_APPROVED_PULL_PROVIDED'
+          y=json.load(open('out/glrd-r3-source-to-cii/synthetic-native-wall-parity.json'))
+          assert y['unrelatedElementFieldChanges']==0 and y['elementWallFieldsChanged']>0
+          assert y['engineeringStatus']=='NOT_APPROVED_MANUAL_TEST_WALL_ONLY'
+          print('R3 PROOF PASS: source+native serializer; engineering approval still HOLD')
+          PY
+      - name: Upload evidence only (no redistributed source masters)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glrd-r3-source-to-cii-proof
+          path: |
+            out/glrd-b313-source-custody.json
+            out/glrd-b313-linelist-workbook-census.json
+            out/glrd-r3-source-to-cii/physical-source-ledger.json
+            out/glrd-r3-source-to-cii/physical-source-ledger.csv
+            out/glrd-r3-source-to-cii/source-to-cii-acceptance.json
+            out/glrd-r3-source-to-cii/synthetic-native-wall-parity.json
+          if-no-files-found: warn
