@@ -162,6 +162,43 @@ function factorBlockerText(details = {}) {
   return rows.join(' · ');
 }
 
+
+/** Screening result is visual evidence only; never a Pull or strict factor. */
+function screeningFactorHtml(reference) {
+  if (!reference?.ok) return '';
+  const S=reference.S||{}, bracket=Array.isArray(S.bracket)?S.bracket:[];
+  const bracketText=bracket.map(x=>esc(x.temperatureC)+'°C:'+compact(x.Sksi,5)+' ksi').join(' → ');
+  const routeText=reference.E===null
+    ? 'E varies by unverified route: '+reference.routeOptions.map(x=>esc(x.route)+'='+compact(x.value)).join(' / ')
+    : 'E '+compact(reference.E)+' (route '+esc(reference.selectedRoute)+')';
+  return `<div data-b313-screening-reference style="margin-top:7px;padding:6px;border:1px solid #f59e0b;border-radius:5px;color:#7c2d12;background:#fffbeb;">
+    <strong>SCREENING MASTER LOOKUP — NOT PULL ELIGIBLE</strong>
+    <div>Source: ${esc(reference.basisId)} · ${esc(reference.basisStatus)} · T1 ${esc(reference.temperatureC)}°C</div>
+    <div>S ${fixed(S.MPa,3)} MPa (${compact(S.ksi,5)} ksi) · ${esc(S.method)} ${bracketText ? '('+bracketText+')':''}</div>
+    <div>${routeText} · W ${compact(reference.W)} · Y ${compact(reference.Y)}</div>
+  </div>`;
+}
+
+function screeningWallHtml(reference) {
+  if (!reference?.ok) return '';
+  const scenarios=Array.isArray(reference.scenarios)?reference.scenarios:[];
+  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;">
+    <strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}
+    </div>`;
+  return `<div data-b313-screening-wall style="margin-top:7px;padding:6px;border:1px solid #f59e0b;border-radius:5px;background:#fffbeb;color:#7c2d12;">
+    <strong>CONDITIONAL REFERENCE ONLY — not design approved</strong>
+    <div>P1 ${compact(reference.pressure)} ${esc(reference.pressureUnit)} · OD ${fixed(reference.outsideDiameterMm,3)} mm · CA ${compact(reference.corrosionAllowanceMm)} mm</div>
+    ${scenarios.map(s=>`<div style="border-top:1px solid #fde68a;padding-top:4px;margin-top:4px;">
+      Route ${esc(s.manufacturingRoute)}${s.routeAssumed?' (what-if; not verified)':''} · E ${compact(s.E)}:
+      ${s.calculationOk
+        ? `pressure wall ${fixed(s.pressureDesignThicknessMm,4)} mm → required nominal ${fixed(s.requiredNominalThicknessMm,4)} mm
+          · class ${fixed(s.classNominalWallMm,4)} mm / ${esc(s.classSchedule||'?')}
+          · ${s.classPass?'class reference PASS':'class reference HOLD '+esc(s.classCode||'UNAVAILABLE')}`
+        : `no result (${esc(s.code)})`}
+    </div>`).join('')}
+  </div>`;
+}
+
 function failedRowHtml(row) {
   const details = row?.details || {};
   const identity = details.materialIdentity || details.factorBasis?.materialIdentity || details.factorBasis?.details?.materialIdentity || null;
@@ -177,6 +214,9 @@ function failedRowHtml(row) {
   const odTolerance = details.toleranceMm ?? details.odBasis?.toleranceMm;
   const odHint = finite(odReference) === null ? '' : `OD reference ${fixed(odReference, 3)} mm${finite(odTolerance) === null ? '' : ` · tolerance ±${fixed(odTolerance, 3)} mm`}`;
   const factorHint = blockers || (strictMissing.length ? `Strict factors missing: ${strictMissing.join(', ')}` : '');
+  const screeningReference = row?.screeningReference;
+  const screeningFactor = screeningFactorHtml(screeningReference);
+  const screeningWall = screeningWallHtml(screeningReference);
   const independentIssues = (Array.isArray(details.independentInputIssues) ? details.independentInputIssues : [])
     .filter((issue) => issue && issue.code !== row.code);
   const independentHint = independentIssues.length
@@ -185,8 +225,8 @@ function failedRowHtml(row) {
   return `<tr>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-family:monospace;font-size:11px;color:#0f172a;">${esc(row.branchName || '—')}</div><div style="font-size:10px;color:#64748b;margin-top:2px;">Line ${esc(row.lineKey || '—')}</div></td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;">${esc(materialId || 'Material identity unresolved')}</div>${materialSource ? `<div style="font-size:10px;color:#64748b;">identity source ${esc(materialSource)}${finite(t1) === null ? '' : ` · T1 ${esc(t1)} °C`}</div>` : ''}</td>
-    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#92400e;">${esc(factorMode)}</div>${factorHint ? `<div style="font-size:10px;color:#92400e;margin-top:3px;">${esc(factorHint)}</div>` : ''}</td>
-    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#991b1b;">${esc(row.code || 'B313_PREVIEW_NOT_UPDATED')}</div><div style="font-size:11px;color:#475569;margin-top:2px;">${esc(reason)}</div>${odHint ? `<div style="font-size:10px;color:#64748b;margin-top:3px;">${esc(odHint)}</div>` : ''}${independentHint}</td>
+    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#92400e;">${esc(factorMode)}</div>${factorHint ? `<div style="font-size:10px;color:#92400e;margin-top:3px;">${esc(factorHint)}</div>` : ''}${screeningFactor}</td>
+    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#991b1b;">${esc(row.code || 'B313_PREVIEW_NOT_UPDATED')}</div><div style="font-size:11px;color:#475569;margin-top:2px;">${esc(reason)}</div>${odHint ? `<div style="font-size:10px;color:#64748b;margin-top:3px;">${esc(odHint)}</div>` : ''}${independentHint}${screeningWall}</td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;white-space:nowrap;">${statusPill('NOT_UPDATED')}</td>
   </tr>`;
 }
@@ -258,12 +298,12 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
 
   return `<details data-mc-b313-report open style="margin:10px 0;border:1px solid ${border};border-radius:8px;background:#ffffff;padding:10px;box-shadow:0 1px 2px rgba(15,23,42,.06);">
     <summary style="cursor:pointer;font-weight:800;color:${titleColor};">B31.3 wall update audit · Evaluated ${summary.evaluatedRows} · ${countsLabel}</summary>
-    <div style="font-size:11px;color:#475569;margin:8px 0;">Line-list and Piping Class data may resolve the governed material identity. They do not invent numeric S/E/W/Y. Automatic factors must still come from strict VERIFIED / PROJECT_APPROVED B31.3 factor records at the row T1 and, where applicable, the manufacturing route.</div>
+    <div style="font-size:11px;color:#475569;margin:8px 0;">Factor lookups from the existing screening master are shown below as numerical references (including temperature interpolation). These results are <strong>not approved for Pull</strong>. Only qualified B31.3 S/E/W/Y or explicitly reviewed controlled manual factors can produce eligible Pull proposals.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       <span style="padding:4px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-size:10px;"><strong>Code basis</strong> ASME B31.3-2024 §304.1.2 Eq. (3a)</span>
       <span style="padding:4px 8px;border-radius:6px;background:#ecfdf5;color:#166534;font-size:10px;"><strong>Primary factors</strong> Preview Material → B31.3 identity → qualified stress S + governed E/W/Y sources at T1</span>
       <span style="padding:4px 8px;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;"><strong>Fallback</strong> manual S/E/W/Y only when active master is incomplete; controlled source required</span>
-      <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Excluded</strong> BENCHMARK_ONLY / SCREENING factors</span>
+      <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Not Pull eligible</strong> BENCHMARK_ONLY / SCREENING reference calculations</span>
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Mill tolerance</strong> ${esc(text(rows.find((row) => row.result?.calculation?.manufacturingTolerance)?.result?.calculation?.manufacturingTolerance?.inputValue ?? 12.5))}${rows.some((row) => row.result?.calculation?.manufacturingTolerance?.basis === 'absolute') ? ' mm absolute' : '% negative'}</span>
     </div>
     ${warning}
