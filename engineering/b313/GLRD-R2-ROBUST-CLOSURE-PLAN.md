@@ -1,0 +1,124 @@
+# GLRD PSI-02 B31.3 — R2 robust closure workpack (17 Nov 2026)
+
+**Disposition:** EXECUTABLE PLAN / ENGINEERING HOLD. Do not merge PR #5 or deploy based on software-only PASS. Do not promote SCREENING, BENCHMARK_ONLY, or invented source approval. This plan is not an engineering sign-off.
+
+## Baseline and scope
+
+- Repository: `reallakshman19/3D_Convertersv0.65`; PR #5 current reviewed head before this plan: `33a810f6f5aa173291ac8c201bf2db9b0519f08f`; main: `91c1a28d248d0053dfdb38d4cc05402a4fb12013`.
+- Authentic target is **GLRD-1000-PSI-02.xml**: 30 Branch, 1,224 Node, SHA-256 `164163380dccffb8f9d6bd7853eabd36eea89e508da2215443e81969144d4a45`. The 31-Branch/1,196-Node BM2 XML is a **different historical model**, never substitute.
+- Seven source-file hashes are pinned in `glrd-pinned-source-manifest.json`; all seven passed in CI (source-custody run 44025609526 / 44025855008). The 86-root-entry staged JSON is **BM2-named**; its applicability to PSI-02 remains unverified.
+- Owner-provided 30-row factor audit was mapped to the exact PSI-02 branch order: 26 DSS S31803/T1 120°C; 2 LTCS A333 Gr 6/T1 120°C; 2 LTCS A333 Gr 6/T1 82°C. These are **audit labels**, NOT independently certified pipe grades/routes or approved factor sets. Source: `glrd-psi02-factor-groups.json`.
+- The prior `bm2-workbench-config.json` was 8,433,327 bytes, SHA-256 `766da8fa5711c373e309e975f6c1bb8fedc7caf4b835d9dbc9909af3de876bd8`, and its saved Line List rows corresponded to `Coversheet` rather than the required `Linelist`. It is not proved effective for PSI-02.
+- PR-head workflow inventory: **54 total: 23 success, 31 failure**. Dedicated B31.3/Preview + Chromium, P0, and GLRD pinned source/native-writer synthetic tests passed. Do NOT represent the whole PR as CI green. P1 `branch-format-extraction.js` runtime/docs drift was observed on `main`; all other failures require independent classification.
+- Actual strict E/W/Y rule pack has **zero published records**. Actual strict S material-factor source has no project-qualified DSS/LTCS stress rows. Code cannot supply licensed/approved engineering values by itself.
+
+## Acceptance outcome, not a blanket target of "30 updated"
+
+Produce a reproducible run of the **real effective 30-row Step 4 Preview** with each occurrence in one of:
+- `CALCULATED_PULL_READY` (fully qualified and correctly selected nominal wall);
+- `CALCULATED_REVIEW_REQUIRED` (valid numeric result but protected physical/source authority or schedule condition requires acceptance);
+- `HOLD_<SPECIFIC_CAUSE>` (missing/ambiguous source, factors, route, pressure units, code clause, applicability or output).
+Only explicit accepted physical rows may become `PULLED`; after Final Run, each accepted row must be independently checked against emitted CII fields. The total may be less than 30 if genuine engineering gaps remain. Never equate calculation with Pull.
+
+## Ordered workpacks and exact acceptance gates
+
+### R2-A — Recover *effective* PSI-02 Preview authority (source engineer + developer)
+
+**Inputs:** pinned PSI-02 XML, Line List workbook, piping-class master, material map, weights, relevant stage; actual saved PSI-02 session configuration or a precisely defined/reviewed replacement.
+
+1. Recover previously provided configuration by exact SHA when possible. Do **not** silently repurpose historical BM2 settings. If source configuration is incomplete, create `psi02-effective-config-r1.json` under controlled custody with explicit deviations, preserved prior settings, source workbook+sheet names and newly computed SHA.
+2. Verify `LL_BM2.xlsx` `Linelist` sheet rather than `Coversheet`; reconcile headers/merged cells and each actual line key. Check source precedence and record conflicts instead of guessing.
+3. Prove the BM2-named staged JSON belongs to PSI-02 using branch/node/geometry identity mapping; otherwise mark it `STAGE_NOT_APPLICABLE` and replay without invented staged facts.
+4. Extract 30 physical Preview rows to `glrd-psi02-effective-preview.json`, each with source branch ordinal/name, line key, XML node IDs, DN/actual OD, Piping Class+exact DN row, source material, actual product form, manufacturing route evidence, P1/value/unit/source, hydro/test pressure separately, T1/value/unit/source, corrosion/erosion allowance, tolerance mode, original wall, pipe schedule options.
+5. Record every unresolved conflict (e.g. LTCS line under class 93833, unverified material code, ambiguous route, no pressure unit); no placeholder approvals.
+
+**PASS:** 30/30 exact branch identity/order; complete source-lineage columns or explicit HOLD; independently confirmed P1 vs hydro/test value and applicable design temperature; effective config hash captured. **FAIL:** Coversheet used as Linelist, BM2 substituted for PSI-02, ambiguous stage accepted.
+
+### R2-B — Establish code edition and governed material/product basis (project piping engineer)
+
+1. Resolve actual governing ASME B31.3 edition from the **PSI-02 project's** engineering design basis. Current app pack declares 2024; an unrelated document mentioning 2020 is NOT authority to switch.
+2. For each physical DN, resolve actual ASTM specification + grade/UNS + product form and manufacturing/seam/examination route. Piping Class alone is insufficient if materials change with DN. A790, A928, A333 or A671 designations are distinct product/manufacturing contexts.
+3. Require MTR/PO/piping specification or other controlled evidence for route. For unknown route, E remains HOLD. No "all DSS seamless" assumption.
+4. Create a small approved `product_identity` register keyed by physical occurrence and reusable qualified product scope; retain evidence hashes, approver and source date.
+
+**PASS:** every eligible occurrence has code edition, exact product and applicable route/quality evidence; conflicts remain named HOLDS. **FAIL:** matching project material-family label used as grade/route approval.
+
+### R2-C — Publish qualified S and E/W/Y (code authority + independent reviewer)
+
+- **S:** exact material/spec, grade, product form and edition; applicable B31.3 Appendix A stress-table row and notes; original temperature records and units; controlled source/table/row reference; allowed temperature interpolation *only under approved code rule and both bracket records*. No default screening S or extrapolation.
+- **E:** table/rule selected from actual manufacturing/seam/examination route and code edition (e.g. B31.3 Tables A-2/A-3 as applicable); no route guess and no unrelated material cross-approval.
+- **W:** weld-strength-reduction code table/rule with material group and metal temperature applicability (B31.3 Table 302.3.5-1 or applicable provisions); explicit source notes, scope and validity.
+- **Y:** coefficient from appropriate code material/temperature/geometry rule, including eq. (3a) applicability (B31.3 Table 304.1.1-1). Do not automatically apply a carbon-steel Y to all DSS.
+- Source authority schema for every approved rule/row: `{edition, spec, grade, productForm, manufacturingRouteScope, factor, temperatureScope, value, units, codeTable, codeRow, codeNotes, sourceDocumentDigest, sourceReviewer, approvalReference, approvalDate, revision}`.
+- Only controlled reviewed values enter `docs/Masters/b313-material-factor-master.json` and `docs/Masters/b313-code-factor-rules.json`. Preserve current benchmark/screening records as nonproduction diagnostics; do not overwrite their statuses.
+- S/E/W/Y can be reused for legitimately identical qualified product+route+edition+temperature scopes. **Individual Pull decisions remain physical-occurrence scoped.**
+- Verify generator, runtime/docs parity, published pack revision fingerprint, ambiguity/duplicate conflict, source supersession/stale Pull, and negative controls. A syntactically well-formed source name is *not* verification of its content.
+
+**PASS:** every eligible factor resolves with a compatible authoritative source and provenance; independently checked values for DSS/120, LTCS/120, LTCS/82, splitting groups by route or product as needed. **FAIL:** manually re-label SCREENING as VERIFIED without external proof or use fake code-table values.
+
+### R2-D — Pressure-design calculation, nominal wall and existing Step 4 UX (developer + engineer)
+
+1. Use only actual **P1 design pressure** with documented units and coincident design **T1**. Never substitute hydro/test pressure or a default T1. Convert units once with trace.
+2. Apply applicable B31.3 straight-pipe pressure-design equation (e.g. §304.1.2 Eq. 3a) **only when its validity conditions are met**; route thick-wall/special conditions to explicit engineering review, not silent Eq.3a acceptance.
+3. Calculate pressure wall, add corrosion/erosion and applicable mechanical allowances, apply negative mill tolerance (12.5% default or explicit mm input), then choose an available project-authorized *nominal* OD/DN/schedule with thickness >= required. Respect source wall and "do not silently reduce" policy.
+4. Validate branch/pipe node topology and effective occurrence authority. Do not copy one branch wall across different OD/nodes/grades/schedules.
+5. Preserve existing `4 Preview` UI, adjacent Fill and `⤓ Pull` icons and individual approval. Rename ambiguous audit `Updated` to `Calculated`; show independent `Pull ready`, `Pulled`, `CII verified` counts. Group HOLDs by distinct product/T1/route/root cause while retaining full 30-row details.
+
+**PASS:** independent hand calculations for representative DSS120, LTCS120, LTCS82, negative pressure/missing-unit/route/class test cases; no silent modifications. **FAIL:** completed formula but invalid pipe schedule, source grade or pressure units.
+
+### R2-E — Authentic end-to-end replay and emitted native CII (developer + independent verifier)
+
+At fixed input/config/master/code-pack SHA snapshots:
+1. Launch original standalone Step 4 using PSI-02, proven applicable stage and correct Line List worksheet; rebuild Preview and capture 30-row source ledger.
+2. Run automatic B31.3 factor resolution and calculation; capture each source record, numeric factor, intermediate wall, nominal selection, status.
+3. Explicitly Pull authorized rows only. Record before/after Preview and node signatures; confirm no unintended Fill Down or cross-branch edit.
+4. Rebuild effective enriched XML via actual app finalization path, then emit **real native CII** with the production Python engine/options, not just a synthetic independent writer call.
+5. Match each accepted physical pipe's source/target nodes to emitted CII ELEMENTs; compare wall numerical fields, units, counts, ordering and unchanged engineering fields. Take separate SHA-256s for original XML, stage/config, enriched XML, native CII, factor pack and acceptance ledger.
+6. Reopen saved state; prove Pull staleness invalidation after factor-pack edition/source revision or source-node mutation.
+
+**PASS:** 100% of accepted Pulls independently matched to emitted CII; no unexpected changes outside authorized row scope. **FAIL:** an unchanged synthetic writer test is used as a substitute for real Step 4 acceptance, or topology/output differs without explanation.
+
+### R2-F — CI triage, independent engineering approval and controlled release
+
+1. Inventory all 54 PR-head workflows and classify all 31 failures by failure step: relevant changed-code regression, inherited main mismatch (reproduced on same test at same base), infrastructure flake (rerun with evidence), or unrelated but blocking release qualification.
+2. Do not mark any failure "pre-existing" from a description alone. At minimum, the observed P1 runtime/docs branch-format extraction mismatch exists on main; the remaining 30 require evidence.
+3. Require successful B31.3 unit+browser+authentic-source+E2E CII workflows at **the final exact PR head**; all production-required workflow failures resolved or explicitly independently dispositioned.
+4. Independent piping-engineer approval of governing edition, material routes, factor sources, schedule selections and CII parity. Engineering signoff cannot be self-granted by CI.
+5. Only after all mandatory gates: non-draft PR, explicit owner approval, merge, Pages deployment, live smoke with cache purge and source/factor revision display.
+
+**PASS:** signed numerical/source qualification + final-head technical acceptance + controlled deployment. Until then **PR #5 DRAFT / ENGINEERING HOLD**.
+
+## UI contract (reuse existing Step 4, no extra screen)
+
+```
+4 Preview    [Fill ▾] [⤓ Pull]  [B31.3 Wall Calculation ▾]
+             B31.3: Evaluated 30 | Basis qualified _ | Calculated _ |
+                    Pull-ready _ | Pulled _ | Native CII verified _
+  ┌ Material / T1 / Route group ──────────────────────────────────────┐
+  │ DSS-A790-S31803  120°C  route: UNVERIFIED   26  HOLD ROUTE+S     │
+  │ LTCS-A333-6      120°C  route: UNVERIFIED    2  HOLD FACTORS      │
+  │ LTCS-A333-6       82°C  route: UNVERIFIED    2  HOLD S BRACKETS   │
+  └───────────────────────────────────────────────────────────────────┘
+  Existing Preview row:  Source → Material → P1/T1 → Wall Thk [Fill][⤓]
+  Existing audit details: factor values/sources/revisions or precise HOLD.
+```
+
+These are **present diagnostic groups**, not guaranteed final engineering groups. Actual product/route conflicts may split them.
+
+## Deliverables and custody contract
+
+- `glrd-psi02-effective-config-r1.json` + SHA + source workbook/worksheet manifest
+- `glrd-psi02-occurrence-custody.json` + CSV: exactly 30 physical rows, conflict reasons, P1/T1/units and source links
+- `glrd-b313-product-route-qualification.json` and independently governed code-factor S/E/W/Y source pack revisions
+- `glrd-b313-factor-and-wall-audit.json`: factor group IDs, row-level calculations, source table notes and nominal selections
+- `glrd-b313-pull-ledger.json`: explicit per-occurrence acceptance, node scope and revision signatures
+- `glrd-b313-emitted-cii-parity.json`: exact native CII node/ELEMENT mapping, counts, differences, hashes and status
+- `glrd-b313-ci-closure.json`: 54 workflow classifications, exact-head required checks and independent release decision
+
+No deliverable may claim `ENGINEERING_APPROVED` or `PULLED` without supporting evidence. Missing external inputs remain explicit HOLD fields.
+
+## Order and responsibility
+
+`R2-A source custody → R2-B product identity + edition → R2-C factor authorization → R2-D calculations → R2-E Pull/CII → R2-F independent review/release`.
+
+Software owner can complete schema, resolvers, verifiers, source reconciliation and tests. The project engineering authority must establish the governing edition, controlled numerical code values, manufacturing route and physical design approvals. This is a real external dependency, not a software defect to bypass.
