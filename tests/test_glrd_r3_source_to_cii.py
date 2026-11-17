@@ -71,7 +71,7 @@ def element(wall,ident='100 110 0 0 0 168.3',other='5'):
 class NativeCiiOracleTests(unittest.TestCase):
     def setUp(self):
         self.a=[element('7.112'),element('12.700','200 210 0 0 0 168.3')]
-        self.b=[element('9.500'),element('12.700','200 210')]
+        self.b=[element('9.500'),element('12.700','200 210 0 0 0 168.3')]
         self.approved=[{'elementOrdinal':1,'approvalReference':'ENG-REF-01',
           'physicalOccurrenceKey':'0|/GLRD/B1|100','baselineElementHeader':'100 110 0 0 0 168.3',
           'ciiFromNode':100,'ciiToNode':110,'sourceNodeNumber':100,
