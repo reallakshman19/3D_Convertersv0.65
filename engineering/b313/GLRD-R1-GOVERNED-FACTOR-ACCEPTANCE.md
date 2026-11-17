@@ -2,15 +2,37 @@
 
 **Engineering status: HOLD (software candidate, not production approval).**
 
-## Selected input custody
+## Source recovery — PSI-02 (30 rows) versus historical BM2 (31 rows)
 
-The current user-selected GLRD-INPUTS Library folder was accessed through the exact
-selected Google Drive account and folder locator. Direct connector listing,
-folder fetch and the exact parent-filtered search all returned zero children.
-No archive from another drive folder or earlier task was silently substituted.
-**Actual-model 30-row replay is therefore NOT verified.** The 30-row diagnostics
-pasted by the owner are evidence of the reported failure, not a substitute for
-the original XML, staged JSON, masters and effective configuration.
+The selected `@GLRD-INPUTS` connected Drive folder is empty, but the owner's
+earlier `GLRD-INPUTS-MANIFEST.md` and `glrd-input-links.md` identify public,
+commit-pinned GLRD inputs in `reallakshman19/3D_Converters`.
+The **30-row wall audit** corresponds to `GLRD-1000-PSI-02.xml`, not
+`GLRD-1000-PI-01 - BM2.xml` (31 branches).
+The latter has different names/nominal sizes for important branches and
+cannot be silently substituted. See `glrd-pinned-source-manifest.json`.
+
+The CI source-custody job pins and hashes **both** XML revisions, staged JSON,
+Line List, Piping Class, valve-weight master and material map. It verifies
+30 current audit branches, 1,224 PSI-02 nodes, 31 historical BM2 branches,
+1,196 BM2 nodes, and 86 staged top-level records. The provided 30-row audit
+classifications have a dedicated source-ordered register:
+`glrd-psi02-factor-groups.json` (26 DSS/T1 120°C, two LTCS/T1 120°C,
+two LTCS/T1 82°C), with *zero factor approvals* and *unverified routes*.
+
+**Do not mistake pinned bytes and the branch census for a complete live Step 4 replay.**
+The staged JSON's relationship to PSI-02 is unverified. The historically
+supplied `bm2-workbench-config.json` was 8,433,327 bytes (SHA-256
+`766da8fa5711c373e309e975f6c1bb8fedc7caf4b835d9dbc9909af3de876bd8`),
+but is not accessible to the current CI runtime; the old config's Line List
+source was the workbook's Coversheet rather than the authoritative Linelist.
+It is *not* established as the effective configuration for PSI-02.
+
+Exact authoritative replay therefore still requires the 30-row run's effective
+config/source-selection evidence, actual P1/T1 units, code edition,
+manufacturing routes, approved factor sources, and native CII output.
+The current code path's synthetic browser Pull test is not a real-material
+CII parity test.
 
 ## Root cause and architecture
 
