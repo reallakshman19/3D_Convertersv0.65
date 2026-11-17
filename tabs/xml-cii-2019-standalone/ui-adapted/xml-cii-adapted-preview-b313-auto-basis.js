@@ -282,7 +282,7 @@ function sourceInfo(model, factor) {
     if (!availability) return `${factor}: no candidate or qualified source record is available.`;
     return [
       `${factor}: ${availability.status || 'UNAVAILABLE'}`,
-      availability.candidateStatuses?.length ? `candidate statuses at T1: ${availability.candidateStatuses.join(', ')}` : '',
+      availability.candidateStatuses?.length ? `candidate statuses: ${availability.candidateStatuses.join(', ')} (at T1)` : '',
       availability.nearbySourceStatuses?.length ? `nearby data status: ${availability.nearbySourceStatuses.join(', ')}` : '',
       availability.nearbyTemperaturesC?.length ? `neighbor temperatures: ${availability.nearbyTemperaturesC.join(', ')} °C` : '',
       availability.qualifiedSourceTemperaturesC?.length ? `qualified resolution points: ${availability.qualifiedSourceTemperaturesC.join(', ')} °C` : '',
