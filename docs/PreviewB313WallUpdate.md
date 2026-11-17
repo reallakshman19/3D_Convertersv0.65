@@ -65,6 +65,26 @@ Pull is allowed for unapproved inferred grade, unresolved route, or
 incomplete factor qualification. User-entered manual S/E/W/Y remains an
 explicit, non-master fallback with independent source/review requirements.
 
+## Size-specific material authority
+
+The existing Step 8 **Piping Class / Material Code** default is not an
+exact pipe product specification across all DN sizes. For B31.3 factor
+corroboration, the selected effective **Piping Class + DN** master row is
+required. A matching row's exact grade is evidence; a class-wide material
+fallback without a matching DN is **review required**. If the generic
+Material Code designation disagrees with the exact-size Piping Class
+material, the row is HOLD (`B313_MATERIAL_CODE_VS_CLASS_DN_CONFLICT`).
+
+This is essential for class 11472 (A333 Grade 6 through DN600; A671
+CC65 Class 22 at DN750–1200) and class 13831 (A790 S31803 through
+DN200; composite A790/A928 at DN250–600). An `A790/A928` product must
+not silently be treated as seamless A790. All factor qualification is
+scoped to the physical pipe occurrence and confirmed route.
+
+See `engineering/b313/material-factor-qualification-intake-v1.json`.
+The intake is a review-only register, **not** an automatic factor
+source and not an authorization for Pull.
+
 ## Material-column custody
 
 The effective Phase 4 `Material` cell is the primary material identity input. That cell already follows the Preview material-authority order: process/line-list material evidence first, then governed piping-class/material-code fallback when process material is absent.
