@@ -153,7 +153,7 @@ export function resolveB313DesignFactors(input={}){
  if(!(Number(S)>0))missing.push('S');
  if(!(Number(E)>0))missing.push('E');
  if(!(Number(W)>0))missing.push('W');
- if(!(Number(Y)>=0))missing.push('Y');
+ if(Y===null||Y===undefined||!Number.isFinite(Number(Y))||Number(Y)<0||Number(Y)>1)missing.push('Y');
  const sources={
    S:o.allowableStressMPa!==undefined||o.S!==undefined?{authority:'CALLER_OVERRIDE'}:sr?{...sr}:null,
    E:o.qualityFactorE!==undefined||o.E!==undefined?{authority:'CALLER_OVERRIDE'}:er?{...er}:rE?.ok?rE.factorSource:null,
