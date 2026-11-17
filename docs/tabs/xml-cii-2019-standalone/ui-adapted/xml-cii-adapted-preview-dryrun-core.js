@@ -579,6 +579,11 @@ function previewP1Unit(lineRow, p1) {
       materialCodeMethod: matMethod,
       materialCodeMatchedMaterial: resolved.materialCodeMatchedMaterial || '',
       materialCodeSource: resolved.materialCodeEvidenceSource || resolved.materialSource || '',
+      materialCodeCorroborationCandidate: resolved.materialCodeCorroborationCandidate || '',
+      materialCodeCorroborationSource: resolved.materialCodeCorroborationSource || '',
+      materialCodeCorroborationMethod: resolved.materialCodeCorroborationMethod || '',
+      materialCodeCorroborationConfidence: resolved.materialCodeCorroborationConfidence ?? null,
+      materialCodeCorroborationNeedsReview: resolved.materialCodeCorroborationNeedsReview === true,
       materialCodeResolutionMethod: resolved.materialCodeMatchMethod || '',
       materialCodeConfidence: resolved.materialCodeConfidence ?? null,
       // Preserve wildcard and conflict review state even when a code exists.
