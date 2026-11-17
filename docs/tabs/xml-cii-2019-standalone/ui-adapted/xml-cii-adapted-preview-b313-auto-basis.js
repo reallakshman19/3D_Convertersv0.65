@@ -390,7 +390,12 @@ function panelHtml(models, config = {}) {
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div><div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div></td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:180px;">
+        <strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div>
+        <input type="text" data-b313-auto-route aria-label="Actual pipe manufacturing route" placeholder="SEAMLESS / EFW_..." value="${esc(model.storedBasis?.manufacturingRoute || (model.routeSource==='confirmed ASTM A106 product specification'?model.route:''))}" style="margin-top:4px;width:98%;">
+        <input type="text" data-b313-auto-route-source aria-label="Physical route source reference" placeholder="Pipe spec / MTR source reference" value="${esc(model.storedBasis?.manufacturingRouteSourceReference || '')}" style="margin-top:4px;width:98%;">
+        <label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-route-reviewed ${model.storedBasis?.manufacturingRouteEvidenceReviewed === true?'checked':''}> Route source independently reviewed</label>
+      </td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'S', 'allowableStress', { width: '82px' })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${stressUnitCell(model)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'E', 'qualityFactorE', { min: 0, max: 1 })}</td>
@@ -486,7 +491,9 @@ function bindRefresh(panel, host, config, models, options) {
       material: model.material,
       materialId: model.materialId,
       designTemperature: model.t1,
-      manufacturingRoute: model.route,
+      manufacturingRoute: text(rowEl?.querySelector?.('[data-b313-auto-route]')?.value),
+      manufacturingRouteSourceReference: text(rowEl?.querySelector?.('[data-b313-auto-route-source]')?.value),
+      manufacturingRouteEvidenceReviewed: rowEl?.querySelector?.('[data-b313-auto-route-reviewed]')?.checked === true,
       allowableStress: numericField(rowEl, 'allowableStress'),
       stressUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="stressUnit"]')?.value || model.fallback?.stressUnit),
       qualityFactorE: numericField(rowEl, 'qualityFactorE'),
@@ -503,9 +510,15 @@ function bindRefresh(panel, host, config, models, options) {
     };
     const status = rowEl.querySelector?.('[data-b313-auto-status]');
     const strictReady = model.factorBasis?.ok && model.factorBasis?.mode === 'ACTIVE_MASTER_STRICT';
-    if ((!strictReady && !validateFallbackRecord(record)) || (!strictReady && !text(record.sourceReference))) {
+    const routeOnly = !!record.manufacturingRoute
+      && !!record.manufacturingRouteSourceReference
+      && record.manufacturingRouteEvidenceReviewed === true;
+    const manualFactorsComplete = validateFallbackRecord(record) && !!text(record.sourceReference);
+    // Allow physical route evidence to be saved independently of manual
+    // factor overrides; a newly verified route may unlock strict code data.
+    if (!strictReady && !manualFactorsComplete && !routeOnly) {
       if (status) {
-        status.textContent = 'INVALID FALLBACK VALUES';
+        status.textContent = 'REVIEW ROUTE SOURCE OR COMPLETE MANUAL FACTORS';
         status.style.color = '#fca5a5';
       }
       return;
