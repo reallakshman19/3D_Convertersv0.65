@@ -59,8 +59,8 @@ def source_receipts(receipt,rows,xml_sha,workbook):
                 raise ValueError('PRESSURE_HEADER_NOT_DESIGN_P1')
             if re.search(r'HYDRO|TEST|OPERATING|PROOF',p_header):
                 raise ValueError('PRESSURE_HEADER_IS_HYDRO_OR_OPERATING')
-            found=re.findall(r'KPA|MPA|PSIG|PSI|BARG|BAR(?:\s*\(G\))?',p_header)
-            found={f.replace(' ','').replace('(G)','G') for f in found}
+            found=re.findall(r'KPA|MPA|PSIA|PSIG|PSI|BARG|BAR(?:\s*\(G\))?',p_header)
+            found={f.replace(' ','').replace('(G)','G').replace('PSIA','PSI').replace('PSIG','PSI') for f in found}
             if len(found)!=1 or next(iter(found))!=str(rec.get('p1Unit','')).upper():
                 raise ValueError('P1_UNIT_NOT_EXACT_HEADER_UNIT')
             t_header=cell('t1HeaderCell').upper()
@@ -76,8 +76,8 @@ def source_receipts(receipt,rows,xml_sha,workbook):
             if not agree:raise ValueError('SOURCE_RECEIPT_DIFFERS_FROM_WORKBOOK')
             # Gauge-vs-absolute pressure is part of the source authority.
             # It must not be guessed from the numerical P1 magnitude.
-            gauge=bool(re.search(r'\\(G\\)|\\bGAUGE\\b|\\bPSIG\\b|\\bBARG\\b',p_header))
-            absolute=bool(re.search(r'\\(A\\)|\\bABS(?:OLUTE)?\\b|\\bPSIA\\b',p_header))
+            gauge=bool(re.search(r'\(G\)|\bGAUGE\b|\bPSIG\b|\bBARG\b',p_header))
+            absolute=bool(re.search(r'\(A\)|\bABS(?:OLUTE)?\b|\bPSIA\b',p_header))
             if gauge == absolute:
                 raise ValueError('P1_GAUGE_ABSOLUTE_SOURCE_UNRESOLVED')
             if rec.get('pressureBasis') != ('GAUGE' if gauge else 'ABSOLUTE'):
