@@ -127,6 +127,37 @@ function fallbackFromStoredOrSeed(storedBasis, seed) {
   return fallback;
 }
 
+/** Source trace shown inside the EXISTING automatic-basis panel. A source row
+ * corroborates product and schedule; it does not qualify B31.3 factors.
+ */
+export function previewB313SourceTrace(row = {}) {
+  const pieces = [];
+  const cls = text(row.pipingClass);
+  const dn = text(row.pipingClassPipeDnMm ?? row.sizeMm);
+  const product = text(row.pipingClassPipeMaterial);
+  const schedule = text(row.pipingClassPipeSchedule);
+  const wall = text(row.pipingClassPipeWallMm);
+  const corrosion = text(row.pipingClassPipeCorrosionMm);
+  const sourceRow = text(row.pipingClassPipeSourceRow);
+  if (cls && product) {
+    pieces.push(`Class ${cls} / DN${dn||'?'} → ${product}` +
+      (schedule ? ` · Sch ${schedule}` : '') +
+      (wall ? ` · nominal ${wall} mm` : '') +
+      (corrosion ? ` · class CA ${corrosion} mm` : '') +
+      (sourceRow ? ` · master row ${sourceRow}` : ''));
+  } else if (cls) {
+    pieces.push(`Class ${cls} / DN${dn||'?'} · exact pipe-product evidence unavailable`);
+  }
+  const code = text(row.materialCode);
+  if (code) {
+    pieces.push(`Material Code ${code} · ${text(row.materialCodeSource)||'source unresolved'}` +
+      (text(row.materialCodeResolutionMethod) ? ` / ${text(row.materialCodeResolutionMethod)}` : '') +
+      (row.materialCodeNeedsReview===true ? ' · REVIEW' : ''));
+  } else pieces.push('Material Code unresolved');
+  if (row.materialCodeCorroborationNeedsReview === true) pieces.push('Class material candidate needs review');
+  return pieces.join(' | ');
+}
+
 export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const material = text(row?.material || row?.materialName || row?.resolvedMaterial || row?.materialCode || '');
   const materialSource = text(row?.materialSource || '');
@@ -145,7 +176,11 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       identityCode: materialIdentity?.code || 'B313_PREVIEW_MATERIAL_NOT_MAPPED',
       statusCode: 'MATERIAL_UNRESOLVED',
       statusLabel: 'MATERIAL UNRESOLVED',
-      factorSummary: '',
+      factorSummary: materialIdentity?.message || materialIdentity?.code || 'Material source unresolved',
+      sourceTrace: previewB313SourceTrace(row),
+      previewP1: text(row?.p1),
+      previewP1Unit: text(row?.p1Unit),
+      previewHydroPressure: text(row?.hydroPressure),
       route: '',
       routeSource: 'unresolved',
       factorBasis: null,
@@ -173,6 +208,10 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       factorSummary: !t1
         ? 'S/E/W/Y not evaluated until Preview T1 is resolved. Enter design T1 in existing 4 Preview, then Rebuild. No fallback temperature is assumed.'
         : 'T1 came from a configuration default, not verified design evidence. Confirm T1 in 4 Preview and rebuild.',
+      sourceTrace: previewB313SourceTrace(row),
+      previewP1: text(row?.p1),
+      previewP1Unit: text(row?.p1Unit),
+      previewHydroPressure: text(row?.hydroPressure),
       route: explicitRoute || defaultRoute,
       routeSource: explicitRoute
         ? 'controlled Preview basis'
@@ -247,6 +286,10 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     factorBasis,
     fallback,
     storedBasis,
+    sourceTrace: previewB313SourceTrace(row),
+    previewP1: text(row?.p1),
+    previewP1Unit: text(row?.p1Unit),
+    previewHydroPressure: text(row?.hydroPressure),
     materialIdentityNeedsReview,
     materialIdentityReviewed,
     materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
@@ -328,6 +371,9 @@ function panelHtml(models, config = {}) {
     const t1 = model.t1 ? `${esc(model.t1)} °C` : 'unresolved';
     const route = model.route || '—';
     const routeSource = model.routeSource || 'unresolved';
+    const pressureTrace = model.previewP1
+      ? `P1 ${esc(model.previewP1)} ${esc(model.previewP1Unit || '(unit unresolved)')}` : 'P1 unresolved';
+    const hydroTrace = model.previewHydroPressure ? ` · test ${esc(model.previewHydroPressure)}` : '';
     const iconDisabled = model.tableContext?.materialId ? '' : 'disabled';
     const identityHint = model.materialIdentityNeedsReview && !model.materialIdentityReviewed
       ? '<div style="font-size:9px;color:#fbbf24;">Family-default grade is only a candidate; verify the exact material specification.</div>'
@@ -337,8 +383,8 @@ function panelHtml(models, config = {}) {
       : '';
     const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1}</div></td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${identityHint}${seedHint}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div><div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div></td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'S', 'allowableStress', { width: '82px' })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${stressUnitCell(model)}</td>
@@ -359,7 +405,7 @@ function panelHtml(models, config = {}) {
 
   return `<div data-mc-b313-auto-basis-panel style="margin:8px 0;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;padding:8px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>B31.3 automatic basis</strong><span style="font-size:10px;color:#94a3b8;">${models.length} material-temperature group${models.length === 1 ? '' : 's'}</span></div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path remains strict VERIFIED / PROJECT_APPROVED factors at Preview T1. When exact strict factors are unavailable, S/E/W/Y below are a non-interpolated controlled fallback seed from one common active-master temperature. Values do not become calculation input until ↻ is clicked. A106 carbon steel defaults to SEAMLESS.</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
       <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
       <input type="number" step="any" min="0" data-b313-mill-value value="${esc(tolerance.value ?? 12.5)}" style="width:80px;">
