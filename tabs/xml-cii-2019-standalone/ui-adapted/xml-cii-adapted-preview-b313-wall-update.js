@@ -57,6 +57,11 @@ function temperatureText(row) {
 }
 
 export function resolvePreviewB313MaterialFromRow(row, config = {}) {
+  if (row?.materialCodeConflict) {
+    return { ok: false, code: 'B313_PREVIEW_MATERIAL_CODE_CONFLICT',
+      message: 'Step 4 Material and Material Code evidence conflict; resolve the existing Preview authority before B31.3 calculation.',
+      details: { materialCodeConflict: row.materialCodeConflict } };
+  }
   const resolved = resolvePreviewB313MaterialIdentity({
     material: materialText(row),
     materialSource: row?.materialSource || '',
