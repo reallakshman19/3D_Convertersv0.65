@@ -130,7 +130,8 @@ function basisForRow(cfg, row, key = previewB313BasisKey(row)) {
   if (key && cfg.bases[key]) return { key, basis: cfg.bases[key], source: 'canonical-material-id-key' };
   // Do not import a legacy group-wide approval into an occurrence-scoped
   // family-default review: it may belong to another physical line.
-  if (key.includes('|GRADE_SCOPE:')) return { key, basis: {}, source: 'unreviewed-family-occurrence' };
+  if (key.includes('|OCCURRENCE:') || key.includes('|GRADE_SCOPE:'))
+    return { key, basis: {}, source: 'unreviewed-physical-occurrence' };
   const legacy = legacyPreviewB313BasisKey(row);
   if (legacy && cfg.bases[legacy]) return { key, basis: cfg.bases[legacy], source: 'legacy-material-text-key' };
   return { key, basis: {}, source: 'none' };
