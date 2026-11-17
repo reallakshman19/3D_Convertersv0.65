@@ -118,7 +118,7 @@ export function previewB313BasisKey(row, config = {}) {
     ].map(normalizedToken);
     const occurrence = scope.some(Boolean)
       ? `|OCCURRENCE:${scope.map(encodeURIComponent).join('~')}` : '';
-    const gradeReview = materialIdentity.b313IdentityNeedsReview === true
+    const gradeReview = materialIdentity.b313IdentityNeedsReview === true && scope.some(Boolean)
       ? `|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}` : '';
     return base + occurrence + gradeReview;
   }
