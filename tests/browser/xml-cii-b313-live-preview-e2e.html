@@ -61,6 +61,16 @@ try {
   // physical-row audit within ONE panel; no wall is changed by Calculate.
   const unifiedSlot = panel.querySelector('[data-mc-b313-unified-audit-slot]');
   assert(unifiedSlot, 'Unified B31.3 audit slot missing from the basis panel');
+  assert(host.querySelector('[data-mc-wall-review]'), 'DTXR and B31.3 do not share a Wall Thickness Review workspace');
+  const existingOverrideReceipt = JSON.stringify(config.overrides || {});
+  const dtxrReviewAction = host.querySelector('[data-mc-dtxr-wall-update]');
+  assert(dtxrReviewAction, 'DTXR candidate review action missing');
+  dtxrReviewAction.click();
+  const dtxrReviewSlot = panel.querySelector('[data-mc-dtxr-unified-review-slot]');
+  assert(dtxrReviewSlot?.querySelector('[data-mc-dtxr-review-results]'),
+    'DTXR source proposals were not rendered alongside B31.3');
+  assert(JSON.stringify(config.overrides || {}) === existingOverrideReceipt,
+    'Merely reviewing DTXR candidates mutated saved wall overrides');
   const liveWallButton = host.querySelector('[data-mc-b313-wall-update]');
   assert(liveWallButton, 'Existing governed B31.3 calculate action missing');
   liveWallButton.click();
@@ -70,7 +80,7 @@ try {
   assert(audit.textContent.includes('Evaluated 41'), 'Audit did not use 41 physical Preview rows');
   assert(host.querySelectorAll('[data-mc-b313-report]').length === 1,
     'Competing top-level and unified B31.3 audit panels were rendered');
-  assert(audit.textContent.includes('Not updated 41'),
+  assert(audit.textContent.includes('Held 41'),
     'Unqualified source inputs must remain not updated');
   assert(!Object.keys(config.b313WallUpdate?.acceptedWallByBranch || {}).length,
     'Calculation must never create accepted Pull walls');
