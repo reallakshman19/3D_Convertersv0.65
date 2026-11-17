@@ -25,6 +25,7 @@ on:
       - 'tests/glrd-b313-qualification-readiness.test.mjs'
       - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
+      - 'tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs'
       - 'tests/xml-cii-issue-781-b313-*.test.mjs'
       - '.github/workflows/step4-b313-pull-validation.yml'
   workflow_dispatch:
@@ -82,7 +83,9 @@ jobs:
             tests/xml-cii-b313-preview-od-selection.test.mjs \
             tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
             tests/xml-cii-issue-781-b313-live-row-custody.test.js \
-            tests/xml-cii-b313-preview-ui-static.test.js
+            tests/xml-cii-b313-preview-ui-static.test.js \
+            tests/xml-cii-b313-unified-review-rca.test.mjs \
+            tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs
   step4-chromium:
     name: Browser Step 4 live Preview
     runs-on: ubuntu-24.04
