@@ -27,6 +27,19 @@ def compare(before,after,approved):
             raise ValueError('BAD_OR_DUPLICATE_APPROVED_ELEMENT')
         if not r.get('approvalReference') or not r.get('physicalOccurrenceKey'):
             raise ValueError('APPROVAL_AND_PHYSICAL_KEY_REQUIRED')
+        # The native CII geometry line is FROM TO DX DY DZ OD.
+        # The emitted wall lives on line two and belongs to the FROM node.
+        # A receipt that names only an element index can swap physical owners.
+        tokens=before[i-1][0].split()
+        if len(tokens)!=6:
+            raise ValueError('BAD_NATIVE_CII_GEOMETRY_ROW')
+        try:
+            cii_from=int(float(tokens[0]));cii_to=int(float(tokens[1]))
+        except ValueError:
+            raise ValueError('NATIVE_CII_FROM_TO_NOT_NUMERIC')
+        if (r.get('ciiFromNode')!=cii_from or r.get('ciiToNode')!=cii_to or
+            str(r.get('sourceNodeNumber'))!=str(cii_from)):
+            raise ValueError('SOURCE_FROM_NODE_TO_EMITTED_CII_OWNER_MISMATCH')
         if r.get('baselineElementHeader')!=before[i-1][0]:
             raise ValueError('BASELINE_ELEMENT_LINEAGE_NOT_PROVEN')
         selected[i]=r
@@ -102,7 +115,7 @@ def main():
     after=element_blocks(Path(a.cii_after).read_text())
     result=compare(before,after,receipt['rows'])
     result.update(schema='glrd-r3-approved-native-cii-parity/v1',sourceXmlSha256=sha(a.source_xml),
-                  afterCiiSha256=sha(a.cii_after),status='PASS_APPROVED_SOURCE_ENRICHED_XML_TO_NATIVE_CII_PARITY')
+                  afterCiiSha256=sha(a.cii_after),status='PASS_RECEIPT_BOUND_NATIVE_WALL_PARITY_ENGINEERING_APPROVAL_REQUIRES_SEPARATE_ATTESTATION')
     target=Path(a.out);target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result,indent=2))
