@@ -10,6 +10,7 @@ on:
       - 'converters/b313-material-factors/code-factor-rule-engine.js'
       - 'converters/b313-material-factors/default-b313-code-rule-data.js'
       - 'docs/Masters/b313-code-factor-rules.json'
+      - 'engineering/b313/glrd-b313-2024-external-reference-intake-v1.json'
       - 'docs/Masters/b313-material-factor-master.json'
       - 'tabs/b313-material-factors-tab.js'
       - 'scripts/generate-b313-material-factors.mjs'
