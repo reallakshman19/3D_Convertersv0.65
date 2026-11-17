@@ -153,6 +153,24 @@ export function resolvePreviewB313MaterialIdentity({
     });
   }
 
+  // A family-default identity is a candidate, not an exact specification.
+  // A reviewed exact designation from Step 8 may disambiguate the SAME
+  // family; never override a conflicting exact primary specification.
+  if (primary.ok && corroborating?.ok && primary.material.materialId !== corroborating.material.materialId
+      && primary.requestMode === 'PROJECT_FAMILY_DEFAULT'
+      && corroborating.requestMode === 'EXACT_PREVIEW_MATERIAL'
+      && primary.material.family === corroborating.material.family) {
+    return {
+      ...corroborating,
+      resolutionSource: 'PREVIEW_MATERIAL_CODE_CORROBORATION',
+      materialSource: text(materialSource),
+      unresolvedPreviewMaterial: text(material),
+      corroboratingMaterial: corroboratingText,
+      corroboratingSource: text(corroboratingSource),
+      corroborationStatus: 'FAMILY_DISAMBIGUATED',
+      b313IdentityNeedsReview: false,
+    };
+  }
   if (primary.ok && corroborating?.ok && primary.material.materialId !== corroborating.material.materialId) {
     return failure('B313_PREVIEW_MATERIAL_CONFLICT', 'Preview Material and reviewed material-code evidence resolve to different B31.3 material identities.', {
       previewMaterial: text(material),
@@ -172,6 +190,9 @@ export function resolvePreviewB313MaterialIdentity({
       corroboratingMaterial: corroboratingText,
       corroboratingSource: text(corroboratingSource),
       corroborationStatus: corroborating?.ok ? 'MATCHED' : (corroboratingText ? 'NOT_USED_REVIEW_REQUIRED' : 'NONE'),
+      // An uncorroborated family default is not a verified exact grade.
+      b313IdentityNeedsReview: primary.requestMode === 'PROJECT_FAMILY_DEFAULT'
+        && corroborating?.requestMode !== 'EXACT_PREVIEW_MATERIAL',
     };
   }
 
