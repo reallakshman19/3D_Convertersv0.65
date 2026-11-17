@@ -106,17 +106,21 @@ export function previewB313BasisKey(row, config = {}) {
   const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
   if (materialIdentity.ok) {
     const base = `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
-    if (materialIdentity.b313IdentityNeedsReview !== true) return base;
-    // Manual grade approval cannot be shared merely because multiple lines
-    // happen to resolve to the same project-family candidate and T1.
+    // Qualified code facts can be reused from the published master. However,
+    // Preview manual factors and review checkboxes are physical-occurrence
+    // approvals: not transferable across lines, DN, routes or branches.
     const scope = [
       row?.branchOccurrenceIndex ?? '', row?.branchName ?? '',
       row?.lineKey ?? '', row?.pipingClass ?? '',
+      row?.boreMm ?? row?.sizeMm ?? row?.size ?? '',
       row?.materialCode ?? '', row?.materialCodeMatchedMaterial ?? '',
+      row?.materialCodeCorroborationCandidate ?? '',
     ].map(normalizedToken);
-    return scope.some(Boolean)
-      ? `${base}|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}`
-      : base;
+    const occurrence = scope.some(Boolean)
+      ? `|OCCURRENCE:${scope.map(encodeURIComponent).join('~')}` : '';
+    const gradeReview = materialIdentity.b313IdentityNeedsReview === true
+      ? `|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}` : '';
+    return base + occurrence + gradeReview;
   }
   const legacy = legacyPreviewB313BasisKey(row);
   return legacy ? `RAW:${legacy}` : '';
