@@ -56,6 +56,23 @@ function temperatureText(row) {
   return text(row?.t1 ?? row?.designTemperature ?? '');
 }
 
+/**
+ * ASTM A106 is a seamless-pipe specification. The *exact* source pipe
+ * product can establish this route; family-default "CS" or a generic
+ * class mapping cannot. All other route declarations need physical
+ * project evidence in their Preview basis.
+ */
+export function b313SourceConfirmsA106Seamless(row, materialIdentity) {
+  if (!materialIdentity?.ok || materialIdentity.material?.materialId !== 'CS-A106-B'
+    || materialIdentity.b313IdentityNeedsReview === true
+    || materialIdentity.b313FallbackApplied === true
+    || materialIdentity.requestMode !== 'EXACT_PREVIEW_MATERIAL') return false;
+  const preview = normalizedToken(materialText(row));
+  const exactClass = row?.materialCodeCorroborationSource === 'piping-class-master-exact-DN'
+    ? normalizedToken(row.materialCodeCorroborationCandidate) : '';
+  return /\\bA106\\b/.test(preview) || /\\bA106\\b/.test(exactClass);
+}
+
 export function resolvePreviewB313MaterialFromRow(row, config = {}) {
   // B31.3 cannot inherit an unresolved choice between the exact Line List
   // class and the class parsed from the physical branch name.
@@ -585,10 +602,21 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     const key = previewB313BasisKey(row, { b313WallUpdate: basisConfig });
     const stored = basisForRow(basisConfig, row, key);
     const basis = stored.basis || {};
+    const assertedRoute = text(basis.manufacturingRoute);
+    const routeAuthority = text(basis.manufacturingRouteSourceReference);
+    const routeReviewed = basis.manufacturingRouteEvidenceReviewed === true;
+    if (assertedRoute && !(routeAuthority && routeReviewed)
+        && !b313SourceConfirmsA106Seamless(row, materialIdentity)) {
+      results.push(failureRow(row, 'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED',
+        'The manufacturing route was entered without a controlled pipe-spec/MTR source and explicit review. Confirm route evidence in the existing B31.3 basis; class mapping or factor-table availability does not prove manufacture.',
+        {route: assertedRoute, routeEvidenceSource: routeAuthority,
+          routeReviewed, materialIdentity, nextAction: 'REVIEW_MANUFACTURING_ROUTE_SOURCE'}));
+      return;
+    }
     const factorBasis = resolvePreviewB313FactorBasis({
       materialIdentity,
       designTemperatureC: temperatureText(row),
-      manufacturingRoute: basis.manufacturingRoute || '',
+      manufacturingRoute: assertedRoute || (b313SourceConfirmsA106Seamless(row, materialIdentity) ? 'SEAMLESS' : ''),
       manualBasis: basis,
     });
     updateVisibleMaterialCell(host, rowIndex, materialIdentity, factorBasis);
