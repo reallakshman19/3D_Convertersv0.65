@@ -22,23 +22,52 @@ concurrency:
 jobs:
   deploy:
     name: Deploy static app
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      # A brand-new repository has no Pages site; configure-pages GET then returns 404.
+      # First enable Settings > Pages > Source: GitHub Actions, OR provide a
+      # PAGES_BOOTSTRAP_TOKEN secret (fine-grained PAT with Pages write access).
+      - name: Detect GitHub Pages site
+        id: pages_state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --silent >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require Pages initialization or bootstrap token
+        if: steps.pages_state.outputs.exists == 'false'
+        env:
+          PAGES_BOOTSTRAP_TOKEN: ${{ secrets.PAGES_BOOTSTRAP_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -z "$PAGES_BOOTSTRAP_TOKEN" ]]; then
+            echo '::error title=GitHub Pages not initialized::Enable Settings > Pages > Build and deployment > Source: GitHub Actions, or add the PAGES_BOOTSTRAP_TOKEN repository secret with Pages write permission for one-time initialization.'
+            exit 1
+          fi
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
+        with:
+          token: ${{ secrets.PAGES_BOOTSTRAP_TOKEN || github.token }}
+          enablement: ${{ steps.pages_state.outputs.exists == 'false' }}
 
       - name: Upload static application
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: .
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
