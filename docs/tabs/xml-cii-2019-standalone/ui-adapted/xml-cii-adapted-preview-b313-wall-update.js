@@ -542,7 +542,7 @@ function renderBasisEditor(host, config, rows, options) {
     <div style="font-size:10px;color:#94a3b8;margin:4px 0;">The Engineering tab edits candidate data only; Preview reads the published active material-factor master. Publish/review controlled factors before they become the strict automatic basis.</div>
     <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th>Preview Material / T1</th><th>B31.3 identity / factor status</th><th>Engineering</th><th>Fallback S</th><th>S unit</th><th>E</th><th>W</th><th>Y</th><th>Route</th><th>P unit</th><th>Dimension std</th><th>Fallback source</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
   </details>`;
-  actionCard.insertAdjacentHTML('afterend', html);
+  (host.querySelector('[data-mc-wall-review]') || actionCard).insertAdjacentHTML('afterend', html);
   editor = host.querySelector('[data-mc-b313-basis-editor]');
 
   editor?.querySelectorAll?.('[data-b313-open-material]').forEach((button) => button.addEventListener('click', () => {
@@ -897,7 +897,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
 function installAction(host, config, xmlText, options, suppliedRows) {
   const rows = currentPreviewB313Rows(host, suppliedRows);
   const buildButton = host?.querySelector?.('[data-mc-preview-build]');
-  const actionBar = buildButton?.parentElement;
+  const actionBar = host?.querySelector?.('[data-mc-wall-review-actions]') || buildButton?.parentElement;
   if (!actionBar || !rows.length) return;
   renderBasisEditor(host, config, rows, options);
   if (actionBar.querySelector('[data-mc-b313-wall-update]')) return;
@@ -905,7 +905,7 @@ function installAction(host, config, xmlText, options, suppliedRows) {
   button.type = 'button';
   button.className = 'model-converters-download-btn';
   button.dataset.mcB313WallUpdate = 'true';
-  button.textContent = B313_PREVIEW_ACTION_LABEL;
+  button.textContent = 'Calculate B31.3 pressure-design wall (review only)';
   button.title = 'Use each Preview row Material + T1 to resolve strict active B31.3 Material Factors, then calculate B31.3-2024 straight-pipe required nominal wall from row OD, P1 and corrosion and select the next adequate project-master pipe wall. Manual S/E/W/Y is fallback only. 12.5% negative mill tolerance is fixed.';
   button.style.cssText = 'padding:8px 14px;min-width:300px;';
   actionBar.appendChild(button);
