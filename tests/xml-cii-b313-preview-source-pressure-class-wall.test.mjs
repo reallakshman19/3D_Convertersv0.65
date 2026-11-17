@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 
 import { calculateAndSelectPreviewB313Wall } from '../converters/xml-cii2019-core/b313-preview-wall-update.js';
+import { b313PullProposal, b313ReadAcceptedWall } from '../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { qualifyPreviewB313ClassWall, resolvePreviewP1LineListHeaderUnit,
   inferPreviewPressureUnit, buildPreviewB313WallUpdateReport, previewB313BasisKey
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
@@ -100,6 +101,29 @@ test('real 4 Preview calculate path uses header unit + exact class wall and crea
   assert.equal(cfg.b313WallUpdate.proposalsByBranch['0'].evidence.pressureUnitSource,
     'line-list-column:Pressure Max kPa(g)');
   assert.equal(cfg.overrides.wallThickness['PIPE-A'],'10.97','Calculate cannot overwrite manual Preview wall');
+  const proposal=cfg.b313WallUpdate.proposalsByBranch['0'];
+  assert.equal(proposal.evidence.pressureUnit,'KPA','receipt must preserve the unit actually used in engineering calculation');
+  const accepted=b313PullProposal(cfg,row,0,preview.nodeBoreWallRows);
+  assert.equal(accepted.ok,true,JSON.stringify(accepted));
+  assert.deepEqual(accepted.record.pressureUnitReceipt,{
+    source:'line-list-column:Pressure Max kPa(g)',unit:'KPA',
+  });
+  cfg.b313WallUpdate.acceptedWallByBranch={'0':accepted.record};
+  assert.ok(b313ReadAcceptedWall(cfg,row,0,preview.nodeBoreWallRows),
+    'accepted wall remains source-bound while header is unchanged');
+  const altered=structuredClone(cfg);
+  altered.linelist.masterRows[0]['Design Pressure PSIG']=5110;
+  assert.equal(b313PullProposal(altered,row,0,preview.nodeBoreWallRows).code,
+    'B313_PULL_P1_UNIT_SOURCE_CHANGED','a second contradictory unit must invalidate the proposal');
+  assert.equal(b313ReadAcceptedWall(altered,row,0,preview.nodeBoreWallRows),null,
+    'old accepted wall must not survive conflicting source unit');
+  const replaced=structuredClone(cfg);
+  delete replaced.linelist.masterRows[0]['Pressure Max kPa(g)'];
+  replaced.linelist.masterRows[0]['Pressure Max PSIG']=5110;
+  assert.equal(b313PullProposal(replaced,row,0,preview.nodeBoreWallRows).code,
+    'B313_PULL_P1_UNIT_SOURCE_CHANGED','a replaced header must invalidate the proposal');
+  assert.equal(b313ReadAcceptedWall(replaced,row,0,preview.nodeBoreWallRows),null);
+
 });
 
 
