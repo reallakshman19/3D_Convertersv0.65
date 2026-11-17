@@ -53,6 +53,9 @@ export function resolveB313QualifiedTemperatureFactor({
   if (!['S','E','W','Y'].includes(f) || String(temperatureC ?? '').trim() === '' || !Number.isFinite(t) || !id) return null;
   const statuses = new Set(allowedStatuses);
   const route = norm(manufacturingRoute);
+  // E describes longitudinal joint / pipe manufacture quality. An
+  // unqualified or absent route must never inherit a generic E record.
+  if (f === 'E' && (!route || ['UNKNOWN','UNVERIFIED','UNRESOLVED','N/A','NONE'].includes(route))) return null;
   const candidates = records.filter(row => row.materialId === id
     && statuses.has(row.status)
     // Status alone never qualifies a factor. Retain a traceable code source;
@@ -63,7 +66,9 @@ export function resolveB313QualifiedTemperatureFactor({
     && (row.status !== 'PROJECT_APPROVED' || String(row.approvalReference || '').trim())
     && (row.edition == null || String(row.edition) === String(edition))
     && (!row.productForm || norm(row.productForm) === norm(productForm)));
-  const routeRows = candidates.filter(row => !row.manufacturingRoute || (route && norm(row.manufacturingRoute) === route));
+  const routeRows = candidates.filter(row => f === 'E'
+    ? !!row.manufacturingRoute && norm(row.manufacturingRoute) === route
+    : !row.manufacturingRoute || (route && norm(row.manufacturingRoute) === route));
   // When there are explicit route-specific records, do not silently use one
   // for a missing/unknown route. Generic records remain valid if supplied.
   function preferRoute(rows) {
@@ -74,7 +79,8 @@ export function resolveB313QualifiedTemperatureFactor({
     if (rows.length !== 1) return null; // duplicate or conflicting authority: HOLD
     const row = rows[0];
     const value = f === 'S' ? stressMPa(row) : Number(row.value);
-    return Number.isFinite(value) && (f === 'Y' ? value >= 0 : value > 0) ? row : null;
+    return Number.isFinite(value) && (f === 'S' ? value > 0
+      : f === 'Y' ? value >= 0 && value <= 1 : value > 0 && value <= 1) ? row : null;
   }
   const exactMatches = preferRoute(routeRows.filter(row => Number(row.temperatureC) === t));
   const eq = unique(exactMatches);
@@ -110,7 +116,8 @@ export function resolveB313QualifiedTemperatureFactor({
   const highValue = f === 'S' ? stressMPa(high) : Number(high.value);
   if (!Number.isFinite(lowValue) || !Number.isFinite(highValue)
       || (f !== 'Y' && (lowValue <= 0 || highValue <= 0))
-      || (f === 'Y' && (lowValue < 0 || highValue < 0))) return null;
+      || (f === 'Y' && (lowValue < 0 || highValue < 0))
+      || (f !== 'S' && (lowValue > 1 || highValue > 1))) return null;
   const value = lowValue + (highValue - lowValue) * (t - lowerT) / (upperT - lowerT);
   const record = { ...low, temperatureC: t, value, ...(f === 'S' ? {unit:'MPa'} : {}),
     resolution: 'LINEAR_QUALIFIED', sourceTemperaturesC: [lowerT,upperT],
@@ -154,8 +161,8 @@ export function resolveB313DesignFactors(input={}){
    W=o.weldStrengthReductionW??o.W??wr?.value??(rW?.ok?rW.value:null),
    Y=o.coefficientY??o.Y??yr?.value??(rY?.ok?rY.value:null),missing=[];
  if(!(Number(S)>0))missing.push('S');
- if(!(Number(E)>0))missing.push('E');
- if(!(Number(W)>0))missing.push('W');
+ if(!(Number(E)>0 && Number(E)<=1))missing.push('E');
+ if(!(Number(W)>0 && Number(W)<=1))missing.push('W');
  if(Y===null||Y===undefined||!Number.isFinite(Number(Y))||Number(Y)<0||Number(Y)>1)missing.push('Y');
  const sources={
    S:o.allowableStressMPa!==undefined||o.S!==undefined?{authority:'CALLER_OVERRIDE'}:sr?{...sr}:null,
