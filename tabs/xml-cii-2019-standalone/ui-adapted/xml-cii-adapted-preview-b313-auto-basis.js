@@ -171,7 +171,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       statusCode: !t1 ? 'B313_PREVIEW_T1_REQUIRED' : 'B313_PREVIEW_T1_SOURCE_UNVERIFIED',
       statusLabel: !t1 ? 'T1 REQUIRED' : 'T1 SOURCE REVIEW',
       factorSummary: !t1
-        ? 'Enter design T1 in existing 4 Preview, then Rebuild Preview. No fallback temperature is assumed.'
+        ? 'S/E/W/Y not evaluated until Preview T1 is resolved. Enter design T1 in existing 4 Preview, then Rebuild. No fallback temperature is assumed.'
         : 'T1 came from a configuration default, not verified design evidence. Confirm T1 in 4 Preview and rebuild.',
       route: explicitRoute || defaultRoute,
       routeSource: explicitRoute
