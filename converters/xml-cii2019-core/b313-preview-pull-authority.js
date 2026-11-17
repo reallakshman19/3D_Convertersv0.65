@@ -1,4 +1,4 @@
-import { B313_MATERIAL_FACTOR_MASTER } from '../b313-material-factors/index.js';
+import { B313_MATERIAL_FACTOR_MASTER, B313_GOVERNED_CODE_RULE_PACK } from '../b313-material-factors/index.js';
 
 /**
  * Detect changed active factor tables across deploys: cached Preview/Pull
@@ -9,7 +9,8 @@ function factorMasterRevision() {
   const master = B313_MATERIAL_FACTOR_MASTER;
   const raw = JSON.stringify({ standard: master.standard, edition: master.edition,
     materials: master.materials,
-    factors: Object.fromEntries(['S','E','W','Y'].map(k => [k, master.factors?.[k]?.records || []])) });
+    factors: Object.fromEntries(['S','E','W','Y'].map(k => [k, master.factors?.[k]?.records || []])),
+    governedCodeRules: B313_GOVERNED_CODE_RULE_PACK });
   let h1 = 0x811c9dc5, h2 = 0x9747b28c;
   for (let i = 0; i < raw.length; i++) {
     h1 = Math.imul(h1 ^ raw.charCodeAt(i), 0x01000193) >>> 0;
