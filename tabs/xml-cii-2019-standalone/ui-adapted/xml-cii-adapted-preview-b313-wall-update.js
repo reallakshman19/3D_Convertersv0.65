@@ -62,12 +62,23 @@ export function resolvePreviewB313MaterialFromRow(row, config = {}) {
       message: 'Step 4 Material and Material Code evidence conflict; resolve the existing Preview authority before B31.3 calculation.',
       details: { materialCodeConflict: row.materialCodeConflict } };
   }
+  // When the Line List publishes only a family, accept exact, reviewed Step
+  // 8 class evidence as corroboration, not as a mutation of governing material.
+  const primaryCodeEvidence = text(row?.materialCodeMatchedMaterial);
+  const classEvidenceAllowed = !primaryCodeEvidence
+    && !!text(row?.materialCodeCorroborationCandidate)
+    && row?.materialCodeCorroborationNeedsReview !== true
+    && row?.pipingClassNeedsReview !== true
+    && !row?.pipingClassConflict;
   const resolved = resolvePreviewB313MaterialIdentity({
     material: materialText(row),
     materialSource: row?.materialSource || '',
-    corroboratingMaterial: row?.materialCodeMatchedMaterial || '',
-    corroboratingSource: row?.materialCodeSource || row?.materialCodeResolutionMethod || '',
-    corroboratingNeedsReview: row?.materialCodeNeedsReview === true,
+    corroboratingMaterial: primaryCodeEvidence
+      || (classEvidenceAllowed ? row?.materialCodeCorroborationCandidate : ''),
+    corroboratingSource: primaryCodeEvidence
+      ? (row?.materialCodeSource || row?.materialCodeResolutionMethod || '')
+      : (classEvidenceAllowed ? row?.materialCodeCorroborationSource : ''),
+    corroboratingNeedsReview: primaryCodeEvidence ? row?.materialCodeNeedsReview === true : !classEvidenceAllowed,
   });
   if (resolved.ok) return resolved;
   const fallback = config?.b313WallUpdate?.materialFallback || { enabled: true, family: 'CS' };
