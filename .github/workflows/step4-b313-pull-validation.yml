@@ -20,6 +20,8 @@ on:
       - 'docs/Masters/SpecwisePipingClass/93833.json'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
       - 'tests/b313-material-factors.test.mjs'
+      - 'tests/glrd-b313-qualification-readiness.test.mjs'
+      - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
       - 'tests/xml-cii-issue-781-b313-*.test.mjs'
       - '.github/workflows/step4-b313-pull-validation.yml'
@@ -46,6 +48,7 @@ jobs:
           node --check converters/b313-material-factors/code-factor-rule-engine.js
           node --check scripts/generate-b313-code-factor-rules.mjs
           node --check scripts/generate-b313-material-factors.mjs
+          node --check scripts/glrd-b313-qualification-readiness.mjs
           node --check tabs/b313-material-factors-tab.js
           node --check converters/xml-cii2019-core/b313-preview-pull-authority.js
           node --check converters/xml-cii2019-core/b313-preview-wall-update.js
@@ -63,6 +66,7 @@ jobs:
         run: |
           node --test \
             tests/b313-material-factors.test.mjs \
+            tests/glrd-b313-qualification-readiness.test.mjs \
             tests/xml-cii-b313-governed-factor-engine.test.mjs \
             tests/xml-cii-b313-glrd-config8-sourcechain.test.mjs \
             tests/xml-cii-b313-factor-qualification-intake.test.mjs \
