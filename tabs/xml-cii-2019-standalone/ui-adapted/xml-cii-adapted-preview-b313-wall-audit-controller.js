@@ -177,11 +177,16 @@ function failedRowHtml(row) {
   const odTolerance = details.toleranceMm ?? details.odBasis?.toleranceMm;
   const odHint = finite(odReference) === null ? '' : `OD reference ${fixed(odReference, 3)} mm${finite(odTolerance) === null ? '' : ` · tolerance ±${fixed(odTolerance, 3)} mm`}`;
   const factorHint = blockers || (strictMissing.length ? `Strict factors missing: ${strictMissing.join(', ')}` : '');
+  const independentIssues = (Array.isArray(details.independentInputIssues) ? details.independentInputIssues : [])
+    .filter((issue) => issue && issue.code !== row.code);
+  const independentHint = independentIssues.length
+    ? `<div style="font-size:10px;color:#92400e;margin-top:5px;"><strong>Also verify independently:</strong> ${independentIssues.map((issue) => esc(issue.message || issue.code)).join(' · ')}</div>`
+    : '';
   return `<tr>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-family:monospace;font-size:11px;color:#0f172a;">${esc(row.branchName || '—')}</div><div style="font-size:10px;color:#64748b;margin-top:2px;">Line ${esc(row.lineKey || '—')}</div></td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;">${esc(materialId || 'Material identity unresolved')}</div>${materialSource ? `<div style="font-size:10px;color:#64748b;">identity source ${esc(materialSource)}${finite(t1) === null ? '' : ` · T1 ${esc(t1)} °C`}</div>` : ''}</td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#92400e;">${esc(factorMode)}</div>${factorHint ? `<div style="font-size:10px;color:#92400e;margin-top:3px;">${esc(factorHint)}</div>` : ''}</td>
-    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#991b1b;">${esc(row.code || 'B313_PREVIEW_NOT_UPDATED')}</div><div style="font-size:11px;color:#475569;margin-top:2px;">${esc(reason)}</div>${odHint ? `<div style="font-size:10px;color:#64748b;margin-top:3px;">${esc(odHint)}</div>` : ''}</td>
+    <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#991b1b;">${esc(row.code || 'B313_PREVIEW_NOT_UPDATED')}</div><div style="font-size:11px;color:#475569;margin-top:2px;">${esc(reason)}</div>${odHint ? `<div style="font-size:10px;color:#64748b;margin-top:3px;">${esc(odHint)}</div>` : ''}${independentHint}</td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;white-space:nowrap;">${statusPill('NOT_UPDATED')}</td>
   </tr>`;
 }
@@ -280,6 +285,11 @@ function zeroInputReport() {
 
 function renderReport(host, report) {
   host?.querySelector?.('[data-mc-b313-report]')?.remove?.();
+  const sharedSlot = host?.querySelector?.('[data-mc-b313-unified-audit-slot]');
+  if (sharedSlot) {
+    sharedSlot.innerHTML = renderPreviewB313WallAuditHtml(report);
+    return;
+  }
   const editor = host?.querySelector?.('[data-mc-b313-basis-editor]');
   if (editor) {
     editor.insertAdjacentHTML('afterend', renderPreviewB313WallAuditHtml(report));
