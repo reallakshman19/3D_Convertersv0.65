@@ -70,7 +70,8 @@ export function b313SourceConfirmsA106Seamless(row, materialIdentity) {
   const preview = normalizedToken(materialText(row));
   const exactClass = row?.materialCodeCorroborationSource === 'piping-class-master-exact-DN'
     ? normalizedToken(row.materialCodeCorroborationCandidate) : '';
-  return /\\bA106\\b/.test(preview) || /\\bA106\\b/.test(exactClass);
+  const exactA106 = /(?:^|[^A-Z0-9])A106(?:$|[^A-Z0-9])/;
+  return exactA106.test(preview) || exactA106.test(exactClass);
 }
 
 export function resolvePreviewB313MaterialFromRow(row, config = {}) {
