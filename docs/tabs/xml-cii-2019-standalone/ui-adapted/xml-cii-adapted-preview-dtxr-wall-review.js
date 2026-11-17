@@ -25,7 +25,7 @@ export function buildDtxrWallReview({
     if (!grouped.has(key)) {
       grouped.set(key, {
         key, value, schedule: txt(candidate.schedule), dtxr: txt(candidate.dtxr),
-        branchNames: [], rowIndices: [], collision: false,
+        branchNames: [], rowIndices: [], acceptanceKeys: [], collision: false,
       });
     }
     const item = grouped.get(key);
@@ -33,12 +33,14 @@ export function buildDtxrWallReview({
       item.collision = true;
     }
     item.rowIndices.push(ri);
+    const occurrence = txt(row?.branchOccurrenceIndex);
+    item.acceptanceKeys.push(/^\\d+$/.test(occurrence) ? String(Number(occurrence)) : String(ri));
     item.branchNames.push(txt(row?.branchName) || ('Preview row ' + (ri + 1)));
   }
   const items = [...grouped.values()].map(item => {
-    const hasAcceptedWall = item.rowIndices.some(i =>
-      own(acceptedWallByBranch, String(i)) &&
-      Number(acceptedWallByBranch[String(i)]?.nominalWallMm) > 0);
+    const hasAcceptedWall = item.acceptanceKeys.some(key =>
+      own(acceptedWallByBranch, key) &&
+      Number(acceptedWallByBranch[key]?.nominalWallMm) > 0);
     const hasExisting = own(existingWalls, item.key) && txt(existingWalls[item.key]) !== '';
     const existingValue = hasExisting ? txt(existingWalls[item.key]) : '';
     const same = hasExisting && Number.isFinite(Number(existingValue)) &&
@@ -63,9 +65,9 @@ export function validateDtxrWallSelection({ review, selectedKeys = [], currentWa
   const skipped = [];
   for (const item of review?.items || []) {
     if (!selected.has(item.key)) continue;
-    const approvedElsewhere = item.rowIndices.some(i =>
-      own(acceptedWallByBranch, String(i)) &&
-      Number(acceptedWallByBranch[String(i)]?.nominalWallMm) > 0);
+    const approvedElsewhere = item.acceptanceKeys.some(key =>
+      own(acceptedWallByBranch, key) &&
+      Number(acceptedWallByBranch[key]?.nominalWallMm) > 0);
     const currentValue = own(currentWalls, item.key) ? txt(currentWalls[item.key]) : '';
     if (!item.eligible || approvedElsewhere || currentValue !== item.existingValue) {
       skipped.push({ key:item.key, reason:approvedElsewhere?'B313_ACCEPTED_WALL_HOLD':
