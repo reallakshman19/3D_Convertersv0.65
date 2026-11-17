@@ -14,6 +14,7 @@ test('intake is source-bound and contains every material/DN transition', () => {
   assert.equal(manifest.authority,'REVIEW_ONLY_NOT_ACTIVE_MASTER');
   assert.equal(manifest.reviewStatus,'ENGINEERING_HOLD');
   assert.equal(manifest.targetCodeEdition,'2024');
+  assert.equal(manifest.projectCodeEditionConfirmed,false);
   assert.equal(manifest.qualificationCases.length,4);
   for (const [classId, file] of Object.entries(classFiles)) {
     const cases = manifest.qualificationCases.filter(x=>x.pipingClass===classId);
