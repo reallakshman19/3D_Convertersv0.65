@@ -89,14 +89,23 @@ def main():
                          + str((len(branches), len(nodes), len(stage))))
     if len(set(names)) != len(names) or any(not name for name in names):
         raise SystemExit("GLRD branch names missing/duplicated")
-    for token in ["P4110001", "P4110003", "B4110003"]:
-        if not any(token in name for name in names):
-            raise SystemExit("GLRD required reference branch missing: " + token)
+    for audited_name in manifest.get("expectedAuditBranches", []):
+        if audited_name not in names:
+            raise SystemExit("Selected 30-row GLRD audit branch missing: " + audited_name)
+    bm2 = ET.parse(files["historical_bm2_xml"])
+    bm2_branches = [el for el in bm2.iter() if localname(el.tag) == "Branch"]
+    bm2_nodes = [el for el in bm2.iter() if localname(el.tag) == "Node"]
+    if len(bm2_branches) != 31 or len(bm2_nodes) != 1196:
+        raise SystemExit("Historical GLRD BM2 source census changed")
+    if names[0] == child_text(bm2_branches[0], "Branchname"):
+        raise SystemExit("PSI-02 and BM2 model variants unexpectedly identical")
+
     config = {
-        "status": "HOLD_EFFECTIVE_CONFIG_NOT_RECEIVED",
+        "status": "HOLD_EFFECTIVE_CONFIG_UNAVAILABLE_IN_THIS_RUN",
         "expectedSha256": manifest["effectiveConfig"]["expectedSha256"],
         "observedSha256": None,
         "configurationAuthority": False,
+        "historicalReceiptVerified": manifest["effectiveConfig"].get("historicalReceiptVerified", False),
     }
     if args.config:
         path = Path(args.config)
@@ -106,15 +115,21 @@ def main():
         config.update(status="PASS_PINNED_CONFIG_HASH", observedSha256=digest, configurationAuthority=True)
     result = {
         "schema": "glrd-b313-source-custody-report/v1",
-        "sourceStatus": "PASS_SOURCE_BYTES_AND_CENSUS",
+        "sourceStatus": "PASS_PINNED_SOURCE_BYTES_CENSUS_AND_AUDIT_VARIANT",
         "inputFiles": checks,
-        "census": {"branches": len(branches), "nodes": len(nodes), "stagedRootEntries": len(stage)},
+        "census": {"branches": len(branches), "nodes": len(nodes),
+                   "stagedRootEntries": len(stage), "historicalBm2Branches": 31,
+                   "historicalBm2Nodes": 1196,
+                   "auditAnchorsMatched": len(manifest.get("expectedAuditBranches", []))},
         "branchNames": names,
+        "xmlVariant": "GLRD-1000-PSI-02.xml",
+        "stageRelationshipToSelectedXml": "HOLD_NOT_PROVEN_PSI02",
+        "historicalXmlVariant": "GLRD-1000-PI-01 - BM2.xml",
         "effectiveConfig": config,
-        "factorQualificationStatus": "HOLD_NO_SOURCE_QUALIFIED_GL RD_S_E_W_Y".replace(" ", ""),
-        "realPreview30RowReplay": "NOT_RUN_CONFIG_AND_APPROVED_FACTORS_REQUIRED",
+        "factorQualificationStatus": "HOLD_NO_SOURCE_QUALIFIED_GLRD_S_E_W_Y",
+        "realPreview30RowReplay": "NOT_RUN_EFFECTIVE_CONFIG_AND_MASTER_IMPORT_UNVERIFIED",
         "nativeCiiWallParity": "NOT_RUN_APPROVED_PULL_REQUIRED",
-        "note": "Source custody is not effective Step 4, approved wall calculation, Pull or native CII output."
+        "note": "Source custody is not effective Step 4, approved wall calculation, Pull or native CII output. Selected audit XML is PSI-02; original BM2 is a distinct 31-branch model."
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
