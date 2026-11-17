@@ -7,6 +7,7 @@ import {
   resolvePreviewB313MaterialIdentity,
 } from '../converters/xml-cii2019-core/b313-preview-wall-update.js';
 import { resolveMaterialCodeFromLineMaterial } from '../converters/xml-cii2019-core/branch-process-resolver.js';
+import { resolvePreviewB313MaterialFromRow } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const base = {
   dn: 250,
@@ -153,6 +154,44 @@ const step8Ltcs = resolveMaterialCodeFromLineMaterial({
 assert.equal(step8Ltcs.materialCode, '177');
 assert.equal(step8Ltcs.matchedRow.materialName, 'ASTM A333-6');
 assert.equal(step8Ltcs.needsReview, false);
+// Process Line List 'LTCS' remains the governing material. The exact class
+// specification is attached as corroborating evidence only; it does NOT set a
+// previously unresolved Material Code.
+const processLtcs = resolveMaterialCodeFromLineMaterial({
+  lineRow: { Material: 'LTCS' }, materialMap: [], pipingClassRow: null,
+  pipingClass: '11472', overrides: {},
+  config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+assert.equal(processLtcs.material, 'LTCS');
+assert.equal(processLtcs.materialCode, '');
+assert.equal(processLtcs.materialCodeCorroborationCandidate, 'ASTM A333-6');
+assert.equal(processLtcs.materialCodeCorroborationNeedsReview, false);
+const processLtcsB313 = resolvePreviewB313MaterialFromRow({
+  material: processLtcs.material, materialSource: processLtcs.source,
+  materialCode: processLtcs.materialCode,
+  materialCodeNeedsReview: true,
+  materialCodeCorroborationCandidate: processLtcs.materialCodeCorroborationCandidate,
+  materialCodeCorroborationSource: processLtcs.materialCodeCorroborationSource,
+  materialCodeCorroborationNeedsReview: false,
+  pipingClassNeedsReview: false,
+}, {});
+assert.equal(processLtcsB313.ok, true, JSON.stringify(processLtcsB313));
+assert.equal(processLtcsB313.material.materialId, 'LTCS-A333-6');
+assert.equal(processLtcsB313.b313IdentityNeedsReview, false);
+const unresolvedClassConflict = resolvePreviewB313MaterialFromRow({
+  material: 'LTCS', materialCodeCorroborationCandidate: 'ASTM A333-6',
+  materialCodeCorroborationNeedsReview: false,
+  pipingClassConflict: 'FORMAT1_FORMAT2_DIFFER',
+}, {});
+assert.equal(unresolvedClassConflict.ok, true);
+assert.equal(unresolvedClassConflict.b313IdentityNeedsReview, true,
+  'A conflicting selected Piping Class cannot establish exact material grade');
+const unreviewedWildcard = resolvePreviewB313MaterialFromRow({
+  material: 'LTCS', materialCodeCorroborationCandidate: 'ASTM A333-6',
+  materialCodeCorroborationNeedsReview: true,
+}, {});
+assert.equal(unreviewedWildcard.b313IdentityNeedsReview, true);
+
 const ltcsIdentity = resolvePreviewB313MaterialIdentity({
   material: 'LTCS',
   corroboratingMaterial: step8Ltcs.matchedRow.materialName,
