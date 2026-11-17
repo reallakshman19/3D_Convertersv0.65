@@ -12,6 +12,7 @@ on:
       - 'docs/Masters/b313-material-factor-master.json'
       - 'docs/Masters/b313-code-factor-rules.json'
       - 'scripts/verify-glrd-b313-authentic-inputs.py'
+      - 'scripts/inspect-glrd-b313-linelist-workbook.py'
       - 'scripts/verify-glrd-b313-native-writer-parity.py'
       - '.github/workflows/glrd-b313-authentic-source-custody.yml'
   workflow_dispatch:
@@ -41,6 +42,9 @@ jobs:
       - name: Download exact pinned GLRD XML, stage and masters, then verify SHA256
         run: |
           python3 scripts/verify-glrd-b313-authentic-inputs.py --fetch --output out/glrd-b313-source-custody.json
+      - name: Inspect authenticated GLRD Line List workbook sheet coverage (metadata only)
+        run: |
+          python3 scripts/inspect-glrd-b313-linelist-workbook.py --input .cache/glrd-b313-source/LL_BM2.xlsx --output out/glrd-b313-linelist-workbook-census.json
       - name: Native CII writer parity with test-only PSI-02 wall modification
         run: |
           python3 scripts/verify-glrd-b313-native-writer-parity.py --xml .cache/glrd-b313-source/GLRD-1000-PSI-02.xml --output out/glrd-b313-synthetic-native-wall-parity.json
@@ -52,5 +56,6 @@ jobs:
           path: |
             out/glrd-b313-factor-qualification-readiness.json
             out/glrd-b313-source-custody.json
+            out/glrd-b313-linelist-workbook-census.json
             out/glrd-b313-synthetic-native-wall-parity.json
           if-no-files-found: warn
