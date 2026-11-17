@@ -618,6 +618,37 @@ export function collectPreviewB313IndependentIssues(row = {}, config = {}) {
   return issues;
 }
 
+
+/** Select the physical exact-DN class wall, never an unauthorized free schedule. */
+export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
+  if (!calc.ok || !calc.calculation?.ok) return { ok:false,code:'B313_PREVIEW_CALCULATION_REQUIRED' };
+  const cls=text(row.pipingClass);
+  if (!cls) return { ok:true,authority:'PIPE_WALL_MASTER_NO_CLASS',selectedNominalWallMm:calc.selectedNominalWallMm,selectedSchedule:calc.selectedSchedule,marginMm:calc.selectionMarginMm };
+  const dn=positive(row.sizeMm ?? row.boreMm);
+  const classDn=positive(row.pipingClassPipeDnMm);
+  const wall=positive(row.pipingClassPipeWallMm);
+  const schedule=text(row.pipingClassPipeSchedule);
+  const product=text(row.pipingClassPipeMaterial);
+  const sourceRow=text(row.pipingClassPipeSourceRow);
+  if (!dn || !classDn || Math.abs(dn-classDn)>1e-6 || !wall || !schedule || !product || !sourceRow) {
+    return {ok:false,code:'B313_PREVIEW_CLASS_EXACT_DN_WALL_EVIDENCE_REQUIRED',
+      message:'Exact-DN Piping Class product, schedule, wall or source row missing. Do not substitute an unapproved schedule.',
+      details:{cls,dn,classDn,wall,schedule,product,sourceRow}};
+  }
+  if (wall>=Number(calc.outsideDiameterMm)/2) return {
+    ok:false,code:'B313_PREVIEW_CLASS_WALL_GEOMETRY_INVALID',
+    message:'Class wall is geometrically inconsistent with actual pipe OD.'};
+  const required=positive(calc.calculation.requiredNominalThicknessMm);
+  if (!required) return {ok:false,code:'B313_PREVIEW_REQUIRED_NOMINAL_MISSING'};
+  if (wall+1e-7<required) return {ok:false,code:'B313_PREVIEW_CLASS_WALL_INSUFFICIENT',
+    message:'Class specified wall fails B31.3 required nominal wall. Engineering must revise/approve class; no silent schedule upgrade.',
+    details:{cls,dn,product,schedule,sourceRow,classNominalWallMm:wall,requiredNominalWallMm:required,deficitMm:required-wall,masterCandidateSchedule:calc.selectedSchedule}};
+  return {ok:true,authority:'PIPING_CLASS_EXACT_DN_PRODUCT',
+    selectedNominalWallMm:wall,selectedSchedule:schedule,marginMm:wall-required,
+    cls,dn,product,sourceRow,requiredNominalWallMm:required,
+    masterCandidateSchedule:calc.selectedSchedule,masterCandidateWallMm:calc.selectedNominalWallMm};
+}
+
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
