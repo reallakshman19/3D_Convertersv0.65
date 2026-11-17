@@ -792,6 +792,15 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, result.code, result.message || result.code, { result, odBasis, pressureBasis, dimensionBasis, basisKey: key, materialIdentity, factorBasis }));
       return;
     }
+    const classSelection = qualifyPreviewB313ClassWall(row, result);
+    if (!classSelection.ok) {
+      results.push(failureRow(row, classSelection.code, classSelection.message || classSelection.code,
+        { result, classSelection, odBasis, pressureBasis, dimensionBasis, basisKey: key, materialIdentity, factorBasis }));
+      return;
+    }
+    const governed = { ...result, selectedNominalWallMm: classSelection.selectedNominalWallMm,
+      selectedSchedule: classSelection.selectedSchedule, selectionMarginMm: classSelection.marginMm,
+      classSelection };
 
     const proposalKey = String(rowIndex);
     const evidence = {
@@ -817,7 +826,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       outsideDiameterReferenceMm: odBasis.referenceOdMm,
       outsideDiameterParityDeltaMm: odBasis.parityDeltaMm,
       negativeMillTolerance: result.calculation.manufacturingTolerance,
-      calculation: result.calculation, selection: result.selection,
+      calculation: result.calculation, selection: result.selection, classSelection,
     };
     const manualReviewed = factorBasis.mode === 'ACTIVE_MASTER_STRICT'
       || (basis.designApproved === true && text(basis.sourceReference)
@@ -830,8 +839,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       schema: 'xml-cii-b313-proposal/v1',
       inputSignature: b313PreviewInputSignature(row, config),
       nodeScope: scopedNodes.map(b313PreviewNodeSignature),
-      nominalWallMm: result.selectedNominalWallMm,
-      selectedSchedule: result.selectedSchedule,
+      nominalWallMm: governed.selectedNominalWallMm,
+      selectedSchedule: governed.selectedSchedule,
       factorBasisMode: factorBasis.mode,
       materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
       materialFallbackReviewed: csReviewed,
@@ -846,7 +855,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       lineKey: row.lineKey || '',
       status: 'CALCULATED', proposalKey,
       materialId: materialIdentity.material.materialId,
-      factorBasisMode: factorBasis.mode, result, evidence,
+      factorBasisMode: factorBasis.mode, result: governed, evidence,
     });
     updated += 1;
   });
