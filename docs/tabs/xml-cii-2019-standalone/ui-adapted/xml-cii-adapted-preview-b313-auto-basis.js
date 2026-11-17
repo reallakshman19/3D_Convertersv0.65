@@ -235,7 +235,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const factorBasis = resolvePreviewB313FactorBasis({
     materialIdentity,
     designTemperatureC: t1,
-    manufacturingRoute: explicitRoute,
+    manufacturingRoute: explicitRoute || (confirmedA106Pipe ? 'SEAMLESS' : ''),
     manualBasis: storedBasis,
   });
   const availability = factorAvailabilityFrom(factorBasis);
