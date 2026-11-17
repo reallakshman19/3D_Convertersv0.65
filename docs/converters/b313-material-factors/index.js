@@ -81,6 +81,8 @@ export function resolveB313QualifiedTemperatureFactor({
   if (exactMatches.length) return null; // invalid/ambiguous exact rows block interpolation
   const intervals = preferRoute(routeRows.filter(row =>
     row.temperatureApplicability === 'CONSTANT_RANGE'
+    && row.validFromC !== '' && row.validFromC != null
+    && row.validToC !== '' && row.validToC != null
     && Number.isFinite(Number(row.validFromC)) && Number.isFinite(Number(row.validToC))
     && Number(row.validFromC) <= t && t <= Number(row.validToC)));
   const within = unique(intervals);
@@ -98,6 +100,7 @@ export function resolveB313QualifiedTemperatureFactor({
   const low = unique(preferRoute(routeRows.filter(row => Number(row.temperatureC) === lowerT)));
   const high = unique(preferRoute(routeRows.filter(row => Number(row.temperatureC) === upperT)));
   if (!low || !high || !low.sourceAuthority || low.sourceAuthority !== high.sourceAuthority) return null;
+  if (low.status !== high.status || String(low.approvalReference || '') !== String(high.approvalReference || '')) return null;
   if (String(low.edition || edition) !== String(high.edition || edition)) return null;
   if (norm(low.productForm || productForm) !== norm(high.productForm || productForm)) return null;
   if (norm(low.manufacturingRoute || '') !== norm(high.manufacturingRoute || '')) return null;
