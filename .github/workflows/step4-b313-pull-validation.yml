@@ -20,6 +20,7 @@ on:
       - 'docs/Masters/SpecwisePipingClass/93833.json'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
       - 'tests/b313-material-factors.test.mjs'
+      - 'tests/b313-material-factors-editor-provenance.test.mjs'
       - 'tests/glrd-b313-qualification-readiness.test.mjs'
       - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
@@ -66,6 +67,7 @@ jobs:
         run: |
           node --test \
             tests/b313-material-factors.test.mjs \
+            tests/b313-material-factors-editor-provenance.test.mjs \
             tests/glrd-b313-qualification-readiness.test.mjs \
             tests/xml-cii-b313-governed-factor-engine.test.mjs \
             tests/xml-cii-b313-glrd-config8-sourcechain.test.mjs \
