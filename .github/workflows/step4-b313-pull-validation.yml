@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - 'converters/b313-material-factors/index.js'
+      - 'converters/b313-material-factors/screening-reference.js'
+      - 'docs/converters/b313-material-factors/screening-reference.js'
       - 'converters/b313-material-factors/code-factor-rule-engine.js'
       - 'converters/b313-material-factors/default-b313-code-rule-data.js'
       - 'docs/Masters/b313-code-factor-rules.json'
@@ -50,6 +52,7 @@ jobs:
       - name: Verify syntax
         run: |
           node --check converters/b313-material-factors/index.js
+          node --check converters/b313-material-factors/screening-reference.js
           node --check converters/b313-material-factors/code-factor-rule-engine.js
           node --check scripts/generate-b313-code-factor-rules.mjs
           node --check scripts/generate-b313-material-factors.mjs
@@ -80,6 +83,7 @@ jobs:
             tests/xml-cii-b313-preview-blocker-ui-static.test.mjs \
             tests/xml-cii-b313-preview-pull-v065.test.mjs \
             tests/xml-cii-b313-preview-wall-update.test.mjs \
+            tests/xml-cii-b313-preview-screening-reference.test.mjs \
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
             tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
