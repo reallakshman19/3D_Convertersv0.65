@@ -513,6 +513,26 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       return;
     }
 
+    // A numeric configuration default is not a reviewed design temperature.
+    // Corrections are made in the existing 4 Preview T1/P1 cells, followed by
+    // Rebuild; never borrow T2/T3, a neighboring branch, or the CS fallback.
+    const t1Raw = temperatureText(row);
+    const t1 = t1Raw === '' ? NaN : Number(t1Raw);
+    const t1Source = normalizedToken(row?.t1Source);
+    if (!Number.isFinite(t1) || t1 <= -273.15 || t1Source === 'DEFAULT' || t1Source === 'NONE') {
+      results.push(failureRow(row,
+        !Number.isFinite(t1) || t1 <= -273.15 ? 'B313_PREVIEW_T1_REQUIRED' : 'B313_PREVIEW_T1_SOURCE_UNVERIFIED',
+        'T1 must be a real design temperature from the effective 4 Preview. Edit/confirm T1 in that table and Rebuild Preview; do not use default or neighboring temperatures.',
+        { t1: t1Raw, t1Source: row?.t1Source || 'unresolved', nextAction: 'EDIT_STEP4_T1_AND_REBUILD' }));
+      return;
+    }
+    if (normalizedToken(row?.p1Source) === 'DEFAULT') {
+      results.push(failureRow(row,'B313_PREVIEW_P1_SOURCE_UNVERIFIED',
+        'P1 is only a configuration default. Confirm design pressure and units in 4 Preview, then Rebuild.',
+        { p1: row?.p1, p1Source: row?.p1Source, nextAction: 'EDIT_STEP4_P1_AND_REBUILD' }));
+      return;
+    }
+
     const key = previewB313BasisKey(row, { b313WallUpdate: basisConfig });
     const stored = basisForRow(basisConfig, row, key);
     const basis = stored.basis || {};
