@@ -1,15 +1,22 @@
 {
   "schema": "glrd-b313-pinned-source-manifest/v1",
-  "project": "GLRD-1000-PI-01",
-  "provenance": "GLRD-INPUTS-MANIFEST.md, owner-provided source links pinned November 5 2026; project model configuration still needs exact receipt",
+  "project": "GLRD-1000-PSI-02",
+  "provenance": "GLRD owner archive plus pinned source repo: 30-row Step 4 audit matches PSI-02 XML, not 31-branch BM2 historical reference; both retained independently",
   "sourceRepo": "reallakshman19/3D_Converters",
-  "expectedXmlBranches": 31,
-  "expectedXmlNodes": 1196,
+  "expectedXmlBranches": 30,
+  "expectedXmlNodes": 1224,
   "expectedStagedArrayCount": 86,
   "status": "AUTHENTIC_SOURCE_FIXTURES_NOT_A_QUALIFIED_B313_DESIGN_BASIS",
   "files": [
     {
       "role": "xml",
+      "path": "Benchmarks/XML-CII-2019/revamped/GLRD-1000-PSI-02.xml",
+      "ref": "3377b7f4baeeee5851e72dcc414d6c4a93f5a933",
+      "bytes": 643002,
+      "sha256": "164163380dccffb8f9d6bd7853eabd36eea89e508da2215443e81969144d4a45"
+    },
+    {
+      "role": "historical_bm2_xml",
       "path": "Benchmarks/XML-CII-2019/revamped/GLRD-1000-PI-01 - BM2.xml",
       "ref": "3377b7f4baeeee5851e72dcc414d6c4a93f5a933",
       "bytes": 629889,
@@ -55,6 +62,21 @@
     "filename": "bm2-workbench-config.json",
     "expectedSha256": "766da8fa5711c373e309e975f6c1bb8fedc7caf4b835d9dbc9909af3de876bd8",
     "confirmedPresent": false,
-    "requiredForAuthoritativePreview": true
+    "requiredForAuthoritativePreview": true,
+    "historicalReceiptVerified": true,
+    "notes": "Previously received and SHA-256 verified in another conversation (8,433,327 bytes); not currently mounted/retrievable; historical saved Linelist was Coversheet rather than effective Linelist, so replay cannot claim parity without corrected configuration authority."
+  },
+  "expectedAuditBranches": [
+    "/GLRD-1000-4\"-P4110001-93833-01/B6",
+    "/GLRD-1000-4\"-P4110001-93833-01/B2",
+    "/GLRD-1000-2\"-P4110003-93833-01/B2",
+    "/GLRD-1000-4\"-B4110003-11502-01/B1",
+    "/GLRD-1000-4\"-B4110003-11502-01/B3"
+  ],
+  "sourceRelation": {
+    "auditTarget": "GLRD-1000-PSI-02.xml",
+    "historicalReference": "GLRD-1000-PI-01 - BM2.xml",
+    "stageJsonOriginallyNamedForBM2": true,
+    "stageMappingToPsi02Verified": false
   }
 }
