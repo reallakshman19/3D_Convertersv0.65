@@ -16,6 +16,57 @@ The initial A106 Gr B temperature `S` series supplied during this work is stored
 
 Caller factor overrides use MPa for `S` / `allowableStressMPa`; `E`, `W`, and `Y` are dimensionless. Override provenance is returned as `CALLER_OVERRIDE` and is never written back into the master automatically.
 
+## Qualified temperature lookup and publication (v0.65 repair)
+
+The Step 4 B31.3 path resolves factors at the **effective Preview T1**. Its
+strict resolver now uses the following **source-governed** rules:
+
+- **S**: exact qualified temperature record first, then straight-line
+  interpolation *only inside* two qualified Table A-1/A-1C records of the
+  same material, product form, code edition, source authority, qualification
+  status and approval. The calculation converts ksi to MPa before
+  interpolation; extrapolation is prohibited.
+- **E**: exact qualified manufacturing-route record, or an explicitly
+  qualified `temperatureApplicability: "CONSTANT_RANGE"` entry covering T1;
+  neither an unknown route nor a single unrelated temperature is assumed.
+- **W/Y**: exact qualified record, an explicitly qualified constant interval,
+  or two source-matched records with reviewed
+  `interpolationPolicy: "LINEAR_APPROVED"`. No automatic interpolation of
+  screening data.
+- Any duplicate authority, missing boundary/source, conflicting grade,
+  unresolved manufacturing route, unsupported temperature or changed master
+  causes a row-level HOLD. Do not replace T1 with T2, a neighboring record,
+  0 °C, the 120 °C config default or a CS family default.
+
+A factor record labelled `PROJECT_APPROVED` or `VERIFIED` must include
+a non-screening `sourceAuthority` and exact `sourceReference`; a
+`PROJECT_APPROVED` record additionally needs `approvalReference`.
+The user-entered text cannot independently prove approval. Governance must
+validate the source, code edition, product form, route and design applicability.
+
+The existing **B31.3 Material Factors** tab supports editing these evidence
+fields. **Save Draft / Import JSON never updates the active resolver.**
+
+To publish after real engineering review:
+
+1. Export the reviewed JSON candidate, reconcile each S/E/W/Y record against
+   the authorized code edition and project specification, and update
+   `docs/Masters/b313-material-factor-master.json` in a governed PR.
+2. Run `node scripts/generate-b313-material-factors.mjs --write`.
+   The generator rejects qualified records lacking the required evidence.
+3. Run `node scripts/generate-b313-material-factors.mjs --check`,
+   `node --test tests/b313-material-factors.test.mjs`, and the Step 4 B31.3
+   Pull/Chromium suites against the exact candidate commit.
+4. Obtain independent engineering review before merging. After deployment,
+   re-open Step 4 and rebuild Preview. Pull signatures detect master revision
+   changes and invalidate stale accepted values.
+
+**Current limitation:** the bundled 2024 catalog contains screening/benchmark
+numbers but no independently verified or approved production factor rows for
+the DSS/LTCS cases shown by the user. Software cannot truthfully mark them
+qualified until controlled source data is supplied. The new engine supports
+such data without guessing values.
+
 ## Public API
 
 ```js
