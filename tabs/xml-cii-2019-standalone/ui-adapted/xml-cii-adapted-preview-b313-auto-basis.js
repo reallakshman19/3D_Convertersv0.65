@@ -41,6 +41,9 @@ function storedBasisForRow(config, row, materialId, t1) {
   if (!bases || typeof bases !== 'object' || Array.isArray(bases)) return {};
   const key = previewB313BasisKey(row, config);
   if (key && bases[key] && typeof bases[key] === 'object') return bases[key];
+  // A family-default identity review is scoped to the Preview occurrence.
+  // Never resurrect an old shared material/T1 approval from another line.
+  if (key.includes('|GRADE_SCOPE:')) return {};
   return Object.values(bases).find((basis) => (
     basis
     && typeof basis === 'object'
