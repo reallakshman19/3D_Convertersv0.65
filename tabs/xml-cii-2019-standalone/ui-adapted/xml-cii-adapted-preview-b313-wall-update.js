@@ -67,6 +67,10 @@ export function b313SourceConfirmsA106Seamless(row, materialIdentity) {
     || materialIdentity.b313IdentityNeedsReview === true
     || materialIdentity.b313FallbackApplied === true
     || materialIdentity.requestMode !== 'EXACT_PREVIEW_MATERIAL') return false;
+  // An unscoped class fallback may name A106 without proving that the
+  // physical pipe is A106. Require the exact DN class source in that case.
+  if (normalizedToken(row?.materialSource) === 'PIPING-CLASS-FALLBACK'
+      && row?.materialCodeCorroborationSource !== 'piping-class-master-exact-DN') return false;
   const preview = normalizedToken(materialText(row));
   const exactClass = row?.materialCodeCorroborationSource === 'piping-class-master-exact-DN'
     ? normalizedToken(row.materialCodeCorroborationCandidate) : '';
