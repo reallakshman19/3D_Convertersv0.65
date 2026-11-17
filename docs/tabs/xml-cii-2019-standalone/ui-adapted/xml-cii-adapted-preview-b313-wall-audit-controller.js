@@ -186,9 +186,44 @@ function failedRowHtml(row) {
   </tr>`;
 }
 
+/**
+ * A single factor-data gap can block many physical GLRD branches. Group
+ * diagnostic causes without collapsing the individual engineering evidence.
+ * These groups are READ-ONLY diagnostics, never approvals or Pull scopes.
+ */
+export function derivePreviewB313AuditRootCauseGroups(report = {}) {
+  const groups = new Map();
+  for (const row of normalizeRows(report?.rows)) {
+    if (row.status === 'UPDATED' || row.status === 'CALCULATED') continue;
+    const info=row.details||{}, basis=info.factorBasis||{};
+    const identity=info.materialIdentity||basis.materialIdentity||basis.details?.materialIdentity||{};
+    const mat=text(identity.material?.materialId||basis.details?.materialId||'UNRESOLVED');
+    const temp=basis.details?.designTemperatureC??basis.designTemperatureC;
+    const t1=temp===undefined||temp===null||text(temp)===''?'?':text(temp);
+    const route=text(basis.details?.manufacturingRoute||basis.factorAvailability?.requestedManufacturingRoute||'UNRESOLVED');
+    const code=text(row.code||'B313_PREVIEW_NOT_UPDATED');
+    const cause=factorBlockerText(info)||text(row.message||code);
+    const key=JSON.stringify([mat,t1,route,code,cause]);
+    if(!groups.has(key))groups.set(key,{
+      materialId:mat,designTemperatureC:t1,manufacturingRoute:route,
+      code,cause,count:0,branches:[],
+    });
+    const group=groups.get(key);
+    group.count++;
+    group.branches.push({branchName:text(row.branchName),lineKey:text(row.lineKey)});
+  }
+  return [...groups.values()].sort((a,b)=>b.count-a.count||a.materialId.localeCompare(b.materialId));
+}
+
 export function renderPreviewB313WallAuditHtml(report = {}) {
   const rows = normalizeRows(report?.rows);
   const summary = derivePreviewB313AuditSummary(report);
+  const rootCauses = derivePreviewB313AuditRootCauseGroups(report);
+  const rootCauseHtml = rootCauses.length ? `<div style="margin:8px 0;padding:7px 9px;border:1px solid #e2e8f0;border-radius:6px;font-size:10px;background:#f8fafc;">
+    <strong>${rootCauses.length} distinct blocking factor/identity groups</strong> (physical rows remain individually audited).
+    ${rootCauses.slice(0,8).map(g=>`<div style="padding-top:4px;"><strong>${g.count} row(s)</strong> · ${esc(g.materialId)} · T1 ${esc(g.designTemperatureC)} °C · route ${esc(g.manufacturingRoute)} · ${esc(g.code)}<div style="color:#64748b;">${esc(g.cause)}</div></div>`).join('')}
+    ${rootCauses.length>8?`<div>… and ${rootCauses.length-8} more groups (see full rows below)</div>`:''}
+  </div>` : '';
   const warning = !summary.hasInput
     ? '<div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-size:11px;font-weight:700;">No Preview branch rows were available to evaluate. No wall-thickness change was made.</div>'
     : summary.summaryMismatch
@@ -207,12 +242,13 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
     <div style="font-size:11px;color:#475569;margin:8px 0;">Line-list and Piping Class data may resolve the governed material identity. They do not invent numeric S/E/W/Y. Automatic factors must still come from strict VERIFIED / PROJECT_APPROVED B31.3 factor records at the row T1 and, where applicable, the manufacturing route.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       <span style="padding:4px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-size:10px;"><strong>Code basis</strong> ASME B31.3-2024 §304.1.2 Eq. (3a)</span>
-      <span style="padding:4px 8px;border-radius:6px;background:#ecfdf5;color:#166534;font-size:10px;"><strong>Primary factors</strong> Preview Material → B31.3 identity → active strict S/E/W/Y at T1</span>
+      <span style="padding:4px 8px;border-radius:6px;background:#ecfdf5;color:#166534;font-size:10px;"><strong>Primary factors</strong> Preview Material → B31.3 identity → qualified stress S + governed E/W/Y sources at T1</span>
       <span style="padding:4px 8px;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;"><strong>Fallback</strong> manual S/E/W/Y only when active master is incomplete; controlled source required</span>
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Excluded</strong> BENCHMARK_ONLY / SCREENING factors</span>
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Mill tolerance</strong> ${esc(text(rows.find((row) => row.result?.calculation?.manufacturingTolerance)?.result?.calculation?.manufacturingTolerance?.inputValue ?? 12.5))}${rows.some((row) => row.result?.calculation?.manufacturingTolerance?.basis === 'absolute') ? ' mm absolute' : '% negative'}</span>
     </div>
     ${warning}
+    ${rootCauseHtml}
     <div style="overflow:auto;max-height:380px;margin-top:8px;border:1px solid #e2e8f0;border-radius:6px;">
       <table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1120px;">
         <thead style="position:sticky;top:0;background:#f8fafc;z-index:1;"><tr>
