@@ -57,6 +57,23 @@ try {
   assert(!legacy || legacy.hidden || legacy.style.display === 'none', 'Legacy B31.3 editor is visible');
   const panel = host.querySelector('[data-mc-b313-auto-basis-panel]');
   assert(panel.getClientRects().length > 0, 'Auto-basis panel is not visibly rendered');
+  // Unified B31.3 review keeps the same per-occurrence editor and full
+  // physical-row audit within ONE panel; no wall is changed by Calculate.
+  const unifiedSlot = panel.querySelector('[data-mc-b313-unified-audit-slot]');
+  assert(unifiedSlot, 'Unified B31.3 audit slot missing from the basis panel');
+  const liveWallButton = host.querySelector('[data-mc-b313-wall-update]');
+  assert(liveWallButton, 'Existing governed B31.3 calculate action missing');
+  liveWallButton.click();
+  await waitFor(() => unifiedSlot.querySelector('[data-mc-b313-report]'),
+    'Unified B31.3 audit after source build and calculation');
+  const audit = unifiedSlot.querySelector('[data-mc-b313-report]');
+  assert(audit.textContent.includes('Evaluated 41'), 'Audit did not use 41 physical Preview rows');
+  assert(host.querySelectorAll('[data-mc-b313-report]').length === 1,
+    'Competing top-level and unified B31.3 audit panels were rendered');
+  assert(audit.textContent.includes('Not updated 41'),
+    'Unqualified source inputs must remain not updated');
+  assert(!Object.keys(config.b313WallUpdate?.acceptedWallByBranch || {}).length,
+    'Calculation must never create accepted Pull walls');
   const rows = host.__xmlCiiPreviewResult.branchRows;
   const a106 = rows.find((row) => String(row.material || '').includes('A106'));
   assert(a106, 'The 41-branch Preview did not resolve A106 material');
