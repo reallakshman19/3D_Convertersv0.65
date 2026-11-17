@@ -111,7 +111,8 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
     const resolved=draftFactorsAt(draft,selectedMaterial,previewTemperature);const values=resolved.overrides;
     if(!values.S||!values.E||!values.W||values.Y==null)return{ok:false,code:'DRAFT_FACTORS_INCOMPLETE',missing:FACTORS.filter((key)=>key==='S'?!values.S:key==='Y'?values.Y==null:!values[key]),records:resolved.records};
     return calculateB313MaterialDesign({
-      material:{materialId:selectedMaterial},designTemperature:previewTemperature,temperatureUnit:'C',manufacturingRoute:'SEAMLESS',
+      material:{materialId:selectedMaterial},designTemperature:previewTemperature,temperatureUnit:'C',
+      qualificationMode:'manual',manufacturingRoute:'',
       designPressure:51.1,pressureUnit:'barg',outsideDiameter:273,lengthUnit:'mm',dn:250,corrosionAllowance:6,
       negativeMillTolerance:{basis:'percent',value:12.5},dimensionStandard:'ASME B36.10M',factorOverrides:values,
     });
@@ -156,7 +157,7 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
   function previewHtml(){const result=preview();return`<div class="engineering-master-preview"><div class="engineering-master-card"><h3>Candidate calculation preview</h3>
     <label>Material<select class="engineering-master-select" data-preview="material">${(draft.materials||[]).map(m=>`<option value="${esc(m.materialId)}" ${m.materialId===selectedMaterial?'selected':''}>${esc(m.materialId)}</option>`).join('')}</select></label><br><br>
     <label>Temperature °C <input class="engineering-master-input" type="number" step="any" data-preview="temperature" value="${esc(previewTemperature)}"></label>
-    <p class="engineering-master-muted">Preview uses the candidate factor rows as explicit API overrides with the DN250 / 51.1 barg benchmark geometry. It does not activate the candidate master.</p></div>
+    <p class="engineering-master-muted">Preview is a NON-AUTHORITATIVE manual calculation of candidate rows with hypothetical DN250 / 51.1 barg test geometry. It does not establish manufacturing route, qualify the source, enable Step 4 Pull, or activate the master.</p></div>
     <div class="engineering-master-card"><h3>API result</h3><pre class="engineering-master-json">${esc(JSON.stringify(result,null,2))}</pre></div></div>`;}
 
   function validationHtml(){const v=validateB313MaterialFactorsDraft(draft);return`<div class="engineering-master-grid"><div class="engineering-master-card"><h3>Errors</h3><div class="engineering-master-metric">${v.errors.length}</div></div><div class="engineering-master-card"><h3>Warnings</h3><div class="engineering-master-metric">${v.warnings.length}</div></div><div class="engineering-master-card"><h3>Status</h3><div class="engineering-master-metric">${v.ok?'PASS':'BLOCKED'}</div></div></div><div class="engineering-master-validation">${[...v.errors.map(x=>({...x,bad:true})),...v.warnings].map(x=>`<div class="engineering-master-issue ${x.bad?'bad':''}"><strong>${esc(x.path)}</strong><div>${esc(x.message)}</div></div>`).join('')||'<div class="engineering-master-banner">No validation findings.</div>'}</div>`;}
