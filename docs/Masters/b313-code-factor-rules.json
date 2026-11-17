@@ -1,0 +1,8 @@
+{
+  "schema": "b313-code-factor-rules/v1",
+  "standard": "ASME B31.3",
+  "edition": "2024",
+  "qualification": "NO_QUALIFIED_CODE_RULES_PUBLISHED",
+  "records": [],
+  "notes": "This is a governed EMPTY registry. Do not infer E/W/Y or promote screening values. Publish rules only after controlled code-edition and project source review."
+}
