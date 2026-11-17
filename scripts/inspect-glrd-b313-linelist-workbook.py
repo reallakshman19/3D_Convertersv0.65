@@ -18,6 +18,7 @@ NS={'x':'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
     'p':'http://schemas.openxmlformats.org/package/2006/relationships'}
 NSR='{'+NS['r']+'}id'
 LINE=re.compile(r'(?<![A-Z0-9])(?:P|B)411\d{4}(?![A-Z0-9])',re.I)
+SEQUENCE=re.compile(r'(?<![0-9])411\d{4}(?![0-9])')
 
 
 def sheet_inventory(filename, expected_line_keys):
@@ -32,6 +33,7 @@ def sheet_inventory(filename, expected_line_keys):
             for si in strings.findall('x:si',NS):
                 shared.append(''.join(t.text or '' for t in si.iter('{'+NS['x']+'}t')))
         results=[]
+        expected_seqs={k[1:] for k in expected_line_keys if k and k[0] in 'PB'}
         for sheet in workbook.findall('x:sheets/x:sheet',NS):
             name=sheet.attrib['name']
             target=targets[sheet.attrib[NSR]].lstrip('/')
@@ -40,6 +42,7 @@ def sheet_inventory(filename, expected_line_keys):
             root=ET.fromstring(archive.read(target))
             rows=root.findall('x:sheetData/x:row',NS)
             seen=set()
+            seen_sequences=set()
             for row in rows:
                 for cell in row.findall('x:c',NS):
                     value=cell.find('x:v',NS)
@@ -51,10 +54,13 @@ def sheet_inventory(filename, expected_line_keys):
                         value=shared[idx] if 0<=idx<len(shared) else ''
                     else: value=value.text or ''
                     seen.update(k.upper() for k in LINE.findall(str(value)))
+                    seen_sequences.update(SEQUENCE.findall(str(value)))
             results.append({'name':name,'populatedSheetRows':len(rows),
-                            'candidatePhysicalLineKeys':sorted(seen & expected_line_keys),
-                            'candidatePhysicalLineKeyCount':len(seen & expected_line_keys),
-                            'evidenceType':'UNSTRUCTURED_CELL_STRING_MATCH_NOT_LINE_LIST_MAPPING'})
+                            'wholeCellCombinedLineKeyMatches':sorted(seen & expected_line_keys),
+                            'wholeCellCombinedLineKeyMatchCount':len(seen & expected_line_keys),
+                            'unscopedSequenceMatches':sorted(seen_sequences & expected_seqs),
+                            'unscopedSequenceMatchCount':len(seen_sequences & expected_seqs),
+                            'evidenceType':'HEURISTIC_CELL_TOKEN_OR_SEQUENCE_SCAN_ONLY_NOT_LINE_LIST_MAPPING'})
         names=[r['name'] for r in results]
         exact=next((n for n in names if n.strip().lower()=='linelist'),None)
         return {'schema':'glrd-b313-linelist-workbook-census/v1',
@@ -80,7 +86,7 @@ def main():
     target.write_text(json.dumps(inventory,indent=2)+'\n')
     print('GLRD pinned Line List XLSX source worksheet inventory:')
     for s in inventory['worksheets']:
-        print(f"  {s['name']}: {s['populatedSheetRows']} populated sheet rows, {s['candidatePhysicalLineKeyCount']}/{len(expected)} candidate distinct GLRD physical line keys")
+        print(f"  {s['name']}: {s['populatedSheetRows']} populated sheet rows, {s['wholeCellCombinedLineKeyMatchCount']}/{len(expected)} joined key tokens; {s['unscopedSequenceMatchCount']} sequence matches (neither proves line identity)")
     print('Named Linelist available:',bool(inventory['preferredNamedWorksheet']))
     print('No browser active-sheet inference or process-design approval performed.')
     print('Report:',target)
