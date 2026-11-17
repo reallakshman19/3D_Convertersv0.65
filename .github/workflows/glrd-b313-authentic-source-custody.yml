@@ -1,0 +1,56 @@
+name: GLRD authenticated-source custody (B31.3)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'engineering/b313/glrd-pinned-source-manifest.json'
+      - 'engineering/b313/glrd-psi02-factor-groups.json'
+      - 'engineering/b313/glrd-b313-2024-external-reference-intake-v1.json'
+      - 'scripts/glrd-b313-qualification-readiness.mjs'
+      - 'tests/glrd-b313-qualification-readiness.test.mjs'
+      - 'docs/Masters/b313-material-factor-master.json'
+      - 'docs/Masters/b313-code-factor-rules.json'
+      - 'scripts/verify-glrd-b313-authentic-inputs.py'
+      - 'scripts/verify-glrd-b313-native-writer-parity.py'
+      - '.github/workflows/glrd-b313-authentic-source-custody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  glrd-input-integrity:
+    name: GLRD pinned input integrity and branch census
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Verify code-factor GLRD readiness matrix without approving any factors
+        run: |
+          node --test tests/glrd-b313-qualification-readiness.test.mjs
+          node scripts/glrd-b313-qualification-readiness.mjs --output out/glrd-b313-factor-qualification-readiness.json
+      - name: Download exact pinned GLRD XML, stage and masters, then verify SHA256
+        run: |
+          python3 scripts/verify-glrd-b313-authentic-inputs.py --fetch --output out/glrd-b313-source-custody.json
+      - name: Native CII writer parity with test-only PSI-02 wall modification
+        run: |
+          python3 scripts/verify-glrd-b313-native-writer-parity.py --xml .cache/glrd-b313-source/GLRD-1000-PSI-02.xml --output out/glrd-b313-synthetic-native-wall-parity.json
+      - name: Upload machine-readable source custody without redistributing owner input files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glrd-b313-source-custody
+          path: |
+            out/glrd-b313-factor-qualification-readiness.json
+            out/glrd-b313-source-custody.json
+            out/glrd-b313-synthetic-native-wall-parity.json
+          if-no-files-found: warn

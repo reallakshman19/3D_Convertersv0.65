@@ -1,4 +1,4 @@
-import { B313_MATERIAL_FACTOR_MASTER } from '../b313-material-factors/index.js';
+import { B313_MATERIAL_FACTOR_MASTER, B313_GOVERNED_CODE_RULE_PACK } from '../b313-material-factors/index.js';
 
 /**
  * Detect changed active factor tables across deploys: cached Preview/Pull
@@ -9,7 +9,8 @@ function factorMasterRevision() {
   const master = B313_MATERIAL_FACTOR_MASTER;
   const raw = JSON.stringify({ standard: master.standard, edition: master.edition,
     materials: master.materials,
-    factors: Object.fromEntries(['S','E','W','Y'].map(k => [k, master.factors?.[k]?.records || []])) });
+    factors: Object.fromEntries(['S','E','W','Y'].map(k => [k, master.factors?.[k]?.records || []])),
+    governedCodeRules: B313_GOVERNED_CODE_RULE_PACK });
   let h1 = 0x811c9dc5, h2 = 0x9747b28c;
   for (let i = 0; i < raw.length; i++) {
     h1 = Math.imul(h1 ^ raw.charCodeAt(i), 0x01000193) >>> 0;
@@ -37,6 +38,15 @@ export function b313PreviewInputSignature(row = {}, config = {}) {
     lineKey: txt(row.lineKey),
     sizeMm: txt(row.sizeMm),
     pipingClass: txt(row.pipingClass),
+    pipingClassSelectedSource: txt(row.pipingClassSelectedSource),
+    pipingClassSelectionExplicit: row.pipingClassSelectionExplicit === true,
+    pipingClassPipeMaterial: txt(row.pipingClassPipeMaterial),
+    pipingClassPipeDnMm: txt(row.pipingClassPipeDnMm),
+    pipingClassPipeSourceRow: txt(row.pipingClassPipeSourceRow),
+    pipingClassPipeSchedule: txt(row.pipingClassPipeSchedule),
+    pipingClassPipeWallMm: txt(row.pipingClassPipeWallMm),
+    pipingClassPipeCorrosionMm: txt(row.pipingClassPipeCorrosionMm),
+    pipingClassPipeRating: txt(row.pipingClassPipeRating),
     material: txt(row.material),
     materialCode: txt(row.materialCode),
     materialCodeMatchedMaterial: txt(row.materialCodeMatchedMaterial),

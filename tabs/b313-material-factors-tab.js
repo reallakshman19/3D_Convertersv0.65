@@ -24,7 +24,7 @@ function loadDraft(){try{const raw=localStorage.getItem(DRAFT_KEY);return raw?JS
 function factorRecords(master,factor){return master?.factors?.[factor]?.records||[];}
 function materialMap(master){return new Map((master.materials||[]).map((row)=>[row.materialId,row]));}
 
-function validateMaster(master){
+export function validateB313MaterialFactorsDraft(master){
   const errors=[];const warnings=[];const ids=new Set();
   for(const [index,row] of (master.materials||[]).entries()){
     if(!row.materialId)errors.push({path:`materials.${index}.materialId`,message:'materialId is required'});
@@ -36,22 +36,33 @@ function validateMaster(master){
     for(const [index,row] of factorRecords(master,factor).entries()){
       const path=`factors.${factor}.records.${index}`;
       if(!ids.has(row.materialId))errors.push({path:`${path}.materialId`,message:'Unknown materialId'});
-      if(!Number.isFinite(Number(row.temperatureC)))errors.push({path:`${path}.temperatureC`,message:'Temperature must be finite'});
+      if(row.temperatureC==null || String(row.temperatureC).trim()==='' || !Number.isFinite(Number(row.temperatureC)))
+        errors.push({path:`${path}.temperatureC`,message:'Temperature must be an explicit finite value'});
       const value=Number(row.value);
       if(!Number.isFinite(value))errors.push({path:`${path}.value`,message:'Value must be finite'});
       if(factor==='S'&&!(value>0))errors.push({path:`${path}.value`,message:'S must be positive'});
       if(['E','W'].includes(factor)&&(!(value>0)||value>1))errors.push({path:`${path}.value`,message:`${factor} must satisfy 0 < ${factor} ≤ 1`});
-      if(factor==='Y'&&value<0)errors.push({path:`${path}.value`,message:'Y must be non-negative'});
+      if(factor==='Y'&&(value<0||value>1))errors.push({path:`${path}.value`,message:'Y must satisfy 0 ≤ Y ≤ 1'});
       if(!STATUSES.has(String(row.status||'').toUpperCase()))errors.push({path:`${path}.status`,message:'Unknown status'});
       if(['VERIFIED','PROJECT_APPROVED'].includes(String(row.status||'').toUpperCase())){
         if(!row.sourceAuthority || /SCREENING|BENCHMARK|CANDIDATE/i.test(String(row.sourceAuthority)))
           errors.push({path:`${path}.sourceAuthority`,message:'Qualified rows require a non-screening source authority'});
         if(!String(row.sourceReference||'').trim())
           errors.push({path:`${path}.sourceReference`,message:'Exact B31.3 code/table source reference is required'});
+        if(!/^[a-f0-9]{64}$/i.test(String(row.sourceDocumentSha256||'')))
+          errors.push({path:`${path}.sourceDocumentSha256`,message:'Controlled source file SHA-256 required'});
+        if(!String(row.sourceReviewedBy||'').trim())
+          errors.push({path:`${path}.sourceReviewedBy`,message:'Independent source reviewer required'});
+        if(!/^20\d{2}-\d{2}-\d{2}$/.test(String(row.sourceReviewDate||'')))
+          errors.push({path:`${path}.sourceReviewDate`,message:'Source review date YYYY-MM-DD required'});
+        if(!String(row.sourceRevision||'').trim())
+          errors.push({path:`${path}.sourceRevision`,message:'Controlled source revision required'});
+        if(factor==='E'&&!String(row.manufacturingRoute||'').trim())
+          errors.push({path:`${path}.manufacturingRoute`,message:'E requires an exact physical pipe manufacturing route'});
         if(row.status==='PROJECT_APPROVED'&&!String(row.approvalReference||'').trim())
           errors.push({path:`${path}.approvalReference`,message:'Project approval reference required'});
-        if(row.edition && String(row.edition)!==String(master.edition))
-          errors.push({path:`${path}.edition`,message:'Factor code edition differs from master'});
+        if(String(row.edition)!==String(master.edition))
+          errors.push({path:`${path}.edition`,message:'Factor code edition must match the active master'});
         if(row.temperatureApplicability==='CONSTANT_RANGE' && (
           factor==='S' || !Number.isFinite(Number(row.validFromC)) ||
           !Number.isFinite(Number(row.validToC)) || Number(row.validFromC)>Number(row.validToC)))
@@ -100,7 +111,8 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
     const resolved=draftFactorsAt(draft,selectedMaterial,previewTemperature);const values=resolved.overrides;
     if(!values.S||!values.E||!values.W||values.Y==null)return{ok:false,code:'DRAFT_FACTORS_INCOMPLETE',missing:FACTORS.filter((key)=>key==='S'?!values.S:key==='Y'?values.Y==null:!values[key]),records:resolved.records};
     return calculateB313MaterialDesign({
-      material:{materialId:selectedMaterial},designTemperature:previewTemperature,temperatureUnit:'C',manufacturingRoute:'SEAMLESS',
+      material:{materialId:selectedMaterial},designTemperature:previewTemperature,temperatureUnit:'C',
+      qualificationMode:'manual',manufacturingRoute:'',
       designPressure:51.1,pressureUnit:'barg',outsideDiameter:273,lengthUnit:'mm',dn:250,corrosionAllowance:6,
       negativeMillTolerance:{basis:'percent',value:12.5},dimensionStandard:'ASME B36.10M',factorOverrides:values,
     });
@@ -122,9 +134,9 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
   function materialsHtml(){return`<div class="engineering-master-table-wrap"><table class="engineering-master-table"><thead><tr><th>Material ID</th><th>Family</th><th>Spec</th><th>Grade</th><th>Product</th><th>Identity status</th></tr></thead><tbody>${filteredMaterials().map((m)=>`<tr><td>${esc(m.materialId)}</td><td>${esc(m.family)}</td><td>${esc(m.spec)}</td><td>${esc(m.grade)}</td><td>${esc(m.productForm)}</td><td>${esc(m.identityStatus)}</td></tr>`).join('')}</tbody></table></div>`;}
 
   function factorHtml(){const rows=filteredFactorRows();return`
-    <div class="engineering-master-banner warn">Edits are candidate data only. Saving a draft does not change the active B31.3 resolver or design-authority status.</div>
+    <div class="engineering-master-banner warn">Edits are candidate data only. Qualified records require exact edition, controlled source-file SHA-256, independent reviewer/date/revision and applicable engineering approval. Saving a draft does not change the active B31.3 resolver or design-authority status.</div>
     <div class="engineering-master-toolbar"><button class="engineering-master-btn" data-action="add-factor">Add ${factor} row</button><span class="engineering-master-muted">${rows.length} visible records</span></div>
-    <div class="engineering-master-table-wrap"><table class="engineering-master-table"><thead><tr><th>Material</th><th>Family</th><th>Temp °C</th><th>${factor}</th>${factor==='S'?'<th>Unit</th>':''}<th>Product</th>${['E','W'].includes(factor)?'<th>Route</th>':''}<th>Status</th><th>Source authority</th><th>Exact source/table</th><th>Approval ref</th><th></th></tr></thead><tbody>${rows.map(({row,index,material})=>`<tr>
+    <div class="engineering-master-table-wrap"><table class="engineering-master-table"><thead><tr><th>Material</th><th>Family</th><th>Temp °C</th><th>${factor}</th>${factor==='S'?'<th>Unit</th>':''}<th>Product</th>${['E','W'].includes(factor)?'<th>Route</th>':''}<th>Status</th><th>Source authority</th><th>Exact source/table</th><th>Edition</th><th>Source SHA-256</th><th>Reviewed by</th><th>Review date</th><th>Source revision</th><th>Approval ref</th><th></th></tr></thead><tbody>${rows.map(({row,index,material})=>`<tr>
       <td><select class="engineering-master-select" data-factor-index="${index}" data-key="materialId">${(draft.materials||[]).map(m=>`<option value="${esc(m.materialId)}" ${m.materialId===row.materialId?'selected':''}>${esc(m.materialId)}</option>`).join('')}</select></td>
       <td>${esc(material?.family||'')}</td><td><input class="engineering-master-input" type="number" step="any" data-factor-index="${index}" data-key="temperatureC" value="${esc(row.temperatureC)}"></td>
       <td><input class="engineering-master-input" type="number" step="any" data-factor-index="${index}" data-key="value" value="${esc(row.value)}"></td>
@@ -134,21 +146,26 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
       <td><select class="engineering-master-select" data-factor-index="${index}" data-key="status">${[...STATUSES].map(s=>`<option ${s===row.status?'selected':''}>${s}</option>`).join('')}</select></td>
       <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceAuthority" value="${esc(row.sourceAuthority||'')}"></td>
       <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceReference" value="${esc(row.sourceReference||'')}" placeholder="B31.3 table / revision"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="edition" value="${esc(row.edition||'')}" placeholder="2024" style="width:70px;"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceDocumentSha256" value="${esc(row.sourceDocumentSha256||'')}" placeholder="Controlled source SHA-256" style="min-width:165px;"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceReviewedBy" value="${esc(row.sourceReviewedBy||'')}" placeholder="Independent reviewer"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceReviewDate" value="${esc(row.sourceReviewDate||'')}" placeholder="YYYY-MM-DD" style="width:105px;"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceRevision" value="${esc(row.sourceRevision||'')}" placeholder="Source revision"></td>
       <td><input class="engineering-master-input" data-factor-index="${index}" data-key="approvalReference" value="${esc(row.approvalReference||'')}" placeholder="Project approval ID"></td>
       <td><button class="engineering-master-btn" data-action="delete-factor" data-index="${index}">Retire/Delete</button></td></tr>`).join('')}</tbody></table></div>`;}
 
   function previewHtml(){const result=preview();return`<div class="engineering-master-preview"><div class="engineering-master-card"><h3>Candidate calculation preview</h3>
     <label>Material<select class="engineering-master-select" data-preview="material">${(draft.materials||[]).map(m=>`<option value="${esc(m.materialId)}" ${m.materialId===selectedMaterial?'selected':''}>${esc(m.materialId)}</option>`).join('')}</select></label><br><br>
     <label>Temperature °C <input class="engineering-master-input" type="number" step="any" data-preview="temperature" value="${esc(previewTemperature)}"></label>
-    <p class="engineering-master-muted">Preview uses the candidate factor rows as explicit API overrides with the DN250 / 51.1 barg benchmark geometry. It does not activate the candidate master.</p></div>
+    <p class="engineering-master-muted">Preview is a NON-AUTHORITATIVE manual calculation of candidate rows with hypothetical DN250 / 51.1 barg test geometry. It does not establish manufacturing route, qualify the source, enable Step 4 Pull, or activate the master.</p></div>
     <div class="engineering-master-card"><h3>API result</h3><pre class="engineering-master-json">${esc(JSON.stringify(result,null,2))}</pre></div></div>`;}
 
-  function validationHtml(){const v=validateMaster(draft);return`<div class="engineering-master-grid"><div class="engineering-master-card"><h3>Errors</h3><div class="engineering-master-metric">${v.errors.length}</div></div><div class="engineering-master-card"><h3>Warnings</h3><div class="engineering-master-metric">${v.warnings.length}</div></div><div class="engineering-master-card"><h3>Status</h3><div class="engineering-master-metric">${v.ok?'PASS':'BLOCKED'}</div></div></div><div class="engineering-master-validation">${[...v.errors.map(x=>({...x,bad:true})),...v.warnings].map(x=>`<div class="engineering-master-issue ${x.bad?'bad':''}"><strong>${esc(x.path)}</strong><div>${esc(x.message)}</div></div>`).join('')||'<div class="engineering-master-banner">No validation findings.</div>'}</div>`;}
+  function validationHtml(){const v=validateB313MaterialFactorsDraft(draft);return`<div class="engineering-master-grid"><div class="engineering-master-card"><h3>Errors</h3><div class="engineering-master-metric">${v.errors.length}</div></div><div class="engineering-master-card"><h3>Warnings</h3><div class="engineering-master-metric">${v.warnings.length}</div></div><div class="engineering-master-card"><h3>Status</h3><div class="engineering-master-metric">${v.ok?'PASS':'BLOCKED'}</div></div></div><div class="engineering-master-validation">${[...v.errors.map(x=>({...x,bad:true})),...v.warnings].map(x=>`<div class="engineering-master-issue ${x.bad?'bad':''}"><strong>${esc(x.path)}</strong><div>${esc(x.message)}</div></div>`).join('')||'<div class="engineering-master-banner">No validation findings.</div>'}</div>`;}
 
   function panelHtml(){if(view==='coverage')return coverageHtml();if(view==='materials')return materialsHtml();if(view.startsWith('factor-')){factor=view.slice(7);return factorHtml();}if(view==='preview')return previewHtml();return validationHtml();}
 
   function render(){
-    const validation=validateMaster(draft);container.innerHTML=`<div class="engineering-master-root"><div class="engineering-master-header"><div><div class="engineering-master-title">B31.3 Material Factors</div><div class="engineering-master-subtitle">Governed working copy for material identity and S / E / W / Y factor data. Active resolver data remains unchanged until a reviewed generated master is published.</div></div><div class="engineering-master-actions"><button class="engineering-master-btn" data-action="revert" ${dirty()?'':'disabled'}>Revert</button><button class="engineering-master-btn" data-action="save" ${dirty()?'':'disabled'}>Save Draft</button><button class="engineering-master-btn" data-action="export">Export JSON</button><label class="engineering-master-btn">Import JSON<input hidden type="file" accept=".json" data-action="import"></label></div></div>
+    const validation=validateB313MaterialFactorsDraft(draft);container.innerHTML=`<div class="engineering-master-root"><div class="engineering-master-header"><div><div class="engineering-master-title">B31.3 Material Factors</div><div class="engineering-master-subtitle">Governed working copy for material identity and S / E / W / Y factor data. Active resolver data remains unchanged until a reviewed generated master is published.</div></div><div class="engineering-master-actions"><button class="engineering-master-btn" data-action="revert" ${dirty()?'':'disabled'}>Revert</button><button class="engineering-master-btn" data-action="save" ${dirty()?'':'disabled'}>Save Draft</button><button class="engineering-master-btn" data-action="export">Export JSON</button><label class="engineering-master-btn">Import JSON<input hidden type="file" accept=".json" data-action="import"></label></div></div>
       <div class="engineering-master-layout"><aside class="engineering-master-sidebar">${navHtml()}<div class="engineering-master-banner ${validation.ok?'':'bad'}">${dirty()?'Candidate has unsaved changes':'Working copy saved/clean'}<br>${validation.errors.length} errors · ${validation.warnings.length} warnings</div></aside><main class="engineering-master-panel"><div class="engineering-master-toolbar"><label>Family <select class="engineering-master-select" data-filter="family"><option>ALL</option>${(draft.families||[]).map(f=>`<option ${f===family?'selected':''}>${esc(f)}</option>`).join('')}</select></label></div>${panelHtml()}</main></div></div>`;
     bind();
   }
@@ -157,12 +174,16 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
     container.querySelectorAll('[data-view]').forEach(btn=>btn.addEventListener('click',()=>{view=btn.dataset.view;render();}));
     container.querySelector('[data-filter="family"]')?.addEventListener('change',(e)=>{family=e.target.value;render();});
     container.querySelectorAll('[data-factor-index]').forEach(input=>input.addEventListener('change',()=>{const index=Number(input.dataset.factorIndex),key=input.dataset.key,row=factorRecords(draft,factor)[index];if(!row)return;row[key]=['temperatureC','value'].includes(key)?Number(input.value):input.value;render();}));
-    container.querySelector('[data-action="add-factor"]')?.addEventListener('click',()=>{const material=filteredMaterials()[0]||draft.materials?.[0];if(!material)return;const row={materialId:material.materialId,productForm:'PIPE',temperatureC:0,value:factor==='S'?1:factor==='Y'?0.4:1,status:'DRAFT',sourceAuthority:'UI_DRAFT'};if(factor==='S')row.unit='MPa';if(['E','W'].includes(factor))row.manufacturingRoute='SEAMLESS';factorRecords(draft,factor).push(row);render();});
+    container.querySelector('[data-action="add-factor"]')?.addEventListener('click',()=>{const material=filteredMaterials()[0]||draft.materials?.[0];if(!material)return;const row={materialId:material.materialId,productForm:'PIPE',edition:draft.edition,
+        temperatureC:0,value:factor==='S'?1:factor==='Y'?0.4:1,
+        status:'DRAFT',sourceAuthority:'UI_DRAFT',sourceReference:'',
+        sourceDocumentSha256:'',sourceReviewedBy:'',sourceReviewDate:'',
+        sourceRevision:'',approvalReference:''};if(factor==='S')row.unit='MPa';if(['E','W'].includes(factor))row.manufacturingRoute='SEAMLESS';factorRecords(draft,factor).push(row);render();});
     container.querySelectorAll('[data-action="delete-factor"]').forEach(btn=>btn.addEventListener('click',()=>{factorRecords(draft,factor).splice(Number(btn.dataset.index),1);render();}));
     container.querySelector('[data-preview="material"]')?.addEventListener('change',(e)=>{selectedMaterial=e.target.value;render();});
     container.querySelector('[data-preview="temperature"]')?.addEventListener('change',(e)=>{previewTemperature=Number(e.target.value);render();});
     container.querySelector('[data-action="revert"]')?.addEventListener('click',()=>{draft=clone(baseline);render();});
-    container.querySelector('[data-action="save"]')?.addEventListener('click',()=>{localStorage.setItem(DRAFT_KEY,JSON.stringify({savedAt:new Date().toISOString(),master:draft}));baseline=clone(draft);emit?.('b313-master:draft-saved',{savedAt:new Date().toISOString(),validation:validateMaster(draft)});render();});
+    container.querySelector('[data-action="save"]')?.addEventListener('click',()=>{localStorage.setItem(DRAFT_KEY,JSON.stringify({savedAt:new Date().toISOString(),master:draft}));baseline=clone(draft);emit?.('b313-master:draft-saved',{savedAt:new Date().toISOString(),validation:validateB313MaterialFactorsDraft(draft)});render();});
     container.querySelector('[data-action="export"]')?.addEventListener('click',()=>saveText('b313-material-factor-candidate.json',JSON.stringify(draft,null,2)));
     container.querySelector('[data-action="import"]')?.addEventListener('change',async(e)=>{const file=e.target.files?.[0];if(!file)return;try{draft=JSON.parse(await file.text());render();}finally{e.target.value='';}});
   }

@@ -1,0 +1,180 @@
+{
+  "schema": "glrd-b313-external-reference-intake/v1",
+  "reviewDisposition": "REFERENCE_CANDIDATES_ONLY_NOT_ACTIVE_FACTORS",
+  "codeEditionClaim": "2024",
+  "externalSourceCaveat": "GitHub provenance claims extraction from an owner-held licensed ASME B31.3-2024 copy. The original Code tables and their license, revision and row-level transcription have NOT been independently inspected or approved for this project. Git blob SHA-1 does NOT replace the original controlled code-source document SHA-256 or project approval.",
+  "sources": [
+    {
+      "sourceId": "PROJECT_B313_ADAPTER",
+      "repository": "reallakshman19/3D_Convertersv0.65",
+      "commit": "91c1a28d248d0053dfdb38d4cc05402a4fb12013",
+      "path": "docs/converters/engineering-calculations/adapters/b313.js",
+      "gitBlobSha1": "ed299634e5d9a10c74ad3592d48b60398e296302",
+      "role": "CALCULATION_ADAPTER_ONLY",
+      "codeComplianceFlag": false,
+      "containsApprovedFactorTables": false
+    },
+    {
+      "sourceId": "EPCC_B313_SUBSET",
+      "repository": "iman-taheri59/epcc-platform",
+      "commit": "afa8b5989733c293bd91752de095376b64b60d98",
+      "path": "standards-packs/reference/b313-materials.ref.json",
+      "gitBlobSha1": "3d2d1201e87b54a62b2a3d50f6dccef4b85b4de6",
+      "role": "REFERENCE_TRANSCRIPTION_CANDIDATE",
+      "sourceClaim": "ASME B31.3-2024 Table A-1 SI, Table A-3, 304.1.1-1 and 302.3.5-1",
+      "a1SubsetRows": 57,
+      "hasA333Grade6": true,
+      "hasA790S31803": false,
+      "sourceCodeIndependentVerification": false,
+      "licenseRedistributionPermissionConfirmed": false
+    },
+    {
+      "sourceId": "EPCC_B313_FULL_A1",
+      "repository": "iman-taheri59/epcc-platform",
+      "commit": "afa8b5989733c293bd91752de095376b64b60d98",
+      "path": "standards-packs/reference/allowable-stress.ref.json",
+      "gitBlobSha1": "a6b20119b517738459f3a605e88dbf051afc96cd",
+      "role": "REFERENCE_TRANSCRIPTION_CANDIDATE",
+      "sourceClaim": "ASME B31.3-2024 Table A-1 SI, 798 transcribed material entries",
+      "a1Rows": 798,
+      "codeSourceProjectApproval": false,
+      "licenseRedistributionPermissionConfirmed": false
+    }
+  ],
+  "groups": [
+    {
+      "groupId": "DSS-120",
+      "materialId": "DSS-A790-S31803",
+      "temperatureC": 120,
+      "occurrences": 26,
+      "sourceSpec": "A790",
+      "sourceUns": "S31803",
+      "fullPackReferenceFound": true,
+      "fullPackUpstreamVerified": false,
+      "fullPackStressTemperaturesC": [
+        225,
+        250,
+        275,
+        300,
+        325
+      ],
+      "sourceApplicabilityAtT1": false,
+      "candidateAllowableStressMPa": null,
+      "candidateStatus": "HOLD_UPSTREAM_UNVERIFIED_AND_T1_BELOW_SOURCE_RANGE",
+      "reason": "The A790 UNS S31803 full-pack row is explicitly verified=false/held and has no source value or bracket at 120°C. A789, A182, A240 and A790 other grades cannot replace the exact A790/S31803 pipe entry.",
+      "qualifiedForStrictMaster": false
+    },
+    {
+      "groupId": "LTCS-120",
+      "materialId": "LTCS-A333-6",
+      "temperatureC": 120,
+      "occurrences": 2,
+      "sourceSpec": "A333",
+      "sourceGrade": "6",
+      "sourceUns": "K03006",
+      "fullPackReferenceFound": true,
+      "fullPackUpstreamVerified": true,
+      "fullPackStressBracketC": [
+        100,
+        150
+      ],
+      "sourceApplicabilityAtT1": true,
+      "candidateAllowableStressMPa": 138,
+      "candidateStatus": "SOURCE_REFERENCE_LOCATED_NOT_PROJECT_QUALIFIED",
+      "reason": "The full and subset packs agree on the A333-6 Table A-1 candidate at 120°C. External verified=true is a producer's cross-check, not the controlled owner Code source approval. GLRD P4110003/B2 and B8 also conflict with class 93833 DSS at physical DN.",
+      "qualifiedForStrictMaster": false
+    },
+    {
+      "groupId": "LTCS-82",
+      "materialId": "LTCS-A333-6",
+      "temperatureC": 82,
+      "occurrences": 2,
+      "sourceSpec": "A333",
+      "sourceGrade": "6",
+      "sourceUns": "K03006",
+      "fullPackReferenceFound": true,
+      "fullPackUpstreamVerified": true,
+      "fullPackStressBracketC": [
+        65,
+        100
+      ],
+      "sourceApplicabilityAtT1": true,
+      "candidateAllowableStressMPa": 138,
+      "candidateStatus": "SOURCE_REFERENCE_LOCATED_NOT_PROJECT_QUALIFIED",
+      "reason": "The A333-6 65/100°C stress values in these transcriptions are equal; 82°C interpolation yields the same candidate result. Exact DN, pipe product, pressure unit and independent project approval remain required.",
+      "qualifiedForStrictMaster": false
+    }
+  ],
+  "factorRuleEvidence": {
+    "A333": [
+      {
+        "factor": "E",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "A-3",
+        "condition": "Seamless pipe",
+        "candidate": 1,
+        "requiresManufacturingRouteVerification": true,
+        "qualifiedForStrictMaster": false
+      },
+      {
+        "factor": "E",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "A-3",
+        "condition": "Electric resistance welded pipe",
+        "candidate": 0.85,
+        "requiresManufacturingRouteVerification": true,
+        "qualifiedForStrictMaster": false
+      },
+      {
+        "factor": "W",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "302.3.5-1",
+        "condition": "Applicable carbon steel welded joint at 82°C or 120°C, subject to exact code and product applicability",
+        "candidate": 1,
+        "qualifiedForStrictMaster": false
+      },
+      {
+        "factor": "Y",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "304.1.1-1",
+        "condition": "Applicable ferritic steel, straight pipe equation applicability and T1 under table threshold",
+        "candidate": 0.4,
+        "qualifiedForStrictMaster": false
+      }
+    ],
+    "A790": [
+      {
+        "factor": "E",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "A-3",
+        "condition": "No A790-specific E row located in 18-row subset; physical product route, B31.3 table notes and NDE must be checked",
+        "candidate": null,
+        "qualifiedForStrictMaster": false
+      },
+      {
+        "factor": "W",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "302.3.5-1",
+        "condition": "Duplex material/temperature/joint applicability not independently classified or qualified",
+        "candidate": null,
+        "qualifiedForStrictMaster": false
+      },
+      {
+        "factor": "Y",
+        "source": "EPCC_B313_SUBSET",
+        "sourceTable": "304.1.1-1",
+        "condition": "Duplex grade must be assigned to the code-approved table family, not inferred from a DSS label",
+        "candidate": null,
+        "qualifiedForStrictMaster": false
+      }
+    ]
+  },
+  "publicationRules": [
+    "Source Git SHA-1 is a pin to extracted reference text, not SHA-256 of the original licensed ASME source.",
+    "Do not copy bulk third-party proprietary code tables to this repository without permission.",
+    "Only manually verified Code table original-source values with revision/source SHA-256/reviewer/date and project approval enter VERIFIED or PROJECT_APPROVED active masters.",
+    "Do not use an A790 source value at 225°C as an extrapolated value at 120°C.",
+    "Project-confirmed manufacturing route controls E; no default E=1 and no claim that this candidate data satisfies GLRD Pull.",
+    "All three audit groups remain ENGINEERING HOLD until strict factors, actual effective Preview and native output parity are independently verified."
+  ]
+}

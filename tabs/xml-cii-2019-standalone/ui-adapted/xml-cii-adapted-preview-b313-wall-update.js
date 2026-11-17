@@ -56,7 +56,69 @@ function temperatureText(row) {
   return text(row?.t1 ?? row?.designTemperature ?? '');
 }
 
+/**
+ * ASTM A106 is a seamless-pipe specification. The *exact* source pipe
+ * product can establish this route; family-default "CS" or a generic
+ * class mapping cannot. All other route declarations need physical
+ * project evidence in their Preview basis.
+ */
+export function b313SourceConfirmsA106Seamless(row, materialIdentity) {
+  if (!materialIdentity?.ok || materialIdentity.material?.materialId !== 'CS-A106-B'
+    || materialIdentity.b313IdentityNeedsReview === true
+    || materialIdentity.b313FallbackApplied === true
+    || materialIdentity.requestMode !== 'EXACT_PREVIEW_MATERIAL') return false;
+  // An unscoped class fallback may name A106 without proving that the
+  // physical pipe is A106. Require the exact DN class source in that case.
+  if (normalizedToken(row?.materialSource) === 'PIPING-CLASS-FALLBACK'
+      && row?.materialCodeCorroborationSource !== 'piping-class-master-exact-DN') return false;
+  const preview = normalizedToken(materialText(row));
+  const exactClass = row?.materialCodeCorroborationSource === 'piping-class-master-exact-DN'
+    ? normalizedToken(row.materialCodeCorroborationCandidate) : '';
+  const exactA106 = /(?:^|[^A-Z0-9])A106(?:$|[^A-Z0-9])/;
+  return exactA106.test(preview) || exactA106.test(exactClass);
+}
+
 export function resolvePreviewB313MaterialFromRow(row, config = {}) {
+  // B31.3 cannot inherit an unresolved choice between the exact Line List
+  // class and the class parsed from the physical branch name.
+  if (row?.pipingClassConflict && row?.pipingClassSelectionExplicit !== true) {
+    return { ok: false, code: 'B313_PREVIEW_PIPING_CLASS_AUTHORITY_UNRESOLVED',
+      message: 'Step 4 Line List and branch Piping Class disagree. Review the existing Piping Class source selection and rebuild before B31.3 calculation.',
+      details: { pipingClass: row.pipingClass, branchClass: row.pipingClassRegex,
+        lineListClass: row.pipingClassLineList, selectedSource: row.pipingClassSelectedSource } };
+  }
+  // The exact-DN project master must be checked AGAINST the governing
+  // Preview material even when a configured Material Code matched first.
+  // A family label (LTCS) cannot silently inherit an A790 DSS class product.
+  // This check is only a contradiction guard; it NEVER certifies S/E/W/Y.
+  const classProduct = text(row?.materialCodeCorroborationCandidate);
+  if (row?.materialCodeCorroborationSource === 'piping-class-master-exact-DN' && classProduct) {
+    const physicalClass = resolvePreviewB313MaterialIdentity({ material: classProduct,
+      materialSource: 'piping-class-master-exact-DN' });
+    const preview = resolvePreviewB313MaterialIdentity({
+      material: materialText(row), materialSource: row?.materialSource || '' });
+    const mapped = text(row?.materialCodeMatchedMaterial)
+      ? resolvePreviewB313MaterialIdentity({ material: row.materialCodeMatchedMaterial,
+          materialSource: row?.materialCodeSource || '' }) : null;
+    const mismatchedFamily = preview.ok && physicalClass.ok
+      && preview.material.family !== physicalClass.material.family;
+    const mismatchedCode = mapped?.ok && physicalClass.ok
+      && mapped.material.materialId !== physicalClass.material.materialId;
+    const mismatchedExactGrade = preview.ok && physicalClass.ok
+      && preview.requestMode === 'EXACT_PREVIEW_MATERIAL'
+      && physicalClass.requestMode === 'EXACT_PREVIEW_MATERIAL'
+      && preview.material.materialId !== physicalClass.material.materialId;
+    if (mismatchedFamily || mismatchedCode || mismatchedExactGrade) {
+      return { ok: false, code: 'B313_PREVIEW_CLASS_DN_MATERIAL_CONFLICT',
+        message: 'The actual Piping Class/DN pipe product contradicts the effective Preview or Material Code designation. Resolve source authority in 4 Preview; never overwrite the Line List material automatically.',
+        details: { branchName: row?.branchName, lineKey: row?.lineKey,
+          pipingClass: row?.pipingClass, sizeMm: row?.sizeMm,
+          previewMaterial: materialText(row), materialCodeMaterial: row?.materialCodeMatchedMaterial || '',
+          exactDnClassMaterial: classProduct, exactDnSource: row?.materialCodeCorroborationSource,
+          previewMaterialId: preview.ok ? preview.material.materialId : null,
+          classMaterialId: physicalClass.ok ? physicalClass.material.materialId : null } };
+    }
+  }
   if (row?.materialCodeConflict) {
     return { ok: false, code: 'B313_PREVIEW_MATERIAL_CODE_CONFLICT',
       message: 'Step 4 Material and Material Code evidence conflict; resolve the existing Preview authority before B31.3 calculation.',
@@ -106,17 +168,21 @@ export function previewB313BasisKey(row, config = {}) {
   const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
   if (materialIdentity.ok) {
     const base = `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
-    if (materialIdentity.b313IdentityNeedsReview !== true) return base;
-    // Manual grade approval cannot be shared merely because multiple lines
-    // happen to resolve to the same project-family candidate and T1.
+    // Qualified code facts can be reused from the published master. However,
+    // Preview manual factors and review checkboxes are physical-occurrence
+    // approvals: not transferable across lines, DN, routes or branches.
     const scope = [
       row?.branchOccurrenceIndex ?? '', row?.branchName ?? '',
       row?.lineKey ?? '', row?.pipingClass ?? '',
+      row?.boreMm ?? row?.sizeMm ?? row?.size ?? '',
       row?.materialCode ?? '', row?.materialCodeMatchedMaterial ?? '',
+      row?.materialCodeCorroborationCandidate ?? '',
     ].map(normalizedToken);
-    return scope.some(Boolean)
-      ? `${base}|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}`
-      : base;
+    const occurrence = scope.some(Boolean)
+      ? `|OCCURRENCE:${scope.map(encodeURIComponent).join('~')}` : '';
+    const gradeReview = materialIdentity.b313IdentityNeedsReview === true && scope.some(Boolean)
+      ? `|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}` : '';
+    return base + occurrence + gradeReview;
   }
   const legacy = legacyPreviewB313BasisKey(row);
   return legacy ? `RAW:${legacy}` : '';
@@ -126,7 +192,8 @@ function basisForRow(cfg, row, key = previewB313BasisKey(row)) {
   if (key && cfg.bases[key]) return { key, basis: cfg.bases[key], source: 'canonical-material-id-key' };
   // Do not import a legacy group-wide approval into an occurrence-scoped
   // family-default review: it may belong to another physical line.
-  if (key.includes('|GRADE_SCOPE:')) return { key, basis: {}, source: 'unreviewed-family-occurrence' };
+  if (key.includes('|OCCURRENCE:') || key.includes('|GRADE_SCOPE:'))
+    return { key, basis: {}, source: 'unreviewed-physical-occurrence' };
   const legacy = legacyPreviewB313BasisKey(row);
   if (legacy && cfg.bases[legacy]) return { key, basis: cfg.bases[legacy], source: 'legacy-material-text-key' };
   return { key, basis: {}, source: 'none' };
@@ -380,9 +447,13 @@ function updateVisibleMaterialCell(host, rowIndex, materialIdentity, factorBasis
     badge = cell.querySelector('[data-b313-material-badge]');
   }
   const active = factorBasis?.ok && factorBasis.mode === 'ACTIVE_MASTER_STRICT';
-  badge.textContent = active ? 'B31.3 MASTER ✓' : 'B31.3 ID ✓';
+  const gradeReview = materialIdentity.b313IdentityNeedsReview === true;
+  // Identity-only is not an approved S/E/W/Y calculation. Only the
+  // separately qualified factor basis receives a success checkmark.
+  badge.textContent = active ? 'B31.3 FACTORS ✓'
+    : gradeReview ? 'B31.3 GRADE REVIEW' : 'B31.3 ID ONLY';
   badge.className = `mc-preview-badge ${active ? 'exact' : ''}`.trim();
-  badge.title = `Preview Material → ${materialIdentity.material.materialId}. Identity source: ${materialIdentity.resolutionSource || materialIdentity.requestMode}. Factor basis: ${factorBasis?.ok ? factorBasis.mode : factorBasis?.code || 'unavailable'}.`;
+  badge.title = `Preview Material → ${materialIdentity.material.materialId}. Identity source: ${materialIdentity.resolutionSource || materialIdentity.requestMode}. Factor basis: ${factorBasis?.ok ? factorBasis.mode : factorBasis?.code || 'unavailable'}. Identity lookup alone does not qualify S/E/W/Y.`;
 }
 
 function factorBasisLabel(factorBasis) {
@@ -436,7 +507,11 @@ function renderBasisEditor(host, config, rows, options) {
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="qualityFactorE" type="number" step="any" min="0" max="1" value="${esc(basis.qualityFactorE)}" placeholder="E" style="width:65px;"></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="weldStrengthReductionW" type="number" step="any" min="0" max="1" value="${esc(basis.weldStrengthReductionW)}" placeholder="W" style="width:65px;"></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="coefficientY" type="number" step="any" min="0" max="1" value="${esc(basis.coefficientY)}" placeholder="Y" style="width:65px;"></td>
-      <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="manufacturingRoute" type="text" value="${esc(basis.manufacturingRoute)}" placeholder="optional route" style="width:95px;"></td>
+      <td style="padding:5px;border-bottom:1px solid #334155;">
+        <input data-b313-field="manufacturingRoute" type="text" value="${esc(basis.manufacturingRoute)}" placeholder="physical route" style="width:115px;">
+        <input data-b313-field="manufacturingRouteSourceReference" type="text" value="${esc(basis.manufacturingRouteSourceReference)}" placeholder="Pipe spec/MTR evidence" style="min-width:160px;">
+        <label style="display:block;font-size:10px;"><input data-b313-field="manufacturingRouteEvidenceReviewed" type="checkbox" ${basis.manufacturingRouteEvidenceReviewed===true?'checked':''}> Route evidence reviewed</label>
+      </td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><select data-b313-field="pressureUnit">${['AUTO','PA','KPA','MPA','BAR','BARG','PSI','PSIG'].map((unit) => `<option value="${unit}" ${normalizedToken(basis.pressureUnit || 'AUTO') === normalizedToken(unit) ? 'selected' : ''}>${unit}</option>`).join('')}</select></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><select data-b313-field="dimensionStandard">${['AUTO','ASME B36.10M','ASME B36.19M'].map((standard) => `<option value="${standard}" ${normalizedToken(basis.dimensionStandard || 'AUTO') === normalizedToken(standard) ? 'selected' : ''}>${standard}</option>`).join('')}</select></td>
       <td style="padding:5px;border-bottom:1px solid #334155;"><input data-b313-field="sourceReference" type="text" value="${esc(basis.sourceReference)}" placeholder="required for manual fallback" style="min-width:190px;"></td>
@@ -477,7 +552,9 @@ function renderBasisEditor(host, config, rows, options) {
       materialId: group?.materialIdentity?.ok ? group.materialIdentity.material.materialId : '',
       designTemperature: group?.designTemperature || '',
     };
-    rowEl.querySelectorAll('[data-b313-field]').forEach((field) => { record[field.dataset.b313Field] = field.value; });
+    rowEl.querySelectorAll('[data-b313-field]').forEach((field) => {
+      record[field.dataset.b313Field] = field.type === 'checkbox' ? field.checked : field.value;
+    });
     cfg.bases[key] = record;
     await options?.onSaveConfigPreservePreview?.(config);
   }));
@@ -536,10 +613,29 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     const key = previewB313BasisKey(row, { b313WallUpdate: basisConfig });
     const stored = basisForRow(basisConfig, row, key);
     const basis = stored.basis || {};
+    const assertedRoute = text(basis.manufacturingRoute);
+    const sourceConfirmsSeamless = b313SourceConfirmsA106Seamless(row, materialIdentity);
+    if (sourceConfirmsSeamless && assertedRoute
+        && normalizedToken(assertedRoute) !== 'SEAMLESS') {
+      results.push(failureRow(row, 'B313_PREVIEW_MANUFACTURING_ROUTE_PRODUCT_CONFLICT',
+        'The effective pipe is ASTM A106 seamless but the saved manufacturing route contradicts the product specification. Resolve the source identity/route conflict before B31.3.',
+        {assertedRoute,productRoute:'SEAMLESS',materialIdentity}));
+      return;
+    }
+    const routeAuthority = text(basis.manufacturingRouteSourceReference);
+    const routeReviewed = basis.manufacturingRouteEvidenceReviewed === true;
+    if (assertedRoute && !(routeAuthority && routeReviewed)
+        && !(sourceConfirmsSeamless && normalizedToken(assertedRoute)==='SEAMLESS')) {
+      results.push(failureRow(row, 'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED',
+        'The manufacturing route was entered without a controlled pipe-spec/MTR source and explicit review. Confirm route evidence in the existing B31.3 basis; class mapping or factor-table availability does not prove manufacture.',
+        {route: assertedRoute, routeEvidenceSource: routeAuthority,
+          routeReviewed, materialIdentity, nextAction: 'REVIEW_MANUFACTURING_ROUTE_SOURCE'}));
+      return;
+    }
     const factorBasis = resolvePreviewB313FactorBasis({
       materialIdentity,
       designTemperatureC: temperatureText(row),
-      manufacturingRoute: basis.manufacturingRoute || '',
+      manufacturingRoute: assertedRoute || (sourceConfirmsSeamless ? 'SEAMLESS' : ''),
       manualBasis: basis,
     });
     updateVisibleMaterialCell(host, rowIndex, materialIdentity, factorBasis);

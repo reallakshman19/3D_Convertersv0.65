@@ -7,6 +7,7 @@ import {
   resolveB313QualifiedTemperatureFactor,
 } from '../b313-material-factors/index.js';
 import { selectPipeWallForCalculation } from '../pipe-wall-master/index.js';
+import { resolvePublishedB313CodeFactor } from '../b313-material-factors/code-factor-rule-engine.js';
 
 export const B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT = 12.5;
 export const B313_PREVIEW_WALL_UPDATE_SCHEMA = 'xml-cii-b313-preview-wall-update/v1';
@@ -260,7 +261,7 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
   const materialRows = records.filter((row) => row.materialId === materialId);
   const exactTemperatureRows = materialRows.filter((row) => Math.abs(Number(row.temperatureC) - designTemperatureC) <= 1e-9);
   const routeSensitive = exactTemperatureRows.some((row) => text(row.manufacturingRoute));
-  const requestedRoute = text(manufacturingRoute) || (materialId === 'CS-A106-B' ? 'SEAMLESS' : '');
+  const requestedRoute = text(manufacturingRoute);
   let applicableRows = exactTemperatureRows;
   if (routeSensitive) {
     if (requestedRoute) {
@@ -277,16 +278,25 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
     factor, records, materialId, temperatureC: designTemperatureC,
     manufacturingRoute: requestedRoute, edition: B313_MATERIAL_FACTOR_MASTER.edition,
   });
-  const eligible = !!qualifiedResolution;
+  const material = B313_MATERIAL_FACTOR_MASTER.materials.find(m=>m.materialId===materialId);
+  const codeRule = factor==='S' ? null : resolvePublishedB313CodeFactor({
+    factor, materialId, materialFamily:material?.family,
+    productForm:material?.productForm || 'PIPE',
+    manufacturingRoute:requestedRoute,temperatureC:designTemperatureC,
+    edition:B313_MATERIAL_FACTOR_MASTER.edition,
+  });
+  const eligible = !!qualifiedResolution || codeRule?.ok === true;
   const sourceTemperaturesC = uniqueSortedNumbers(qualifiedResolution?.sourceTemperaturesC || []);
   const nearbyTemps = uniqueSortedNumbers(materialRows.map((row)=>row.temperatureC));
   const lower = nearbyTemps.filter((t)=>t<designTemperatureC).at(-1);
   const upper = nearbyTemps.find((t)=>t>designTemperatureC);
   const surroundingRows = materialRows.filter((row) => Number(row.temperatureC)===lower || Number(row.temperatureC)===upper);
-  let status = qualifiedResolution?.resolution === 'LINEAR_QUALIFIED'
-    ? 'QUALIFIED_INTERPOLATION_AVAILABLE'
-    : qualifiedResolution?.resolution === 'QUALIFIED_CONSTANT_RANGE'
-      ? 'QUALIFIED_RANGE_AVAILABLE' : 'STRICT_AVAILABLE';
+  let status = codeRule?.ok
+    ? 'QUALIFIED_CODE_RULE_AVAILABLE'
+    : qualifiedResolution?.resolution === 'LINEAR_QUALIFIED'
+      ? 'QUALIFIED_INTERPOLATION_AVAILABLE'
+      : qualifiedResolution?.resolution === 'QUALIFIED_CONSTANT_RANGE'
+        ? 'QUALIFIED_RANGE_AVAILABLE' : 'STRICT_AVAILABLE';
   if (!eligible) {
     if (!exactTemperatureRows.length) status = 'NO_QUALIFIED_TEMPERATURE_BASIS';
     else if (routeSensitive && !requestedRoute && !applicableRows.length) status = 'MANUFACTURING_ROUTE_REQUIRED';
@@ -298,7 +308,8 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
     factor,
     status,
     strictAvailable: eligible,
-    qualifiedResolution: qualifiedResolution?.resolution || null,
+    qualifiedResolution: codeRule?.ok ? 'GOVERNED_CODE_RULE' : qualifiedResolution?.resolution || null,
+    qualifiedCodeRuleSource: codeRule?.ok ? codeRule.factorSource : null,
     qualifiedSourceTemperaturesC: sourceTemperaturesC,
     nearbyTemperaturesC: [lower, upper].filter(Number.isFinite),
     nearbySourceStatuses: uniqueText(surroundingRows.map(row=>row.status)),

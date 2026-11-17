@@ -7,6 +7,7 @@ import {
 import {
   previewB313BasisKey,
   resolvePreviewB313MaterialFromRow,
+  b313SourceConfirmsA106Seamless,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261116-b313-pull-v065';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
@@ -43,7 +44,7 @@ function storedBasisForRow(config, row, materialId, t1) {
   if (key && bases[key] && typeof bases[key] === 'object') return bases[key];
   // A family-default identity review is scoped to the Preview occurrence.
   // Never resurrect an old shared material/T1 approval from another line.
-  if (key.includes('|GRADE_SCOPE:')) return {};
+  if (key.includes('|OCCURRENCE:') || key.includes('|GRADE_SCOPE:')) return {};
   return Object.values(bases).find((basis) => (
     basis
     && typeof basis === 'object'
@@ -127,6 +128,37 @@ function fallbackFromStoredOrSeed(storedBasis, seed) {
   return fallback;
 }
 
+/** Source trace shown inside the EXISTING automatic-basis panel. A source row
+ * corroborates product and schedule; it does not qualify B31.3 factors.
+ */
+export function previewB313SourceTrace(row = {}) {
+  const pieces = [];
+  const cls = text(row.pipingClass);
+  const dn = text(row.pipingClassPipeDnMm ?? row.sizeMm);
+  const product = text(row.pipingClassPipeMaterial);
+  const schedule = text(row.pipingClassPipeSchedule);
+  const wall = text(row.pipingClassPipeWallMm);
+  const corrosion = text(row.pipingClassPipeCorrosionMm);
+  const sourceRow = text(row.pipingClassPipeSourceRow);
+  if (cls && product) {
+    pieces.push(`Class ${cls} / DN${dn||'?'} → ${product}` +
+      (schedule ? ` · Sch ${schedule}` : '') +
+      (wall ? ` · nominal ${wall} mm` : '') +
+      (corrosion ? ` · class CA ${corrosion} mm` : '') +
+      (sourceRow ? ` · master row ${sourceRow}` : ''));
+  } else if (cls) {
+    pieces.push(`Class ${cls} / DN${dn||'?'} · exact pipe-product evidence unavailable`);
+  }
+  const code = text(row.materialCode);
+  if (code) {
+    pieces.push(`Material Code ${code} · ${text(row.materialCodeSource)||'source unresolved'}` +
+      (text(row.materialCodeResolutionMethod) ? ` / ${text(row.materialCodeResolutionMethod)}` : '') +
+      (row.materialCodeNeedsReview===true ? ' · REVIEW' : ''));
+  } else pieces.push('Material Code unresolved');
+  if (row.materialCodeCorroborationNeedsReview === true) pieces.push('Class material candidate needs review');
+  return pieces.join(' | ');
+}
+
 export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const material = text(row?.material || row?.materialName || row?.resolvedMaterial || row?.materialCode || '');
   const materialSource = text(row?.materialSource || '');
@@ -145,7 +177,11 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       identityCode: materialIdentity?.code || 'B313_PREVIEW_MATERIAL_NOT_MAPPED',
       statusCode: 'MATERIAL_UNRESOLVED',
       statusLabel: 'MATERIAL UNRESOLVED',
-      factorSummary: '',
+      factorSummary: materialIdentity?.message || materialIdentity?.code || 'Material source unresolved',
+      sourceTrace: previewB313SourceTrace(row),
+      previewP1: text(row?.p1),
+      previewP1Unit: text(row?.p1Unit),
+      previewHydroPressure: text(row?.hydroPressure),
       route: '',
       routeSource: 'unresolved',
       factorBasis: null,
@@ -157,9 +193,20 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const materialId = text(materialIdentity.material?.materialId);
   const storedBasis = storedBasisForRow(config, row, materialId, t1);
   const explicitRoute = text(storedBasis.manufacturingRoute);
+  const routeReference = text(storedBasis.manufacturingRouteSourceReference);
+  const routeEvidenceReviewed = storedBasis.manufacturingRouteEvidenceReviewed === true;
+  const confirmedA106Pipe = b313SourceConfirmsA106Seamless(row, materialIdentity);
+  const a106RouteConflict = confirmedA106Pipe && !!explicitRoute
+    && explicitRoute.toUpperCase() !== 'SEAMLESS';
+  // Route entries are candidates until a real pipe-spec/MTR source is
+  // independently reviewed. Factor table options do not prove construction.
+  // Explicit A106 routes contradicting its seamless specification fail closed.
+  const reviewedExplicitRoute = explicitRoute && !a106RouteConflict
+    && ((routeReference && routeEvidenceReviewed) || confirmedA106Pipe)
+    ? explicitRoute : '';
 
   if (!t1 || text(row?.t1Source).toLowerCase() === 'default') {
-    const defaultRoute = materialId === 'CS-A106-B' ? 'SEAMLESS' : '';
+    const defaultRoute = confirmedA106Pipe ? 'SEAMLESS' : '';
     return {
       schema: B313_PREVIEW_AUTO_BASIS_SCHEMA,
       basisKey,
@@ -173,12 +220,14 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       factorSummary: !t1
         ? 'S/E/W/Y not evaluated until Preview T1 is resolved. Enter design T1 in existing 4 Preview, then Rebuild. No fallback temperature is assumed.'
         : 'T1 came from a configuration default, not verified design evidence. Confirm T1 in 4 Preview and rebuild.',
+      sourceTrace: previewB313SourceTrace(row),
+      previewP1: text(row?.p1),
+      previewP1Unit: text(row?.p1Unit),
+      previewHydroPressure: text(row?.hydroPressure),
       route: explicitRoute || defaultRoute,
       routeSource: explicitRoute
-        ? 'controlled Preview basis'
-        : defaultRoute
-          ? 'A106 carbon-steel default'
-          : 'unresolved',
+        ? reviewedExplicitRoute ? 'reviewed physical route evidence' : 'ROUTE SOURCE/REVIEW REQUIRED'
+        : defaultRoute ? 'confirmed ASTM A106 product specification' : 'unresolved',
       factorBasis: null,
       fallback: null,
       tableContext: { materialId, temperatureC: undefined },
@@ -188,20 +237,16 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const factorBasis = resolvePreviewB313FactorBasis({
     materialIdentity,
     designTemperatureC: t1,
-    manufacturingRoute: explicitRoute,
+    manufacturingRoute: reviewedExplicitRoute || (confirmedA106Pipe ? 'SEAMLESS' : ''),
     manualBasis: storedBasis,
   });
   const availability = factorAvailabilityFrom(factorBasis);
-  const defaultRoute = routeFromAvailability(availability)
-    || (materialId === 'CS-A106-B' ? 'SEAMLESS' : '');
+  const defaultRoute = confirmedA106Pipe ? 'SEAMLESS' : '';
   const route = explicitRoute || defaultRoute;
   const routeSource = explicitRoute
-    ? 'controlled Preview basis'
-    : materialId === 'CS-A106-B' && route === 'SEAMLESS'
-      ? 'A106 carbon-steel default'
-      : route
-        ? 'active factor master'
-        : 'unresolved';
+    ? reviewedExplicitRoute ? 'reviewed physical route evidence' : 'ROUTE SOURCE/REVIEW REQUIRED'
+    : defaultRoute ? 'confirmed ASTM A106 product specification' : 'unresolved';
+  const routeNeedsReview = !!explicitRoute && !reviewedExplicitRoute;
 
   const strictReady = factorBasis?.ok && factorBasis.mode === 'ACTIVE_MASTER_STRICT';
   const storedFallbackReady = factorBasis?.ok && factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK';
@@ -216,6 +261,8 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const fallback = strictReady ? null : fallbackFromStoredOrSeed(storedBasis, seed);
   const status = materialIdentityNeedsReview && !materialIdentityReviewed
     ? { code: 'GRADE_REVIEW_REQUIRED', label: 'GRADE REVIEW REQUIRED' }
+    : a106RouteConflict ? { code: 'B313_ROUTE_PRODUCT_CONFLICT', label: 'PRODUCT / ROUTE CONFLICT' }
+    : routeNeedsReview ? { code: 'B313_ROUTE_EVIDENCE_REQUIRED', label: 'ROUTE EVIDENCE REQUIRED' }
     : strictReady
       ? { code: 'AUTO_READY', label: 'AUTO READY ✓' }
     : storedFallbackReady
@@ -235,8 +282,11 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     factorBasisCode: factorBasis?.code || '',
     statusCode: status.code,
     statusLabel: status.label,
-    factorSummary: strictReady
-      ? strictFactorSummary(factorBasis)
+    factorSummary: a106RouteConflict
+      ? 'The selected route contradicts the exact ASTM A106 seamless pipe specification. Resolve the physical product/route conflict before calculation.'
+      : routeNeedsReview
+        ? 'Confirm the physical pipe manufacturing route against a controlled pipe spec/MTR and explicitly review the source; code-table route options are not construction evidence.'
+      : strictReady ? strictFactorSummary(factorBasis)
       : storedFallbackReady && fallback?.ok
         ? fallbackFactorSummary(fallback, true)
         : fallback?.ok
@@ -244,9 +294,14 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
           : unavailableFactorSummary(availability),
     route,
     routeSource,
+    routeNeedsReview,
     factorBasis,
     fallback,
     storedBasis,
+    sourceTrace: previewB313SourceTrace(row),
+    previewP1: text(row?.p1),
+    previewP1Unit: text(row?.p1Unit),
+    previewHydroPressure: text(row?.hydroPressure),
     materialIdentityNeedsReview,
     materialIdentityReviewed,
     materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
@@ -328,6 +383,9 @@ function panelHtml(models, config = {}) {
     const t1 = model.t1 ? `${esc(model.t1)} °C` : 'unresolved';
     const route = model.route || '—';
     const routeSource = model.routeSource || 'unresolved';
+    const pressureTrace = model.previewP1
+      ? `P1 ${esc(model.previewP1)} ${esc(model.previewP1Unit || '(unit unresolved)')}` : 'P1 unresolved';
+    const hydroTrace = model.previewHydroPressure ? ` · test ${esc(model.previewHydroPressure)}` : '';
     const iconDisabled = model.tableContext?.materialId ? '' : 'disabled';
     const identityHint = model.materialIdentityNeedsReview && !model.materialIdentityReviewed
       ? '<div style="font-size:9px;color:#fbbf24;">Family-default grade is only a candidate; verify the exact material specification.</div>'
@@ -337,9 +395,14 @@ function panelHtml(models, config = {}) {
       : '';
     const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1}</div></td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${identityHint}${seedHint}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div></td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div><div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:180px;">
+        <strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div>
+        <input type="text" data-b313-auto-route aria-label="Actual pipe manufacturing route" placeholder="SEAMLESS / EFW_..." value="${esc(model.storedBasis?.manufacturingRoute || (model.routeSource==='confirmed ASTM A106 product specification'?model.route:''))}" style="margin-top:4px;width:98%;">
+        <input type="text" data-b313-auto-route-source aria-label="Physical route source reference" placeholder="Pipe spec / MTR source reference" value="${esc(model.storedBasis?.manufacturingRouteSourceReference || '')}" style="margin-top:4px;width:98%;">
+        <label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-route-reviewed ${model.storedBasis?.manufacturingRouteEvidenceReviewed === true?'checked':''}> Route source independently reviewed</label>
+      </td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'S', 'allowableStress', { width: '82px' })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${stressUnitCell(model)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'E', 'qualityFactorE', { min: 0, max: 1 })}</td>
@@ -359,7 +422,7 @@ function panelHtml(models, config = {}) {
 
   return `<div data-mc-b313-auto-basis-panel style="margin:8px 0;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;padding:8px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>B31.3 automatic basis</strong><span style="font-size:10px;color:#94a3b8;">${models.length} material-temperature group${models.length === 1 ? '' : 's'}</span></div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path remains strict VERIFIED / PROJECT_APPROVED factors at Preview T1. When exact strict factors are unavailable, S/E/W/Y below are a non-interpolated controlled fallback seed from one common active-master temperature. Values do not become calculation input until ↻ is clicked. A106 carbon steel defaults to SEAMLESS.</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data. Only source-confirmed ASTM A106 pipe may imply seamless manufacturing; generic CS does not.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
       <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
       <input type="number" step="any" min="0" data-b313-mill-value value="${esc(tolerance.value ?? 12.5)}" style="width:80px;">
@@ -418,6 +481,8 @@ function validateFallbackRecord(record) {
   return record.allowableStress > 0
     && record.qualityFactorE > 0 && record.qualityFactorE <= 1
     && record.weldStrengthReductionW > 0 && record.weldStrengthReductionW <= 1
+    && record.coefficientY !== null && record.coefficientY !== undefined
+    && Number.isFinite(Number(record.coefficientY))
     && record.coefficientY >= 0 && record.coefficientY <= 1
     && text(record.stressUnit);
 }
@@ -435,7 +500,9 @@ function bindRefresh(panel, host, config, models, options) {
       material: model.material,
       materialId: model.materialId,
       designTemperature: model.t1,
-      manufacturingRoute: model.route,
+      manufacturingRoute: text(rowEl?.querySelector?.('[data-b313-auto-route]')?.value),
+      manufacturingRouteSourceReference: text(rowEl?.querySelector?.('[data-b313-auto-route-source]')?.value),
+      manufacturingRouteEvidenceReviewed: rowEl?.querySelector?.('[data-b313-auto-route-reviewed]')?.checked === true,
       allowableStress: numericField(rowEl, 'allowableStress'),
       stressUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="stressUnit"]')?.value || model.fallback?.stressUnit),
       qualityFactorE: numericField(rowEl, 'qualityFactorE'),
@@ -452,9 +519,15 @@ function bindRefresh(panel, host, config, models, options) {
     };
     const status = rowEl.querySelector?.('[data-b313-auto-status]');
     const strictReady = model.factorBasis?.ok && model.factorBasis?.mode === 'ACTIVE_MASTER_STRICT';
-    if ((!strictReady && !validateFallbackRecord(record)) || (!strictReady && !text(record.sourceReference))) {
+    const routeOnly = !!record.manufacturingRoute
+      && !!record.manufacturingRouteSourceReference
+      && record.manufacturingRouteEvidenceReviewed === true;
+    const manualFactorsComplete = validateFallbackRecord(record) && !!text(record.sourceReference);
+    // Allow physical route evidence to be saved independently of manual
+    // factor overrides; a newly verified route may unlock strict code data.
+    if (!strictReady && !manualFactorsComplete && !routeOnly) {
       if (status) {
-        status.textContent = 'INVALID FALLBACK VALUES';
+        status.textContent = 'REVIEW ROUTE SOURCE OR COMPLETE MANUAL FACTORS';
         status.style.color = '#fca5a5';
       }
       return;

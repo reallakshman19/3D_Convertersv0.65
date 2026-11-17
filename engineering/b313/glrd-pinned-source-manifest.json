@@ -1,0 +1,82 @@
+{
+  "schema": "glrd-b313-pinned-source-manifest/v1",
+  "project": "GLRD-1000-PSI-02",
+  "provenance": "GLRD owner archive plus pinned source repo: 30-row Step 4 audit matches PSI-02 XML, not 31-branch BM2 historical reference; both retained independently",
+  "sourceRepo": "reallakshman19/3D_Converters",
+  "expectedXmlBranches": 30,
+  "expectedXmlNodes": 1224,
+  "expectedStagedArrayCount": 86,
+  "status": "AUTHENTIC_SOURCE_FIXTURES_NOT_A_QUALIFIED_B313_DESIGN_BASIS",
+  "files": [
+    {
+      "role": "xml",
+      "path": "Benchmarks/XML-CII-2019/revamped/GLRD-1000-PSI-02.xml",
+      "ref": "3377b7f4baeeee5851e72dcc414d6c4a93f5a933",
+      "bytes": 643002,
+      "sha256": "164163380dccffb8f9d6bd7853eabd36eea89e508da2215443e81969144d4a45"
+    },
+    {
+      "role": "historical_bm2_xml",
+      "path": "Benchmarks/XML-CII-2019/revamped/GLRD-1000-PI-01 - BM2.xml",
+      "ref": "3377b7f4baeeee5851e72dcc414d6c4a93f5a933",
+      "bytes": 629889,
+      "sha256": "6bcc477860fdbe9a80159839bf476a8c1e6ce7a966587a25bc62498709843151"
+    },
+    {
+      "role": "stage_json",
+      "path": "Benchmarks/XML-CII-2019/revamped/STF_2026Nov03-0839_managed_stage.json",
+      "ref": "3377b7f4baeeee5851e72dcc414d6c4a93f5a933",
+      "bytes": 1816629,
+      "sha256": "1d2469fe05d712cd1dd2da9913a840516ae686fb1616eb6d7b5e14d8918e2746"
+    },
+    {
+      "role": "line_list",
+      "path": "Benchmarks/XML-CII-2019/revamped/LL_BM2.xlsx",
+      "ref": "3377b7f4baeeee5851e72dcc414d6c4a93f5a933",
+      "bytes": 314449,
+      "sha256": "73496a1277cd1f39de823d57180ee0d8c4b1d72241923f1e558af2c7c805d007"
+    },
+    {
+      "role": "piping_class",
+      "path": "docs/docs/Masters/Piping class master.xlsx",
+      "ref": "25db94769994751bb0fb6e6d83a578efd9ac8162",
+      "bytes": 426876,
+      "sha256": "bea1c45f3f7dcf51340a6d625cfcc23cfc5926be3413d697183b607e2ccab82c"
+    },
+    {
+      "role": "valve_weights",
+      "path": "docs/docs/Masters/wtValveweights.xlsx",
+      "ref": "25db94769994751bb0fb6e6d83a578efd9ac8162",
+      "bytes": 88499,
+      "sha256": "49b9e1c655c7124fbe471e988894ae200a978f640dc3119e36eba582fcfb7c78"
+    },
+    {
+      "role": "material_map",
+      "path": "docs/docs/Masters/PCF_MAT_MAP.TXT",
+      "ref": "25db94769994751bb0fb6e6d83a578efd9ac8162",
+      "bytes": 6639,
+      "sha256": "84b2e94488e5bceb135557a9272b0a75a87d9a53c46783865373b18f7c4dda29"
+    }
+  ],
+  "effectiveConfig": {
+    "filename": "bm2-workbench-config.json",
+    "expectedSha256": "766da8fa5711c373e309e975f6c1bb8fedc7caf4b835d9dbc9909af3de876bd8",
+    "confirmedPresent": false,
+    "requiredForAuthoritativePreview": true,
+    "historicalReceiptVerified": true,
+    "notes": "Previously received and SHA-256 verified in another conversation (8,433,327 bytes); not currently mounted/retrievable; historical saved Linelist was Coversheet rather than effective Linelist, so replay cannot claim parity without corrected configuration authority."
+  },
+  "expectedAuditBranches": [
+    "/GLRD-1000-4\"-P4110001-93833-01/B6",
+    "/GLRD-1000-4\"-P4110001-93833-01/B2",
+    "/GLRD-1000-2\"-P4110003-93833-01/B2",
+    "/GLRD-1000-4\"-B4110003-11502-01/B1",
+    "/GLRD-1000-4\"-B4110003-11502-01/B3"
+  ],
+  "sourceRelation": {
+    "auditTarget": "GLRD-1000-PSI-02.xml",
+    "historicalReference": "GLRD-1000-PI-01 - BM2.xml",
+    "stageJsonOriginallyNamedForBM2": true,
+    "stageMappingToPsi02Verified": false
+  }
+}

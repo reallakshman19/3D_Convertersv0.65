@@ -68,8 +68,12 @@ try {
   host.querySelector('[data-mc-preview-build]').click();
   await waitFor(() => host.__xmlCiiPreviewResult !== previousResult
     && host.__xmlCiiPreviewResult?.branchRows?.some((row) => row.lineKey === a106.lineKey && row.t1 === '82'), 'authorized T1 Preview rebuild');
-  await waitFor(() => host.querySelector('[data-b313-auto-key$="T1=82"]'), 'T1 82 auto-basis row');
-  const seedRow = host.querySelector('[data-b313-auto-key$="T1=82"]');
+  // The engineering basis is now scoped to the physical Preview occurrence,
+  // so T1 is no longer the final component of the persistence key.
+  await waitFor(() => host.querySelector('[data-b313-auto-key*="T1=82"]'), 'T1 82 auto-basis row');
+  const seedRow = host.querySelector('[data-b313-auto-key*="T1=82"]');
+  assert(seedRow.dataset.b313AutoKey.includes('|OCCURRENCE:'),
+    'Manual factor approvals must be physically occurrence-scoped');
   const seedPanel = host.querySelector('[data-mc-b313-auto-basis-panel]');
   assert(seedRow.textContent.includes('Seed 120 °C'), 'T1 82 did not show the 120 °C common seed');
   assert(seedRow.querySelectorAll('[data-b313-auto-field]').length >= 7, 'S/unit/E/W/Y and pressure/dimension basis controls are incomplete');

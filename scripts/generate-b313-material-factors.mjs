@@ -23,10 +23,19 @@ for (const factor of ['S','E','W','Y']) {
     if (!String(row.sourceReference||'').trim()) {
       qualificationErrors.push(`${prefix}: exact code/table sourceReference required`);
     }
+    if (!/^[a-f0-9]{64}$/i.test(String(row.sourceDocumentSha256||'')) ||
+        !String(row.sourceReviewedBy||'').trim() ||
+        !/^20\d{2}-\d{2}-\d{2}$/.test(String(row.sourceReviewDate||'')) ||
+        !String(row.sourceRevision||'').trim()) {
+      qualificationErrors.push(`${prefix}: controlled code-source digest, reviewer, review date and revision required`);
+    }
+    if (factor === 'E' && !String(row.manufacturingRoute||'').trim()) {
+      qualificationErrors.push(`${prefix}: E must have a source-qualified physical manufacturing route`);
+    }
     if (row.status === 'PROJECT_APPROVED' && !String(row.approvalReference||'').trim()) {
       qualificationErrors.push(`${prefix}: controlled project approvalReference required`);
     }
-    if (row.edition != null && String(row.edition) !== String(data.edition)) {
+    if (String(row.edition) !== String(data.edition)) {
       qualificationErrors.push(`${prefix}: record edition differs from master edition`);
     }
     const temp = Number(row.temperatureC), val = Number(row.value);

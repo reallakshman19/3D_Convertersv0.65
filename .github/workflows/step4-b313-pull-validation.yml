@@ -7,12 +7,23 @@ on:
     branches: [main]
     paths:
       - 'converters/b313-material-factors/index.js'
+      - 'converters/b313-material-factors/code-factor-rule-engine.js'
+      - 'converters/b313-material-factors/default-b313-code-rule-data.js'
+      - 'docs/Masters/b313-code-factor-rules.json'
+      - 'engineering/b313/glrd-b313-2024-external-reference-intake-v1.json'
       - 'docs/Masters/b313-material-factor-master.json'
       - 'tabs/b313-material-factors-tab.js'
       - 'scripts/generate-b313-material-factors.mjs'
+      - 'scripts/generate-b313-code-factor-rules.mjs'
       - 'converters/xml-cii2019-core/b313-preview-*.js'
+      - 'converters/xml-cii2019-core/branch-process-resolver.js'
+      - 'converters/xml-cii2019-core/default-piping-class-material-code-rows.js'
+      - 'docs/Masters/SpecwisePipingClass/93833.json'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
       - 'tests/b313-material-factors.test.mjs'
+      - 'tests/b313-material-factors-editor-provenance.test.mjs'
+      - 'tests/glrd-b313-qualification-readiness.test.mjs'
+      - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
       - 'tests/xml-cii-issue-781-b313-*.test.mjs'
       - '.github/workflows/step4-b313-pull-validation.yml'
@@ -36,7 +47,10 @@ jobs:
       - name: Verify syntax
         run: |
           node --check converters/b313-material-factors/index.js
+          node --check converters/b313-material-factors/code-factor-rule-engine.js
+          node --check scripts/generate-b313-code-factor-rules.mjs
           node --check scripts/generate-b313-material-factors.mjs
+          node --check scripts/glrd-b313-qualification-readiness.mjs
           node --check tabs/b313-material-factors-tab.js
           node --check converters/xml-cii2019-core/b313-preview-pull-authority.js
           node --check converters/xml-cii2019-core/b313-preview-wall-update.js
@@ -47,11 +61,17 @@ jobs:
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-facts-worker-entry.js
       - name: Check active B31.3 master generation and qualification gate
-        run: node scripts/generate-b313-material-factors.mjs --check
+        run: |
+          node scripts/generate-b313-material-factors.mjs --check
+          node scripts/generate-b313-code-factor-rules.mjs --check
       - name: Test Pull, B31.3 adapters, Preview and legacy custody
         run: |
           node --test \
             tests/b313-material-factors.test.mjs \
+            tests/b313-material-factors-editor-provenance.test.mjs \
+            tests/glrd-b313-qualification-readiness.test.mjs \
+            tests/xml-cii-b313-governed-factor-engine.test.mjs \
+            tests/xml-cii-b313-glrd-config8-sourcechain.test.mjs \
             tests/xml-cii-b313-factor-qualification-intake.test.mjs \
             tests/xml-cii-b313-preview-blocker-ui-static.test.mjs \
             tests/xml-cii-b313-preview-pull-v065.test.mjs \

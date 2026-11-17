@@ -9,20 +9,30 @@ import { previewB313BasisKey } from '../tabs/xml-cii-2019-standalone/ui-adapted/
 
 const a106Row = {
   material: 'ASTM A106-B',
-  materialSource: 'piping-class-fallback',
+  materialSource: 'process-linelist-material',
   t1: '0',
 };
 
 const a106 = derivePreviewB313AutoBasisRow(a106Row, {});
 assert.equal(a106.materialId, 'CS-A106-B');
 assert.equal(a106.route, 'SEAMLESS');
-assert.equal(a106.routeSource, 'A106 carbon-steel default');
+assert.equal(a106.routeSource, 'confirmed ASTM A106 product specification');
 assert.equal(a106.statusCode, 'FALLBACK_SEED_READY');
 assert.equal(a106.statusLabel, 'FALLBACK SEED — REFRESH TO ACCEPT');
 assert.equal(a106.fallback?.seedTemperatureC, 0);
 assert.equal(a106.fallback?.designAuthority, false);
 assert.match(a106.factorSummary, /CANDIDATE SEED @ 0 °C/);
 assert.deepEqual(a106.tableContext, { materialId: 'CS-A106-B', temperatureC: 0 });
+
+// Generic CS family or an unscoped Piping Class fallback cannot prove
+// ASTM A106 seamless construction, even when the material catalog defaults to A106.
+const unscopedA106=derivePreviewB313AutoBasisRow({
+  ...a106Row,materialSource:'piping-class-fallback',
+}, {});
+assert.equal(unscopedA106.route,'');
+assert.equal(unscopedA106.routeSource,'unresolved');
+const genericCs=derivePreviewB313AutoBasisRow({material:'CS',materialSource:'process-linelist-material',t1:'0'},{});
+assert.notEqual(genericCs.route,'SEAMLESS');
 
 const a106BlankT1 = derivePreviewB313AutoBasisRow({
   ...a106Row,
@@ -31,7 +41,7 @@ const a106BlankT1 = derivePreviewB313AutoBasisRow({
 assert.equal(a106BlankT1.statusCode, 'B313_PREVIEW_T1_REQUIRED');
 assert.equal(a106BlankT1.statusLabel, 'T1 REQUIRED');
 assert.equal(a106BlankT1.route, 'SEAMLESS');
-assert.equal(a106BlankT1.routeSource, 'A106 carbon-steel default');
+assert.equal(a106BlankT1.routeSource, 'confirmed ASTM A106 product specification');
 assert.equal(a106BlankT1.tableContext.temperatureC, undefined);
 assert.match(a106BlankT1.factorSummary, /not evaluated until Preview T1 is resolved/);
 
@@ -79,7 +89,9 @@ const explicitRoute = derivePreviewB313AutoBasisRow(a106Row, {
   },
 });
 assert.equal(explicitRoute.route, 'ERW');
-assert.equal(explicitRoute.routeSource, 'controlled Preview basis');
+assert.equal(explicitRoute.routeSource, 'ROUTE SOURCE/REVIEW REQUIRED');
+assert.equal(explicitRoute.statusCode, 'B313_ROUTE_PRODUCT_CONFLICT',
+  'A106 seamless pipe specification cannot silently accept an ERW override');
 
 const deduped = buildPreviewB313AutoBasisRows([a106Row, { ...a106Row }], {});
 assert.equal(deduped.length, 1);
@@ -100,7 +112,7 @@ assert.match(runtimeSource, /legacyEditor\.hidden = true/);
 assert.match(runtimeSource, /legacyEditor\.style\.display = 'none'/);
 assert.match(runtimeSource, /data-b313-auto-open-material/);
 assert.match(runtimeSource, />▦<\/button>/);
-assert.match(runtimeSource, /A106 carbon steel defaults to SEAMLESS/);
+assert.match(runtimeSource, /Only source-confirmed ASTM A106 pipe may imply seamless manufacturing/);
 assert.match(runtimeSource, /Blank T1 is never treated as 0 °C/);
 assert.match(runtimeSource, /data-b313-auto-field="\$\{field\}"/);
 assert.match(runtimeSource, /fallbackInputCell\(model, 'S', 'allowableStress'/);
