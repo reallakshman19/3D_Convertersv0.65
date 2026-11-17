@@ -9,6 +9,10 @@ const common={
   edition:'2024', status:'PROJECT_APPROVED',
   sourceAuthority:'GOVERNED-2024-CODE-CONTROL-TEST',
   sourceReference:'CONTROLLED-CODE-TABLE-TEST-ONLY',
+  sourceDocumentSha256:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  sourceReviewedBy:'SYNTHETIC-TEST-REVIEWER',
+  sourceReviewDate:'2026-11-17',
+  sourceRevision:'SYNTHETIC-TEST-REVISION',
   approvalReference:'INDEPENDENT-TEST-APPROVAL-NOT-PRODUCTION',
   codeClause:'B31.3-SYNTHETIC-TABLE',
   productForm:'PIPE',
@@ -34,6 +38,10 @@ test('governed E rule requires code edition, route, source and temperature',()=>
   assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,status:'SCREENING'}]}).ok,false);
   assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,sourceReference:''}]}).ok,false);
   assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,approvalReference:''}]}).ok,false);
+  assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,sourceDocumentSha256:''}]}).ok,false);
+  assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,sourceReviewedBy:''}]}).ok,false);
+  assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,sourceReviewDate:''}]}).ok,false);
+  assert.equal(resolveB313GovernedCodeFactor({...request,factor:'E',rules:[{...r,sourceRevision:''}]}).ok,false);
 });
 test('governed W/Y material-family scope is explicit and remains fail closed',()=>{
   const r={...common,factor:'Y',value:0.4,scope:'CODE_MATERIAL_FAMILY',
