@@ -73,6 +73,7 @@ jobs:
             tests/glrd-b313-qualification-readiness.test.mjs \
             tests/xml-cii-b313-governed-factor-engine.test.mjs \
             tests/xml-cii-b313-glrd-config8-sourcechain.test.mjs \
+            tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs \
             tests/xml-cii-b313-factor-qualification-intake.test.mjs \
             tests/xml-cii-b313-preview-blocker-ui-static.test.mjs \
             tests/xml-cii-b313-preview-pull-v065.test.mjs \
