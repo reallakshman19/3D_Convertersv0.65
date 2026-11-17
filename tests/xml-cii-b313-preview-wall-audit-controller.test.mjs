@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   derivePreviewB313AuditSummary,
+  derivePreviewB313AuditRootCauseGroups,
   renderPreviewB313WallAuditHtml,
   selectPreviewB313AuditRows,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
@@ -87,7 +88,7 @@ assert.deepEqual(
 const html = renderPreviewB313WallAuditHtml(staleSummaryReport);
 assert.match(html, /Evaluated 2 · Updated 1 · Not updated 1/);
 assert.match(html, /ASME B31\.3-2024 §304\.1\.2 Eq\. \(3a\)/);
-assert.match(html, /Preview Material → B31\.3 identity → active strict S\/E\/W\/Y at T1/);
+assert.match(html, /Preview Material → B31\.3 identity → qualified stress S \+ governed E\/W\/Y sources at T1/);
 assert.match(html, /BENCHMARK_ONLY \/ SCREENING factors/);
 assert.match(html, /12\.5% negative/);
 assert.match(html, /A106_GR_B · T1 120 °C/);
@@ -103,5 +104,37 @@ const noRowsHtml = renderPreviewB313WallAuditHtml({
 assert.match(noRowsHtml, /Evaluated 0 · Updated 0 · Not updated 0/);
 assert.match(noRowsHtml, /No Preview branch rows were available to evaluate/);
 assert.doesNotMatch(noRowsHtml, /B31\.3 wall update audit — 0 updated, 0 not updated/);
+
+const factorIssue = (id,t1,branch) => ({
+  branchName: branch, lineKey: 'GLRD-LINE',
+  code: 'B313_PREVIEW_FACTOR_BASIS_UNAVAILABLE',
+  status: 'NOT_UPDATED',message:'Strict factors missing',
+  details:{
+    materialIdentity:{ok:true,material:{materialId:id},materialSource:'process-linelist-material'},
+    factorBasis:{ok:false,code:'B313_PREVIEW_FACTOR_BASIS_UNAVAILABLE',details:{
+      materialId:id,designTemperatureC:t1,manufacturingRoute:'',
+      factorAvailability:{factors:{
+        S:{strictAvailable:false,status:'QUALIFICATION_STATUS_REJECTED',candidateStatuses:['SCREENING']},
+        E:{strictAvailable:false,status:'MANUFACTURING_ROUTE_REQUIRED',availableManufacturingRoutes:['SEAMLESS']},
+        W:{strictAvailable:false,status:'QUALIFICATION_STATUS_REJECTED',candidateStatuses:['SCREENING']},
+        Y:{strictAvailable:false,status:'QUALIFICATION_STATUS_REJECTED',candidateStatuses:['SCREENING']},
+      },strictAcceptedStatuses:['VERIFIED','PROJECT_APPROVED']}
+    }}
+  }
+});
+const groupedReport={summary:{inputRows:4,updatedRows:0,calculatedRows:0,skippedRows:4},rows:[
+  factorIssue('DSS-A790-S31803',120,'/GLRD-DSS/B1'),
+  factorIssue('DSS-A790-S31803',120,'/GLRD-DSS/B2'),
+  factorIssue('LTCS-A333-6',120,'/GLRD-LTCS/B1'),
+  factorIssue('LTCS-A333-6',82,'/GLRD-LTCS/B2'),
+]};
+const grouped=derivePreviewB313AuditRootCauseGroups(groupedReport);
+assert.equal(grouped.length,3,'One shared cause per distinct material/temperature/route');
+assert.equal(grouped[0].count,2);
+assert.equal(grouped.reduce((n,g)=>n+g.count,0),4,'Group counts preserve all physical occurrences');
+assert.match(renderPreviewB313WallAuditHtml(groupedReport),/3 distinct blocking factor\/identity groups/);
+assert.match(renderPreviewB313WallAuditHtml(groupedReport),/2 row\(s\)/);
+assert.match(renderPreviewB313WallAuditHtml(groupedReport),/manufacturing route required/);
+assert.equal(derivePreviewB313AuditRootCauseGroups({rows:[]}).length,0);
 
 console.log('XML/CII Preview B31.3 wall audit controller checks passed.');
