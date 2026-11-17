@@ -6,6 +6,7 @@ on:
     paths:
       - 'engineering/b313/glrd-pinned-source-manifest.json'
       - 'engineering/b313/glrd-psi02-factor-groups.json'
+      - 'engineering/b313/glrd-b313-2024-external-reference-intake-v1.json'
       - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/glrd-b313-qualification-readiness.test.mjs'
       - 'docs/Masters/b313-material-factor-master.json'
