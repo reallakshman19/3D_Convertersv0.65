@@ -614,10 +614,18 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     const stored = basisForRow(basisConfig, row, key);
     const basis = stored.basis || {};
     const assertedRoute = text(basis.manufacturingRoute);
+    const sourceConfirmsSeamless = b313SourceConfirmsA106Seamless(row, materialIdentity);
+    if (sourceConfirmsSeamless && assertedRoute
+        && normalizedToken(assertedRoute) !== 'SEAMLESS') {
+      results.push(failureRow(row, 'B313_PREVIEW_MANUFACTURING_ROUTE_PRODUCT_CONFLICT',
+        'The effective pipe is ASTM A106 seamless but the saved manufacturing route contradicts the product specification. Resolve the source identity/route conflict before B31.3.',
+        {assertedRoute,productRoute:'SEAMLESS',materialIdentity}));
+      return;
+    }
     const routeAuthority = text(basis.manufacturingRouteSourceReference);
     const routeReviewed = basis.manufacturingRouteEvidenceReviewed === true;
     if (assertedRoute && !(routeAuthority && routeReviewed)
-        && !b313SourceConfirmsA106Seamless(row, materialIdentity)) {
+        && !(sourceConfirmsSeamless && normalizedToken(assertedRoute)==='SEAMLESS')) {
       results.push(failureRow(row, 'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED',
         'The manufacturing route was entered without a controlled pipe-spec/MTR source and explicit review. Confirm route evidence in the existing B31.3 basis; class mapping or factor-table availability does not prove manufacture.',
         {route: assertedRoute, routeEvidenceSource: routeAuthority,
@@ -627,7 +635,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     const factorBasis = resolvePreviewB313FactorBasis({
       materialIdentity,
       designTemperatureC: temperatureText(row),
-      manufacturingRoute: assertedRoute || (b313SourceConfirmsA106Seamless(row, materialIdentity) ? 'SEAMLESS' : ''),
+      manufacturingRoute: assertedRoute || (sourceConfirmsSeamless ? 'SEAMLESS' : ''),
       manualBasis: basis,
     });
     updateVisibleMaterialCell(host, rowIndex, materialIdentity, factorBasis);
