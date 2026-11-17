@@ -10,6 +10,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=relative=>JSON.parse(fs.readFileSync(path.join(ROOT,relative),'utf8'));
 const model=read('engineering/b313/glrd-psi02-factor-groups.json');
 const source=read('engineering/b313/glrd-pinned-source-manifest.json');
+const sourceCandidates=read('engineering/b313/glrd-b313-2024-external-reference-intake-v1.json');
 const validCodes=new Set(['VERIFIED','PROJECT_APPROVED']);
 const SUPPORTED=new Set(['S','E','W','Y']);
 function factorStatus(factor,group,route){
@@ -49,8 +50,20 @@ function factorStatus(factor,group,route){
  * rows, even if qualified code records later become available.
  */
 export function buildGLRDB313QualificationReadiness({
-  matrix=model,pinned=source,
+  matrix=model,pinned=source,externalReferenceIntake=sourceCandidates,
 }={}){
+  // External GitHub reference texts are evidence for an intake worklist ONLY.
+  // They never become qualified S/E/W/Y rows or design-authoritative Pulls.
+  if(externalReferenceIntake.schema!=='glrd-b313-external-reference-intake/v1'
+      || externalReferenceIntake.reviewDisposition!=='REFERENCE_CANDIDATES_ONLY_NOT_ACTIVE_FACTORS'
+      || externalReferenceIntake.codeEditionClaim!==B313_MATERIAL_FACTOR_MASTER.edition
+      || !Array.isArray(externalReferenceIntake.groups)
+      || externalReferenceIntake.groups.length!==3
+      || !externalReferenceIntake.sources.some(s=>s.sourceId==='EPCC_B313_FULL_A1')
+      || !externalReferenceIntake.sources.some(s=>s.sourceId==='EPCC_B313_SUBSET')
+      || externalReferenceIntake.groups.some(g=>g.qualifiedForStrictMaster!==false)) {
+    throw Error('Unqualified external reference receipt cannot be promoted to an active factor master');
+  }
   if(matrix.schema!=='glrd-psi02-b313-audit-factor-groups/v1'
       || matrix.expectedBranches!==30 || !Array.isArray(matrix.rows)
       || matrix.rows.length!==30 || matrix.groups.length<1)
@@ -66,6 +79,11 @@ export function buildGLRDB313QualificationReadiness({
     if(own.length!==group.occurrences)throw Error('GLRD group count mismatch '+group.id);
     const route=group.manufacturingRoute && !['UNKNOWN','UNVERIFIED','UNRESOLVED'].includes(group.manufacturingRoute)
       ? group.manufacturingRoute:null;
+    const receipt=externalReferenceIntake.groups.find(g=>g.groupId===group.id);
+    if(!receipt || receipt.materialId!==group.materialId
+        || receipt.temperatureC!==group.temperatureC
+        || receipt.occurrences!==group.occurrences)
+      throw Error('External reference receipt is not reconciled with the exact GLRD group '+group.id);
     const factors=Object.fromEntries([...SUPPORTED].map(f=>[f,factorStatus(f,group,route)]));
     const missing=Object.values(factors).filter(f=>f.status!=='SOURCE_QUALIFIED').map(f=>f.factor);
     const flags=[
@@ -76,9 +94,22 @@ export function buildGLRDB313QualificationReadiness({
     ];
     if(own.some(r=>r.lineKey==='P4110003'&&r.classCodeFromBranchName==='93833'))
       flags.push('LTCS_LINE_LIST_VS_CLASS_93833_DSS_CONFLICT_REVIEW');
+    if(receipt.sourceApplicabilityAtT1===true)
+      flags.push('EXTERNAL_STRESS_REFERENCE_LOCATED_AWAITING_CODE_SOURCE_AND_PROJECT_APPROVAL');
+    else flags.push('EXTERNAL_STRESS_ROW_HELD_OR_T1_NOT_COVERED');
     return {id:group.id,materialId:group.materialId,temperatureC:group.temperatureC,
       occurrences:own.length,manufacturingRoute:route,
       factors,missingQualifiedFactors:missing,sourceIssues:flags,
+      externalReferenceCandidate:{
+        sourceSpec:receipt.sourceSpec,
+        sourceGrade:receipt.sourceGrade||null,
+        sourceUns:receipt.sourceUns||null,
+        sourceStatus:receipt.candidateStatus,
+        upstreamVerifiedClaim:receipt.fullPackUpstreamVerified===true,
+        sourceApplicabilityAtT1:receipt.sourceApplicabilityAtT1===true,
+        candidateAllowableStressMPa:receipt.candidateAllowableStressMPa,
+        qualifiedForStrictMaster:false,
+      },
       calculated:0,pullReady:0,pulled:0,emittedCiiVerified:0,
       status:'HOLD_REAL_PREVIEW_AND_ENGINEERING_AUTHORITY'};
   });
@@ -89,6 +120,15 @@ export function buildGLRDB313QualificationReadiness({
     governingProjectEditionConfirmed:false,
     sourceCodePackRevision:B313_GOVERNED_CODE_RULE_PACK.edition,
     qualifiedCodeRuleRecords:B313_GOVERNED_CODE_RULE_PACK.records.length,
+    externalReferenceIntake:{
+      disposition:externalReferenceIntake.reviewDisposition,
+      sources:externalReferenceIntake.sources.map(s=>({
+        sourceId:s.sourceId,repository:s.repository,commit:s.commit,
+        path:s.path,gitBlobSha1:s.gitBlobSha1
+      })),
+      originalCodeSourceSha256Verified:false,
+      activeFactorsPromoted:0,
+    },
     sourceStatus:'PINNED_SOURCE_CUSTODY_SEPARATE',
     effectivePreviewStatus:'NOT_REPLAYED_WITH_AUTHORIZED_PSI02_CONFIG',
     inputRows:matrix.rows.length,
