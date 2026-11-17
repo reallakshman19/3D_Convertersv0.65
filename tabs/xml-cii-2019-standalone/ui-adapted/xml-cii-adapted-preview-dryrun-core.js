@@ -583,6 +583,8 @@ function previewP1Unit(lineRow, p1) {
       materialCodeCorroborationSource: resolved.materialCodeCorroborationSource || '',
       materialCodeCorroborationMethod: resolved.materialCodeCorroborationMethod || '',
       materialCodeCorroborationConfidence: resolved.materialCodeCorroborationConfidence ?? null,
+      materialCodeCorroborationSizeMm: resolved.materialCodeCorroborationSizeMm ?? null,
+      materialCodeCorroborationCompositeSpecification: resolved.materialCodeCorroborationCompositeSpecification === true,
       materialCodeCorroborationNeedsReview: resolved.materialCodeCorroborationNeedsReview === true,
       materialCodeResolutionMethod: resolved.materialCodeMatchMethod || '',
       materialCodeConfidence: resolved.materialCodeConfidence ?? null,
