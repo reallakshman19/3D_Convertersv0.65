@@ -10,6 +10,7 @@ import {
 import {
   resolveMaterialCodeFromLineMaterial,
   resolveXmlCiiB313ClassMaterialEvidence,
+  resolveXmlCiiB313MaterialCodeClassConflict,
 } from '../converters/xml-cii2019-core/branch-process-resolver.js';
 import {
   resolvePreviewB313MaterialFromRow,
@@ -191,6 +192,20 @@ const class11472Dn750 = resolveXmlCiiB313ClassMaterialEvidence({
 assert.equal(class11472Dn750.materialCodeCorroborationCandidate,'ASTM A671-CC65 cl 22');
 assert.equal(class11472Dn750.materialCodeCorroborationNeedsReview,false,
   'Exact DN establishes an identity candidate but not factor qualification');
+const wrongFamilyMaterial = resolveXmlCiiB313MaterialCodeClassConflict({
+  materialCodeMatchedMaterial:'ASTM A333-6',classEvidence:class11472Dn750,
+});
+assert.equal(wrongFamilyMaterial.code,'B313_MATERIAL_CODE_VS_CLASS_DN_CONFLICT');
+assert.equal(wrongFamilyMaterial.sizeMm,750);
+assert.equal(resolveXmlCiiB313MaterialCodeClassConflict({
+  materialCodeMatchedMaterial:'ASTM A671-CC65 cl 22',classEvidence:class11472Dn750,
+}),null);
+const rowConflict=resolvePreviewB313MaterialFromRow({
+  material:'LTCS',materialCodeMatchedMaterial:'ASTM A333-6',
+  materialCodeConflict:wrongFamilyMaterial,t1:'82',
+}, {});
+assert.equal(rowConflict.ok,false);
+assert.equal(rowConflict.code,'B313_PREVIEW_MATERIAL_CODE_CONFLICT');
 const class11472Unscoped = resolveXmlCiiB313ClassMaterialEvidence({
   pipingClass:'11472',config:{useDefaultPipingClassMaterialCodeMap:true},
 });
