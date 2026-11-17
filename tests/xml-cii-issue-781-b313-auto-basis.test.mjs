@@ -89,7 +89,9 @@ const explicitRoute = derivePreviewB313AutoBasisRow(a106Row, {
   },
 });
 assert.equal(explicitRoute.route, 'ERW');
-assert.equal(explicitRoute.routeSource, 'controlled Preview basis');
+assert.equal(explicitRoute.routeSource, 'ROUTE SOURCE/REVIEW REQUIRED');
+assert.equal(explicitRoute.statusCode, 'B313_ROUTE_PRODUCT_CONFLICT',
+  'A106 seamless pipe specification cannot silently accept an ERW override');
 
 const deduped = buildPreviewB313AutoBasisRows([a106Row, { ...a106Row }], {});
 assert.equal(deduped.length, 1);
