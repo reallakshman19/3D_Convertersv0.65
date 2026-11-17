@@ -25,3 +25,4 @@ Then open `http://localhost:8080/`.
 
 Engineering Calculations → External Reference Review supports opt-in, read-only inspection of locally supplied EPCC standards-pack JSON and a MatSEng-style piping calculation comparison. No upstream code, proprietary standard tables or unqualified B31.3 factors are bundled. See [read me.txt](read%20me.txt) for exact upstream commit IDs, scope, limitations and usage.
 
+The existing PR #5 Config 8 / Piping Class / 4 Preview B31.3 authority remains the source of truth; the future in-place dimensional audit is scoped in [PR5–PR6 Integration Plan](engineering/external-reference-port/PR5-PR6-INTEGRATION-PLAN.md).
