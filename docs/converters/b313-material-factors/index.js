@@ -123,6 +123,9 @@ export function resolveB313DesignFactors(input={}){
  const mode=String(input.qualificationMode||'strict').toLowerCase();
  if(mode==='strict' && Array.isArray(input.acceptedStatuses))return fail('B313_STRICT_STATUS_OVERRIDE_FORBIDDEN',
    'Strict source qualification cannot be overridden by caller-supplied acceptedStatuses.');
+ if(mode==='strict' && (Object.keys(input.factorOverrides||{}).length>0 || Object.keys(input.factors||{}).length>0))
+   return fail('B313_STRICT_FACTOR_OVERRIDE_FORBIDDEN',
+     'Caller numeric factor overrides cannot satisfy strict code authority; use the separately reviewed manual fallback.');
  const statuses=acceptedStatuses(mode,input.acceptedStatuses),id=identity.material.materialId;
  const route=input.manufacturingRoute||input.material?.manufacturingRoute
    ||(mode!=='strict'&&id==='CS-A106-B'?'SEAMLESS':null);
