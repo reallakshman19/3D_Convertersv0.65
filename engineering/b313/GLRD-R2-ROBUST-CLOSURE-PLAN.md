@@ -122,3 +122,59 @@ No deliverable may claim `ENGINEERING_APPROVED` or `PULLED` without supporting e
 `R2-A source custody → R2-B product identity + edition → R2-C factor authorization → R2-D calculations → R2-E Pull/CII → R2-F independent review/release`.
 
 Software owner can complete schema, resolvers, verifiers, source reconciliation and tests. The project engineering authority must establish the governing edition, controlled numerical code values, manufacturing route and physical design approvals. This is a real external dependency, not a software defect to bypass.
+
+## 2026-11-17 — Implemented Step 8 / Step 4 source-chain integration (PR #5)
+
+**Code-scoped disposition: IMPLEMENTED / focused CI PASS. Engineering factor and actual-Pull approval remain HOLD.**
+
+The exact 7-column Step 8 Piping Class / Material Code configuration and the
+existing Step 4 Preview/auto-basis panel have not been replaced.
+
+**Effective source resolution and UI:**
+- Preserve governing effective Preview Material, P1/T1 and the *separate*
+  hydro/test-pressure column; display P1 with resolved unit or `unit unresolved`.
+- Carry read-only exact DN Piping Class `Material_Name`, `SCH`,
+  nominal wall, corrosion, class rating and `_sourceRowIndex` into the
+  existing Step 4 branch-row ledger and show them in the existing
+  `B31.3 automatic basis` identity/status cell.
+- Show Material Code and its source/match method as separate mapping
+  evidence. Mapping confidence is NOT an ASME stress/factor approval.
+- Compare physical exact-DN master product to *both* Preview material
+  and the Material Code designation, even if the Material Code matches first.
+  An unapproved choice between exact Line List and branch class is a
+  distinct `B313_PREVIEW_PIPING_CLASS_AUTHORITY_UNRESOLVED` HOLD.
+- Preserve original source Material/Piping Class values: no auto substitution.
+  Physical class/product contradiction produces
+  `B313_PREVIEW_CLASS_DN_MATERIAL_CONFLICT` *before* S/E/W/Y lookup.
+- Change the existing badge from misleading `B31.3 ID ✓` to
+  `B31.3 ID ONLY`, `B31.3 GRADE REVIEW`, or
+  `B31.3 FACTORS ✓` (latter ONLY when strict factors qualify).
+- Save Pull authority signature with class source selection, exact-DN material,
+  schedule, nominal wall, corrosion and original master row. Any changed
+  value invalidates a previously saved Pull.
+- A source-confirmed ASTM A106 pipe specification may imply seamless
+  manufacturing, whereas a generic CS family default or unscoped
+  class mapping may NOT prove the manufacturing route.
+
+**Real source examples and specific intended statuses:**
+
+| Owner GLRD row | Effective Material / T1 | Exact source master | New disposition |
+|---|---|---|---|
+| P4110001/B6, DN200 | DSS, 120 °C | 93833 DN200 / ASTM A790 UNS S31803 / Sch 80S / 12.7 mm / CA0 / source row 10559 | Identity corroborated; factors still HOLD until qualified |
+| P4110003/B2, DN50 | LTCS, 120 °C | 93833 DN50 / ASTM A790 UNS S31803 / Sch 40S / 3.9116 mm / CA0 | **B313_PREVIEW_CLASS_DN_MATERIAL_CONFLICT**; no code lookup or Pull |
+| B4110003/B1, 82 °C | LTCS, 82 °C | 11502 is ASTM A333 Grade 6 family | DN and production source must still be reconciled; qualified 82 °C factors absent |
+
+The B313 source-chain regression uses the actual committed Class 93833
+and 11502 JSON rows and tests conflicts, Config 8 precedence, downstream
+auto-basis display/source trace, and Pull staleness on class/master edits.
+`tests/xml-cii-b313-glrd-config8-sourcechain.test.mjs`.
+
+**Focused CI evidence:** [Step 4 B31.3 Pull acceptance run 44033041090](https://github.com/reallakshman19/3D_Convertersv0.65/actions/runs/44033041090):
+unit and Chromium PASS. [Pinned GLRD source custody run 44033041051](https://github.com/reallakshman19/3D_Convertersv0.65/actions/runs/44033041051): PASS.
+
+**Not cleared:** controlled project-governing B31.3 code-table S sources,
+manufacturing-route evidence, qualified E/W/Y rule values (the governed
+published pack still contains zero approved rows), approved effective PSI-02
+configuration, and real full-row Pull-to-native-CII parity. Do not claim a
+nonzero production GLRD thickness result until those are supplied and
+independently reviewed. This is not a release authorization.
