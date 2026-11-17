@@ -224,6 +224,18 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
   const rows = normalizeRows(report?.rows);
   const summary = derivePreviewB313AuditSummary(report);
   const rootCauses = derivePreviewB313AuditRootCauseGroups(report);
+  const coverage = report?.lineListCoverage;
+  const missingSource = coverage?.missingProcessRows > 0;
+  const missingLineKeys = Array.isArray(coverage?.missingLineKeys) ? coverage.missingLineKeys : [];
+  const sourceCoverageHtml = missingSource
+    ? `<div data-b313-linelist-coverage role="alert" style="margin:9px 0;padding:9px 10px;border:1px solid #c2410c;border-radius:7px;background:#fff7ed;color:#7c2d12;font-size:11px;">
+        <strong>UPSTREAM LINE LIST COVERAGE HOLD — ${coverage.missingProcessRows} physical branches lack P1/T1 source evidence</strong>
+        <div style="margin-top:4px;">Loaded Line List: <strong>${coverage.loadedLineListRows === null ? 'unavailable' : coverage.loadedLineListRows} rows</strong> · exact/approved matches ${coverage.matchedPhysicalRows} / ${coverage.physicalRows} physical branches · unmatched ${coverage.unmatchedPhysicalRows} · missing T1 ${coverage.missingT1Rows} · missing P1 ${coverage.missingP1Rows}.</div>
+        <div style="margin-top:4px;">Check that the real <strong>Linelist</strong> worksheet—not Coversheet/summary—was selected in <strong>1 Source &amp; Masters</strong>. Then verify the missing line keys, reselect the correct sheet and <strong>Rebuild Preview</strong>. No automatic 120°C/pressure values are assigned.</div>
+        <div style="margin-top:4px;overflow-wrap:anywhere;"><strong>Missing line keys (${missingLineKeys.length}):</strong> ${esc(missingLineKeys.join(', ') || '(source keys unavailable)')}</div>
+        <button type="button" data-b313-open-linelist-source style="margin-top:7px;padding:5px 9px;border:1px solid #c2410c;border-radius:5px;background:#fff;color:#7c2d12;cursor:pointer;font-weight:700;">Open 1 Source &amp; Masters</button>
+      </div>`
+    : '';
   const rootCauseHtml = rootCauses.length ? `<div style="margin:8px 0;padding:7px 9px;border:1px solid #e2e8f0;border-radius:6px;font-size:10px;background:#f8fafc;">
     <strong>${rootCauses.length} distinct blocking factor/identity groups</strong> (physical rows remain individually audited).
     ${rootCauses.slice(0,8).map(g=>`<div style="padding-top:4px;"><strong>${g.count} row(s)</strong> · ${esc(g.materialId)} · T1 ${esc(g.designTemperatureC)} °C · route ${esc(g.manufacturingRoute)} · ${esc(g.code)}<div style="color:#64748b;">${esc(g.cause)}</div></div>`).join('')}
@@ -253,6 +265,7 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Mill tolerance</strong> ${esc(text(rows.find((row) => row.result?.calculation?.manufacturingTolerance)?.result?.calculation?.manufacturingTolerance?.inputValue ?? 12.5))}${rows.some((row) => row.result?.calculation?.manufacturingTolerance?.basis === 'absolute') ? ' mm absolute' : '% negative'}</span>
     </div>
     ${warning}
+    ${sourceCoverageHtml}
     ${rootCauseHtml}
     <div style="overflow:auto;max-height:380px;margin-top:8px;border:1px solid #e2e8f0;border-radius:6px;">
       <table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1120px;">
@@ -283,20 +296,33 @@ function zeroInputReport() {
   };
 }
 
+function bindSourceNavigation(host) {
+  const button = host?.querySelector?.('[data-b313-open-linelist-source]');
+  button?.addEventListener?.('click', () => {
+    // Navigate to existing source/master controls; never select a worksheet,
+    // import a workbook or approve a temperature on the user's behalf.
+    const sourcePhase = document.querySelector('[data-phase="source"]');
+    sourcePhase?.click?.();
+  });
+}
+
 function renderReport(host, report) {
   host?.querySelector?.('[data-mc-b313-report]')?.remove?.();
   const sharedSlot = host?.querySelector?.('[data-mc-b313-unified-audit-slot]');
   if (sharedSlot) {
     sharedSlot.innerHTML = renderPreviewB313WallAuditHtml(report);
+    bindSourceNavigation(host);
     return;
   }
   const editor = host?.querySelector?.('[data-mc-b313-basis-editor]');
   if (editor) {
     editor.insertAdjacentHTML('afterend', renderPreviewB313WallAuditHtml(report));
+    bindSourceNavigation(host);
     return;
   }
   const actionBar = host?.querySelector?.('[data-mc-preview-build]')?.parentElement;
   actionBar?.parentElement?.insertAdjacentHTML?.('afterend', renderPreviewB313WallAuditHtml(report));
+  bindSourceNavigation(host);
 }
 
 function bindAuditButton(host, config, xmlText, options, getSnapshotRows, getLiveRows) {
