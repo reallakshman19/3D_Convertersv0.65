@@ -13,6 +13,17 @@ test('30 authentic PSI-02 branches group into exactly 26+2+2 provisional factors
   assert.deepEqual(r.groups.map(g=>[g.id,g.occurrences]),[
     ['DSS-120',26],['LTCS-120',2],['LTCS-82',2]]);
   assert.equal(r.qualifiedCodeRuleRecords,0);
+  assert.equal(r.externalReferenceIntake.activeFactorsPromoted,0);
+  assert.equal(r.externalReferenceIntake.originalCodeSourceSha256Verified,false);
+  assert.equal(r.groups.find(g=>g.id==='DSS-120').externalReferenceCandidate.sourceStatus,
+    'HOLD_UPSTREAM_UNVERIFIED_AND_T1_BELOW_SOURCE_RANGE');
+  assert.equal(r.groups.find(g=>g.id==='DSS-120').externalReferenceCandidate.candidateAllowableStressMPa,null);
+  for(const id of ['LTCS-120','LTCS-82']){
+    const candidate=r.groups.find(g=>g.id===id).externalReferenceCandidate;
+    assert.equal(candidate.candidateAllowableStressMPa,138);
+    assert.equal(candidate.qualifiedForStrictMaster,false);
+    assert.equal(candidate.sourceApplicabilityAtT1,true);
+  }
   assert.equal(r.totals.calculated,0);
   assert.equal(r.totals.pullReady,0);
   assert.equal(r.totals.pulled,0);
@@ -42,4 +53,17 @@ test('source digest, physical ordinal and group count contradictions fail closed
   altered=structuredClone(model);
   altered.groups[0].occurrences=30;
   assert.throws(()=>buildGLRDB313QualificationReadiness({matrix:altered}),/count mismatch/);
+});
+
+test('pinned external reference receipt cannot promote unapproved source entries',()=>{
+  const receipt=JSON.parse(readFileSync(new URL('../engineering/b313/glrd-b313-2024-external-reference-intake-v1.json',import.meta.url),'utf8'));
+  const promoted=structuredClone(receipt);
+  promoted.groups[1].qualifiedForStrictMaster=true;
+  assert.throws(()=>buildGLRDB313QualificationReadiness({externalReferenceIntake:promoted}),/cannot be promoted/);
+  const unrelated=structuredClone(receipt);
+  unrelated.groups[0].sourceSpec='A333';
+  unrelated.groups[0].materialId='LTCS-A333-6';
+  assert.throws(()=>buildGLRDB313QualificationReadiness({externalReferenceIntake:unrelated}),/not reconciled/);
+  const r=buildGLRDB313QualificationReadiness();
+  assert(r.groups.every(g=>g.calculated===0&&g.pullReady===0));
 });
