@@ -68,22 +68,35 @@ function resolveMaterialToken(value, { allowProjectFamilyDefault = true } = {}) 
   const token = text(value);
   if (!token) return failure('B313_PREVIEW_MATERIAL_REQUIRED', 'Preview material is required.');
 
+  // Generic family tokens are also listed as catalog aliases (e.g. DSS).
+  // They must NOT be resolved as exact material grades before Step 8 can
+  // corroborate them. A designation containing a real grade, such as SS316,
+  // still takes the exact-identity path below.
+  const normalized = normalizedToken(token);
+  const genericFamily = /^(?:CS|CARBON STEEL)(?: SOUR)?$/.test(normalized) ? 'CS'
+    : /^(?:LTCS|LT CS|LOW TEMPERATURE CARBON STEEL)(?: SOUR)?$/.test(normalized) ? 'LTCS'
+    : /^(?:SS|STAINLESS|STAINLESS STEEL)$/.test(normalized) ? 'SS'
+    : /^(?:DSS|DUPLEX|DUPLEX SS|DUPLEX STAINLESS STEEL)$/.test(normalized) ? 'DSS'
+    : /^(?:SDSS|SUPER DUPLEX|SUPER DUPLEX SS|SUPER DUPLEX STAINLESS STEEL)$/.test(normalized) ? 'SDSS'
+    : null;
   let lastExactFailure = null;
-  for (const variant of materialTokenVariants(token)) {
-    const exact = resolveB313MaterialIdentity({ material: { spec: variant } });
-    if (exact.ok) {
-      return {
-        ...exact,
-        schema: B313_PREVIEW_MATERIAL_FACTOR_SCHEMA,
-        requestMode: 'EXACT_PREVIEW_MATERIAL',
-        requestedMaterial: token,
-        matchedMaterialVariant: variant,
-      };
+  if (!genericFamily) {
+    for (const variant of materialTokenVariants(token)) {
+      const exact = resolveB313MaterialIdentity({ material: { spec: variant } });
+      if (exact.ok) {
+        return {
+          ...exact,
+          schema: B313_PREVIEW_MATERIAL_FACTOR_SCHEMA,
+          requestMode: 'EXACT_PREVIEW_MATERIAL',
+          requestedMaterial: token,
+          matchedMaterialVariant: variant,
+        };
+      }
+      lastExactFailure = exact;
     }
-    lastExactFailure = exact;
   }
 
-  const family = inferredFamily(token);
+  const family = genericFamily || inferredFamily(token);
   if (!family) {
     return failure('B313_PREVIEW_MATERIAL_NOT_MAPPED', 'Preview material does not map to a B31.3 project material identity.', {
       requestedMaterial: token,
