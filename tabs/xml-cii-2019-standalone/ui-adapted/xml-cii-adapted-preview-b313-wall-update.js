@@ -337,31 +337,48 @@ function sameNumeric(left, right) {
   return Math.abs(a - b) <= scale * 1e-9;
 }
 
+/**
+ * A physical Step-4 P1 from a selected Line List may inherit its pressure
+ * unit ONLY from the SAME exact line and a header that expressly denotes
+ * design/maximum P1 pressure, and whose numerical cell equals Preview P1.
+ * Hydro/test columns, unrelated numeric cells, guesses from pressure magnitude
+ * and a header of unknown unit are excluded. No master data is changed here.
+ */
+export function resolvePreviewP1LineListHeaderUnit(row = {}, config = {}) {
+  if (!/LINELIST|LINE.LIST/.test(normalizedToken(row.p1Source)) || !text(row.lineKey)
+      || !text(row.p1)) return { unit: '', source: 'P1_NOT_LINE_LIST_SOURCED' };
+  const selected = _xmlCiiFindLineListRow(row.lineKey, config);
+  const raw = selected?.row;
+  if (!raw || typeof raw !== 'object') return { unit: '', source: 'NO_SELECTED_LINE_LIST_ROW' };
+  const matches = [];
+  for (const [key, value] of Object.entries(raw)) {
+    const header = normalizedToken(key);
+    if (!/(?:\bP1\b|\bDESIGN\b|\bMAX(?:IMUM)?\b)/.test(header)
+        || /(?:\bHYDRO\b|\bTEST\b)/.test(header)) continue;
+    const unit = pressureUnitFromColumnName(key);
+    if (unit && sameNumeric(value, row.p1)) matches.push({ unit, source: `line-list-column:${key}` });
+  }
+  const unique = [...new Set(matches.map(item => item.unit))];
+  if (unique.length > 1) return { unit: '', source: 'LINE_LIST_P1_UNIT_CONFLICT',
+    candidates: matches.map(item => item.source) };
+  if (unique.length === 1) return matches[0];
+  return { unit: '', source: 'LINE_LIST_P1_HEADER_NOT_EXPLICIT_OR_VALUE_MISMATCH' };
+}
+
 export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, previewOnly = false) {
   const explicit = normalizePressureUnit(basis.pressureUnit);
   const fromPreview = normalizePressureUnit(row?.p1Unit);
-  if (explicit && fromPreview && explicit !== fromPreview) {
-    return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_CONFLICT', explicit, previewUnit: fromPreview };
-  }
+  const fromHeader = resolvePreviewP1LineListHeaderUnit(row, config);
+  if (fromHeader.source === 'LINE_LIST_P1_UNIT_CONFLICT') return fromHeader;
+  const supplied = [explicit, fromPreview, fromHeader.unit].filter(Boolean);
+  if (new Set(supplied).size > 1) return {
+    unit: '', source: 'P1_UNIT_AUTHORITIES_CONFLICT',
+    designBasis: explicit, previewUnit: fromPreview, lineListUnit: fromHeader.unit,
+  };
   if (explicit) return { unit: explicit, source: 'design-basis' };
   if (fromPreview) return { unit: fromPreview, source: row?.p1UnitSource || 'preview' };
+  if (fromHeader.unit) return fromHeader;
   if (previewOnly) return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
-
-  const match = _xmlCiiFindLineListRow(row?.lineKey, config);
-  const raw = match?.row || null;
-  if (raw && typeof raw === 'object') {
-    const preferred = [];
-    const fallback = [];
-    for (const [key, value] of Object.entries(raw)) {
-      const unit = pressureUnitFromColumnName(key);
-      if (!unit) continue;
-      const item = { unit, source: `line-list-column:${key}` };
-      if (sameNumeric(value, row?.p1)) preferred.push(item); else fallback.push(item);
-    }
-    if (preferred.length === 1) return preferred[0];
-    if (!preferred.length && fallback.length === 1 && normalizedToken(row?.p1Source).startsWith('LINELIST')) return fallback[0];
-  }
-
   if (normalizedToken(row?.p1Source).includes('XML')) {
     const unit = normalizePressureUnit(sourceXml?.pressureUnit);
     if (unit) return { unit, source: 'source-xml-units' };
