@@ -98,5 +98,5 @@ test('source and GitHub Pages runtime mirrors match exactly for unified wall han
   assert.match(renderer,/data-mc-wall-review-actions/);
   assert.match(auto,/data-mc-dtxr-unified-review-slot/);
   assert.match(b313,/data-mc-wall-review-actions/);
-  assert.doesNotMatch(renderer,/overrides\\.wallThickness\\[key\\] = candidate\\.value/);
+  assert.equal(renderer.includes('overrides.wallThickness[key] = candidate.value'), false);
 });
