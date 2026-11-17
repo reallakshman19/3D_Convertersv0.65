@@ -474,6 +474,8 @@ function validateFallbackRecord(record) {
   return record.allowableStress > 0
     && record.qualityFactorE > 0 && record.qualityFactorE <= 1
     && record.weldStrengthReductionW > 0 && record.weldStrengthReductionW <= 1
+    && record.coefficientY !== null && record.coefficientY !== undefined
+    && Number.isFinite(Number(record.coefficientY))
     && record.coefficientY >= 0 && record.coefficientY <= 1
     && text(record.stressUnit);
 }
