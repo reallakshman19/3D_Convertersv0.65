@@ -46,7 +46,7 @@ const autoBasisSource = await read('tabs/xml-cii-2019-standalone/ui-adapted/xml-
 const auditAt = previewSource.indexOf('installPreviewB313WallUpdateAuditController({');
 const autoAt = previewSource.indexOf('queueMicrotask(() => installPreviewB313AutoBasisPanel({');
 assert.ok(auditAt >= 0 && autoAt > auditAt, 'automatic B31.3 basis must run after legacy controller microtask is scheduled');
-assert.ok(autoBasisSource.includes('B31.3 automatic basis'));
+assert.ok(autoBasisSource.includes('B31.3 Wall Review — Basis &amp; Results'));
 assert.ok(autoBasisSource.includes('data-b313-auto-refresh'));
 assert.ok(autoBasisSource.includes('data-b313-factor-info-button'));
 assert.ok(autoBasisSource.includes('[data-mc-b313-basis-editor]'));

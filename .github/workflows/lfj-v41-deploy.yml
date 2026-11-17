@@ -16,7 +16,7 @@ permissions:
   contents: read
 jobs:
   source-mirror:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
           git rev-parse HEAD
           node --test docs/lfj/deployment-parity.test.mjs
   real-browser-worker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
