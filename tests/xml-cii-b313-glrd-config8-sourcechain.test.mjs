@@ -151,3 +151,18 @@ test('existing Step 4 automatic panel exposes editable pipe route source and rev
  assert.match(src,/routeOnly/);
  assert.match(src,/ROUTE EVIDENCE REQUIRED/);
 });
+
+test('A106 seamless source and welded route override HOLD before numeric factor lookup',()=>{
+ const row={material:'ASTM A106-B',materialSource:'process-linelist-material',t1:'120',
+   branchName:'/A106-SYNTHETIC/B1',branchOccurrenceIndex:0,lineKey:'A106-SYNTHETIC',
+   p1:'10',p1Source:'linelist',p1Unit:'MPA',t1Source:'linelist',sizeMm:50,
+   corrosion:0};
+ const key=previewB313BasisKey(row,{});
+ const config={b313WallUpdate:{bases:{[key]:{
+   manufacturingRoute:'ERW',manufacturingRouteSourceReference:'TEST-ONLY-MTR',
+   manufacturingRouteEvidenceReviewed:true
+ }}}};
+ const result=buildPreviewB313WallUpdateReport({rows:[row],config});
+ assert.equal(result.rows[0].code,'B313_PREVIEW_MANUFACTURING_ROUTE_PRODUCT_CONFLICT');
+ assert.equal(result.summary.calculatedRows,0);
+});
