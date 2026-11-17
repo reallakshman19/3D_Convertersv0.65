@@ -27,6 +27,7 @@ on:
       - 'tests/xml-cii-b313-*.test.mjs'
       - 'tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs'
       - 'tests/xml-cii-glrd-unified-wall-review-approval.test.mjs'
+      - 'tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs'
       - 'tests/xml-cii-issue-781-b313-*.test.mjs'
       - '.github/workflows/step4-b313-pull-validation.yml'
   workflow_dispatch:
@@ -87,6 +88,7 @@ jobs:
             tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
             tests/xml-cii-issue-781-b313-live-row-custody.test.js \
             tests/xml-cii-b313-preview-ui-static.test.js \
+            tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs \
             tests/xml-cii-b313-unified-review-rca.test.mjs \
             tests/xml-cii-glrd-unified-wall-review-approval.test.mjs \
             tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs
