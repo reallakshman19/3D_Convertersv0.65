@@ -97,7 +97,7 @@ export function resolveXmlCiiB313ClassMaterialEvidence({
       : (candidate ? 'piping-class-config-unscoped' : ''),
     materialCodeCorroborationMethod: sizedCandidate ? 'size-exact' : (matched?.method || ''),
     materialCodeCorroborationConfidence: sizedCandidate ? (reviewed ? 100 : 0) : (matched?.confidence ?? null),
-    materialCodeCorroborationNeedsReview: !!candidate && !reviewed,
+    materialCodeCorroborationNeedsReview: !reviewed && (!!candidate || !!pipingClassRow),
     materialCodeCorroborationSizeMm: exactSizedRow ? size : null,
     materialCodeCorroborationCompositeSpecification: compositeSpecification,
   };
