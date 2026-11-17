@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
@@ -170,18 +171,59 @@ const processLtcs = resolveMaterialCodeFromLineMaterial({
 });
 assert.equal(processLtcs.material, 'LTCS');
 assert.equal(processLtcs.materialCode, '');
+const class11472 = JSON.parse(fs.readFileSync(new URL('../docs/Masters/SpecwisePipingClass/11472.json', import.meta.url), 'utf8'));
+const class13831 = JSON.parse(fs.readFileSync(new URL('../docs/Masters/SpecwisePipingClass/13831.json', import.meta.url), 'utf8'));
+const pickSize = (cls, dn) => cls.rows.find((row) => Number(row.convertedBore) === dn);
 const classEvidence = resolveXmlCiiB313ClassMaterialEvidence({
   pipingClass: '11472', config: { useDefaultPipingClassMaterialCodeMap: true },
+  pipingClassRow: pickSize(class11472, 150), sizeMm: 150,
 });
 assert.equal(classEvidence.materialCodeCorroborationCandidate, 'ASTM A333-6');
 assert.equal(classEvidence.materialCodeCorroborationNeedsReview, false);
-assert.equal(classEvidence.materialCodeCorroborationMethod, 'exact');
+assert.equal(classEvidence.materialCodeCorroborationMethod, 'size-exact');
+assert.equal(classEvidence.materialCodeCorroborationSizeMm,150);
+// The class switches product from ASTM A333 to ASTM A671 at DN750;
+// class-wide A333 factor approval would be a severe source-identity error.
+const class11472Dn750 = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'11472', config: {useDefaultPipingClassMaterialCodeMap:true},
+  pipingClassRow:pickSize(class11472,750),sizeMm:750,
+});
+assert.equal(class11472Dn750.materialCodeCorroborationCandidate,'ASTM A671-CC65 cl 22');
+assert.equal(class11472Dn750.materialCodeCorroborationNeedsReview,false,
+  'Exact DN establishes an identity candidate but not factor qualification');
+const class11472Unscoped = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'11472',config:{useDefaultPipingClassMaterialCodeMap:true},
+});
+assert.equal(class11472Unscoped.materialCodeCorroborationNeedsReview,true,
+  'A class-wide mapping is never a qualified exact pipe product');
+const dssDn200 = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'13831',pipingClassRow:pickSize(class13831,200),sizeMm:200,
+});
+assert.equal(dssDn200.materialCodeCorroborationCandidate,'ASTM A790 UNS S31803');
+assert.equal(dssDn200.materialCodeCorroborationNeedsReview,false);
+const dssDn250 = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'13831',pipingClassRow:pickSize(class13831,250),sizeMm:250,
+});
+assert.match(dssDn250.materialCodeCorroborationCandidate,/A790\/A928/i);
+assert.equal(dssDn250.materialCodeCorroborationNeedsReview,true,
+  'A790/A928 alternative manufacturing specs require review');
+const mismatchedDn = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'13831',pipingClassRow:pickSize(class13831,200),sizeMm:250,
+});
+assert.equal(mismatchedDn.materialCodeCorroborationNeedsReview,true,
+  'Wrong-size class row cannot qualify material designation');
 const weakClassEvidence = resolveXmlCiiB313ClassMaterialEvidence({
   pipingClass: '31148', config: { useDefaultPipingClassMaterialCodeMap: true },
 });
 if (weakClassEvidence.materialCodeCorroborationCandidate) {
   assert.equal(weakClassEvidence.materialCodeCorroborationNeedsReview, true);
 }
+const invalidDnClass = resolvePreviewB313MaterialFromRow({
+  material:'LTCS',
+  materialCodeCorroborationCandidate:class11472Unscoped.materialCodeCorroborationCandidate,
+  materialCodeCorroborationNeedsReview:class11472Unscoped.materialCodeCorroborationNeedsReview,
+}, {});
+assert.equal(invalidDnClass.b313IdentityNeedsReview,true);
 const processLtcsB313 = resolvePreviewB313MaterialFromRow({
   material: processLtcs.material, materialSource: processLtcs.source,
   materialCode: processLtcs.materialCode,
