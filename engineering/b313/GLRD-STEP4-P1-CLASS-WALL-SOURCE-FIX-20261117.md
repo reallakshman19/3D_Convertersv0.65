@@ -30,3 +30,9 @@ The first post-PR7 B31.3 report could also render separately above the lazily mo
 - Full PSI02 source/config custody, physical row/node ledger, accepted Pull and actual native emitted CII wall parity. No Python converter changes authorized or made.
 
 **This fix enables correctly source-bound calculations as soon as qualified factors exist; it does not fabricate the missing factors, force 30/30 acceptance or imply that a successful app deployment is an approved stress analysis.**
+
+## Pull-time stale P1 source prevention (additional correction)
+
+A calculated proposal generated from `line-list-column:Pressure Max kPa(g)` now carries the **actual resolved pressure unit** in its evidence. `converters/xml-cii2019-core/b313-preview-line-list-pressure-receipt.js` independently rechecks the exact selected Line List header, value and unit at explicit Pull, and `b313ReadAcceptedWall()` rechecks the same receipt when accepted wall is replayed to Preview. A changed/removed header, altered P1 or conflicting unit returns `B313_PULL_P1_UNIT_SOURCE_CHANGED`, without modifying an old accepted record. This is a source-custody protection, not a substitute for a qualified factor or proof of physical manufacture.
+
+New tests exercise a synthetic A106 calculated source-bound proposal, its Pull acceptance, and rejection of header replacement (`kPa` → `PSIG`) or an additional contradictory pressure header; authentic DSS Class 93833 still remains factor-HOLD. Source and `docs/` JS modules are synchronized. No Python converter edit.
