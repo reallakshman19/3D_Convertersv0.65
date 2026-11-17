@@ -1,5 +1,6 @@
 import { B313_MATERIAL_FACTOR_MASTER } from './default-b313-material-factor-data.js';
 import { calculateB313Thickness } from '../b313-thickness/index.js';
+import { resolvePublishedB313CodeFactor, B313_GOVERNED_CODE_RULE_PACK } from './code-factor-rule-engine.js';
 import { selectRequiredPipeWall } from '../pipe-wall-master/index.js';
 
 const KSI_TO_MPA = 6.894757293168361;
@@ -119,15 +120,46 @@ export function resolveB313QualifiedTemperatureFactor({
 
 export function resolveB313DesignFactors(input={}){
  const identity=resolveB313MaterialIdentity(input);if(!identity.ok)return identity;const t=tempC(input);if(t==null)return fail('INVALID_DESIGN_TEMPERATURE','A finite design temperature in C or F is required.');
- const mode=String(input.qualificationMode||'strict').toLowerCase(),statuses=acceptedStatuses(mode,input.acceptedStatuses),id=identity.material.materialId,route=input.manufacturingRoute||input.material?.manufacturingRoute||(id==='CS-A106-B'?'SEAMLESS':null),f=B313_MATERIAL_FACTOR_MASTER.factors;
- const strict=mode==='strict' && !Array.isArray(input.acceptedStatuses);
+ const mode=String(input.qualificationMode||'strict').toLowerCase();
+ if(mode==='strict' && Array.isArray(input.acceptedStatuses))return fail('B313_STRICT_STATUS_OVERRIDE_FORBIDDEN',
+   'Strict source qualification cannot be overridden by caller-supplied acceptedStatuses.');
+ const statuses=acceptedStatuses(mode,input.acceptedStatuses),id=identity.material.materialId;
+ const route=input.manufacturingRoute||input.material?.manufacturingRoute
+   ||(mode!=='strict'&&id==='CS-A106-B'?'SEAMLESS':null);
+ const f=B313_MATERIAL_FACTOR_MASTER.factors;
+ const strict=mode==='strict';
  const resolve=(factor)=>strict
    ? resolveB313QualifiedTemperatureFactor({factor,records:f[factor].records,materialId:id,temperatureC:t,manufacturingRoute:route,productForm:identity.material.productForm||'PIPE',edition:B313_MATERIAL_FACTOR_MASTER.edition})?.record
    : exact(f[factor].records,id,t,statuses,factor==='E'||factor==='W'?{manufacturingRoute:route}:{});
  const sr=resolve('S'),er=resolve('E'),wr=resolve('W'),yr=resolve('Y'),o=input.factorOverrides||input.factors||{};
- const S=o.allowableStressMPa??o.S??stressMPa(sr),E=o.qualityFactorE??o.E??er?.value,W=o.weldStrengthReductionW??o.W??wr?.value,Y=o.coefficientY??o.Y??yr?.value,missing=[];
- if(!(Number(S)>0))missing.push('S');if(!(Number(E)>0))missing.push('E');if(!(Number(W)>0))missing.push('W');if(!(Number(Y)>=0))missing.push('Y');
- const sources={S:o.allowableStressMPa!==undefined||o.S!==undefined?{authority:'CALLER_OVERRIDE'}:sr?{...sr}:null,E:o.qualityFactorE!==undefined||o.E!==undefined?{authority:'CALLER_OVERRIDE'}:er?{...er}:null,W:o.weldStrengthReductionW!==undefined||o.W!==undefined?{authority:'CALLER_OVERRIDE'}:wr?{...wr}:null,Y:o.coefficientY!==undefined||o.Y!==undefined?{authority:'CALLER_OVERRIDE'}:yr?{...yr}:null};
+ // Code tables may supply qualified E/W/Y rules across valid temperature
+ // ranges, but only from the published, edition-specific, source-verified pack.
+ // Caller-provided rule arrays are intentionally ignored.
+ const rule=(factor)=>strict?resolvePublishedB313CodeFactor({
+   factor,materialId:id,materialFamily:identity.material.family,
+   productForm:identity.material.productForm||'PIPE',
+   manufacturingRoute:route,temperatureC:t,edition:B313_MATERIAL_FACTOR_MASTER.edition,
+ }):null;
+ const rE=rule('E'),rW=rule('W'),rY=rule('Y');
+ const conflicts=[['E',er,rE],['W',wr,rW],['Y',yr,rY]].filter(([key,record,ru])=>
+   record&&ru?.ok&&Math.abs(Number(record.value)-Number(ru.value))>1e-12);
+ if(conflicts.length)return fail('B313_FACTOR_AUTHORITY_CONFLICT',
+   'Qualified material-factor data and governed code-rule data disagree; resolve sources before calculation.',
+   {factors:conflicts.map(x=>x[0]),materialId:id,temperatureC:t});
+ const S=o.allowableStressMPa??o.S??stressMPa(sr),
+   E=o.qualityFactorE??o.E??er?.value??(rE?.ok?rE.value:null),
+   W=o.weldStrengthReductionW??o.W??wr?.value??(rW?.ok?rW.value:null),
+   Y=o.coefficientY??o.Y??yr?.value??(rY?.ok?rY.value:null),missing=[];
+ if(!(Number(S)>0))missing.push('S');
+ if(!(Number(E)>0))missing.push('E');
+ if(!(Number(W)>0))missing.push('W');
+ if(!(Number(Y)>=0))missing.push('Y');
+ const sources={
+   S:o.allowableStressMPa!==undefined||o.S!==undefined?{authority:'CALLER_OVERRIDE'}:sr?{...sr}:null,
+   E:o.qualityFactorE!==undefined||o.E!==undefined?{authority:'CALLER_OVERRIDE'}:er?{...er}:rE?.ok?rE.factorSource:null,
+   W:o.weldStrengthReductionW!==undefined||o.W!==undefined?{authority:'CALLER_OVERRIDE'}:wr?{...wr}:rW?.ok?rW.factorSource:null,
+   Y:o.coefficientY!==undefined||o.Y!==undefined?{authority:'CALLER_OVERRIDE'}:yr?{...yr}:rY?.ok?rY.factorSource:null,
+ };
  if(missing.length)return fail('B313_FACTOR_DATA_INCOMPLETE','Material identity resolved, but one or more design factors are unavailable at this temperature/qualification level.',{material:identity.material,temperatureC:t,missing,qualificationMode:mode});
  return{ok:true,code:'B313_FACTORS_RESOLVED',material:identity.material,temperatureC:t,qualificationMode:mode,factors:{allowableStressMPa:Number(S),qualityFactorE:Number(E),weldStrengthReductionW:Number(W),coefficientY:Number(Y)},factorSources:sources,designAuthority:Object.values(sources).every(s=>s?.status==='VERIFIED'||s?.status==='PROJECT_APPROVED')};
 }
@@ -137,4 +169,4 @@ export function calculateB313MaterialDesign(input={}){
  const wants=input.selectPipeWall!==false&&(input.dn!=null||input.nps!=null);if(!wants)return{ok:true,code:'B313_MATERIAL_DESIGN_CALCULATED',materialFactors:fr,calculation:calc};const standard=input.dimensionStandard||input.pipeDimensionStandard;if(!standard)return{ok:false,code:'PIPE_DIMENSION_STANDARD_REQUIRED',message:'Pipe-wall selection requires an explicit dimensionStandard/pipeDimensionStandard; material family does not imply B36.10M or B36.19M.',materialFactors:fr,calculation:calc};
  const wall=selectRequiredPipeWall({dimensionStandard:standard,dn:input.dn,nps:input.nps,requiredNominalThicknessMm:calc.requiredNominalThicknessMm});return{ok:wall.ok,code:wall.ok?'B313_MATERIAL_DESIGN_AND_WALL_SELECTED':wall.code,materialFactors:fr,calculation:calc,pipeWall:wall};
 }
-export { B313_MATERIAL_FACTOR_MASTER };
+export { B313_MATERIAL_FACTOR_MASTER, B313_GOVERNED_CODE_RULE_PACK };
