@@ -16,7 +16,8 @@ assert(ui.includes('resolvePreviewB313FactorBasis'));
 assert(ui.includes('calculateAndSelectPreviewB313Wall'));
 assert(ui.includes('listPipeWallsForSize'));
 assert(ui.includes('B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT'));
-assert(ui.includes('__b313WallEvidence'));
+assert(ui.includes('proposalsByBranch'));
+assert(!ui.includes('overrides.wallThickness[overrideKey] ='), 'B31.3 calculation must not apply wall until Pull.');
 assert(ui.includes('Open B31.3 Material Factors'));
 assert(ui.includes("tabId: 'b313-material-factors'"));
 assert(ui.includes('Preview Material → B31.3 material identity'));
@@ -30,7 +31,8 @@ assert(ui.includes('B313_PREVIEW_ROW_OD_PARITY_MISMATCH'));
 assert(!ui.includes('P*D /'), 'Preview UI must not duplicate the B31.3 equation.');
 assert(!ui.includes('20000'), 'Preview UI must not hardcode the A106 benchmark allowable stress.');
 
-assert(composer.includes('calculateB313Thickness'));
+assert(composer.includes('calculateEngineering'));
+assert(composer.includes("calculationId: 'PIPE.B313.THICKNESS'"));
 assert(composer.includes('selectPipeWallForCalculation'));
 assert(composer.includes('resolveB313MaterialIdentity'));
 assert(composer.includes('resolveB313DesignFactors'));
@@ -50,7 +52,7 @@ assert(auditController.includes('selectPreviewB313AuditRows'));
 assert(auditController.includes('derivePreviewB313AuditSummary'));
 assert(auditController.includes('renderPreviewB313WallAuditHtml'));
 assert(auditController.includes('event.stopImmediatePropagation()'));
-assert(auditController.includes('BENCHMARK_ONLY factors'));
+assert(auditController.includes('BENCHMARK_ONLY / SCREENING factors'));
 assert(auditController.includes('Audit counters were recomputed from row evidence'));
 
 console.log('XML/CII Preview B31.3 material-factor action and stable audit wiring checks passed.');

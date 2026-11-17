@@ -8,7 +8,7 @@ Phase 4 Preview exposes the explicit action:
 Update wall thickness as per B31.3 Sec II
 ```
 
-The action is not automatic wall authority. It changes only rows that complete the governed material/factor, pressure, corrosion, OD, applicability and pipe-wall-selection chain.
+The action calculates proposals only. It does **not** modify Wall Thk. On a qualified result, use the new **⤓ Pull** icon beside the existing **↓ Fill Down** icon in the Step 4 Wall Thk cell to explicitly accept the validated same-OD wall for that Preview branch. Pull and Fill are independent operations.
 
 ## Runtime chain
 
@@ -22,15 +22,19 @@ strict active S / E / W / Y at T1
         ↓
 manual controlled S/E/W/Y fallback only if active factors are incomplete
         ↓
-Preview P1 + corrosion + source-XML OD
+Preview P1 + corrosion + effective Step 4 source-bound node OD
         ↓
 B31.3-2024 straight-pipe thickness API
         ↓
-required nominal wall with fixed 12.5% negative mill tolerance
+required nominal wall with configurable 12.5% default or absolute-mm negative mill tolerance
         ↓
 Pipe Wall Master selector
         ↓
-Preview wallThickness override + immutable-style audit evidence
+CALCULATED proposal + source-bound node evidence
+        ↓
+explicit ⤓ Pull confirmation (never Fill Down)
+        ↓
+accepted same-OD node group → Rebuild Preview → enriched XML parity verification
 ```
 
 ## Material-column custody
@@ -94,7 +98,7 @@ If strict active factors are incomplete at the exact Preview T1, the existing pe
 
 Manual fallback is recorded as `MANUAL_EXPLICIT_FALLBACK`; it is not promoted into the active factor master and is not labelled design-authority data.
 
-When controlled factors later become available in the active master, `ACTIVE_MASTER_STRICT` takes precedence over a retained manual fallback record.
+When controlled factors later become available in the active master, `ACTIVE_MASTER_STRICT` takes precedence over a retained manual fallback record. The current automatic-basis panel allows manual S/E/W/Y and explicit source reference even when no fallback seed exists. A user-entered source reference alone is not independent design qualification; Pull requires explicit review of a manual basis.
 
 ## Basis key
 
@@ -108,12 +112,7 @@ Legacy raw material-text keys remain readable so existing #424 draft basis entri
 
 ## Pressure custody
 
-Pressure-unit priority remains:
-
-1. explicit Preview B31.3 basis pressure unit;
-2. unambiguous line-list pressure column whose value matches P1;
-3. source XML `<PressureUnits>` only when P1 provenance is XML;
-4. otherwise fail closed.
+Pressure-unit resolution happens **when Build/Rebuild Preview constructs the effective P1 row**, including its matching Line List column and unit provenance. B31.3 calculation accepts either that Preview-resolved unit or a non-conflicting explicit basis unit; contradictory units HOLD. The B31.3 action does not independently read XML or re-match the Line List.
 
 ## Dimension-standard custody
 
@@ -126,38 +125,53 @@ The B31.3 material core itself still does not silently choose a pipe-dimension s
 
 ## OD custody
 
-The pressure calculation uses source-XML OD evidence. The Pipe Wall Master DN OD is a disambiguation/reference value only.
+The pressure calculation uses the effective Step 4 source-bound node OD ledger exposed by the Preview worker. AVEVA may encode pipe-run nodes as ELBO, TEE, RIGID, etc., without a literal PIPE node type. A single, positive OD group may be accepted for that branch; zero-OD nodes retain their existing walls. Distinct positive ODs in the branch produce HOLD rather than arbitrary selection. The Pipe Wall Master DN OD is a parity/reference value only.
 
 For the retained DN50 source-data warning:
 
 ```text
 master reference OD = 60.0 mm
 source candidates    = 60.3 mm, 26.7 mm
-selected source OD   = 60.3 mm
+status               = HOLD (mixed positive ODs)
 ```
 
-The 26.7 mm fitting/flange endpoint is rejected as the pipe-calculation OD. The project master inconsistency is not silently corrected.
+The 26.7 mm fitting/flange endpoint is not silently ignored in favor of 60.3 mm. Resolve the physical occurrence/scope upstream in Preview; the project master inconsistency is not silently corrected.
 
 ## Wall selection
 
-The calculation always applies:
+The Step 4 default is:
 
 ```js
 negativeMillTolerance: { basis: 'percent', value: 12.5 }
 ```
 
+The existing B31.3 basis panel also permits an alternative absolute deduction, e.g.:
+
+```js
+negativeMillTolerance: { basis: 'absolute', value: 1.5, unit: 'mm' }
+```
+
+These alternatives are **not additive**. Changing tolerance invalidates prior proposals and acceptances.
+
 The B31.3 API computes the required nominal wall; the merged Pipe Wall Master API selects the next adequate commercial wall/schedule. The Preview UI contains no duplicated pressure-thickness equation and no duplicated schedule-selection formula.
 
 ## Evidence
 
-Successful rows write:
+Successful calculation rows write a **proposal only**:
 
 ```text
-config.overrides.wallThickness[wallKey]
-config.overrides.__b313WallEvidence[wallKey]
+config.b313WallUpdate.proposalsByBranch[branchOccurrenceIndex]
 ```
 
-The evidence includes:
+Explicit Pull writes a separate accepted record:
+
+```text
+config.b313WallUpdate.acceptedWallByBranch[branchOccurrenceIndex]
+```
+
+The accepted wall is applied to the validated positive-OD node group on full Preview rebuild, after material/rating resolution. Zero-OD nodes are preserved, and mixed-OD branches remain held. It is not a shared Piping-Class/DN override.
+
+The proposal and acceptance evidence includes:
 
 - Preview material, material source and material-code evidence;
 - resolved B31.3 material identity and resolution source;
@@ -168,12 +182,20 @@ The evidence includes:
 - P1 provenance and pressure-unit provenance;
 - source OD, master reference OD and parity delta;
 - corrosion allowance;
-- fixed 12.5% negative mill tolerance;
+- chosen percent or absolute-mm negative mill tolerance;
 - B31.3 calculation result;
 - selected wall, schedule/equivalents and margin.
 
-The Preview Material cell receives a non-authoritative linkage badge (`B31.3 ID ✓` or `B31.3 MASTER ✓`) without changing the displayed material value. The wall cell receives `✓ B31.3` only after a successful wall update.
+The Preview Material cell receives a non-authoritative linkage badge (`B31.3 ID ✓` or `B31.3 MASTER ✓`) without changing the displayed material value. The wall cell must not receive `✓ B31.3` from calculation alone; its accepted authority is shown only after explicit Pull and successful Preview rebuild.
 
 ## Engineering qualification boundary
 
 Merging this Preview adoption does not complete B31.3 design-authority qualification. Controlled B31.3-2024 `S/E/W/Y` population/review and the licensed-code-text engineering review of the production thickness implementation remain separate release/governance requirements.
+
+## CS fallback policy
+
+When the effective Preview material is blank or genuinely unmapped, the B31.3 basis panel may offer the configured **CS** family fallback. It does not rewrite the Preview Material cell, does not override known non-CS identities (for example stainless), and requires explicit user confirmation before Pull. The CS family is not itself an allowable-stress record: a controlled exact material identity and qualified S/E/W/Y or independently reviewed manual basis are required for engineering acceptance. The default may be disabled in project settings.
+
+## Release boundary
+
+An accepted Pull is recorded as user-accepted and **pending native output verification**. A successful UI calculation is not a verified design or proof of native CII parity. Strict factor master qualification and Owner-supplied actual input/output cases remain required for release.

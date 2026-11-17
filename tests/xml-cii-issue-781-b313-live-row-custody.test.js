@@ -11,9 +11,9 @@ const activation = read('tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted
 const updateController = read('tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js');
 const auditController = read('tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js');
 
-assert(renderer.includes('function publishPreviewResult(host, branchRows = [], nodeRows = [])'));
+assert(renderer.includes('function publishPreviewResult(host, branchRows = [], nodeRows = [], formatPreviewPasses = [], nodeBoreWallRows = [])'));
 assert(renderer.includes('host.__xmlCiiPreviewResult = result'));
-assert(renderer.includes('const previewResult = publishPreviewResult(host, branchRows, nodeRows)'));
+assert(renderer.includes('const previewResult = publishPreviewResult(host, branchRows, nodeRows, formatPreviewPasses, nodeBoreWallRows)'));
 assert(renderer.includes('return previewResult;'));
 
 assert(rendererV7.includes('const legacyResult = await buildLegacyPreview(rootEl, xmlText, config, delegatedOptions)'));

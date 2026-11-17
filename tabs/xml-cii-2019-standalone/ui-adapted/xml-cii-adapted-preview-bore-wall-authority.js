@@ -13,6 +13,7 @@ import {
 import {
   resolveXmlCiiWallThicknessWithEvidence,
 } from '../../../converters/xml-cii2019-core/dtxr-wall-evidence-ledger.js';
+import { b313ReadAcceptedWall } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import {
   resolveXmlCiiBoreAuthority,
 } from '../../../converters/xml-cii2019-core/bore-authority.js';
@@ -253,6 +254,7 @@ function buildNodeBoreWallRows({
         endpoint: childText(node, 'Endpoint'),
         pipingClass,
         boreMm: bore.boreMm,
+        outsideDiameterMm: Number(childText(node, 'OutsideDiameter') || childText(node, 'OuterDiameter') || childText(node, 'OD')) || null,
         boreSource: bore.source,
         boreFallbackUsed: bore.fallbackUsed,
         boreTraceMismatch: bore.traceMismatch,
@@ -371,5 +373,33 @@ export function applyPreviewBoreWallAuthority({
     nodeRows: correctNodeRows(result.nodeRows, nodeAuthority.rows, {requireSourceOrdinal}),
     nodeBoreWallRows: nodeAuthority.rows,
     boreAuthorityDiagnostics: nodeAuthority.diagnostics,
+  };
+}
+
+/**
+ * Apply Pull AFTER final Preview material/rating resolution. Proposal
+ * fingerprints are computed from the same effective rows shown to the user.
+ */
+export function applyAcceptedB313PullAuthority(result, config = {}) {
+  if (!result || !Array.isArray(result.branchRows) || !Array.isArray(result.nodeBoreWallRows)) return result;
+  const ledger = result.nodeBoreWallRows;
+  const accepted = result.branchRows.map((row, index) =>
+    b313ReadAcceptedWall(config, row, index, ledger));
+  if (!accepted.some(Boolean)) return result;
+  const branchRows = result.branchRows.map((row, index) => accepted[index]
+    ? { ...row, wallThickness: String(accepted[index].nominalWallMm),
+        wallThicknessSource: 'b313-pulled', b313PullStatus: 'ACCEPTED' }
+    : row);
+  const nodeBoreWallRows = ledger.map((row) => {
+    const record = accepted[row.branchOccurrenceIndex];
+    return record && text(row.outsideDiameterMm) !== '' && Number(row.outsideDiameterMm) > 0
+      ? { ...row, wallThickness: String(record.nominalWallMm), wallThicknessSource: 'b313-pulled' }
+      : row;
+  });
+  return {
+    ...result,
+    branchRows,
+    nodeRows: correctNodeRows(result.nodeRows, nodeBoreWallRows, {requireSourceOrdinal: true}),
+    nodeBoreWallRows,
   };
 }
