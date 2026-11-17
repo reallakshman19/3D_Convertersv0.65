@@ -34,6 +34,22 @@ assert.equal(a106BlankT1.routeSource, 'A106 carbon-steel default');
 assert.equal(a106BlankT1.tableContext.temperatureC, undefined);
 assert.match(a106BlankT1.factorSummary, /not evaluated until Preview T1 is resolved/);
 
+const uncorroboratedDss = derivePreviewB313AutoBasisRow({ material: 'DSS', t1: '120' }, {});
+assert.equal(uncorroboratedDss.statusCode, 'GRADE_REVIEW_REQUIRED');
+assert.equal(uncorroboratedDss.materialIdentityNeedsReview, true);
+const corroboratedDss = derivePreviewB313AutoBasisRow({
+  material: 'DSS', materialCodeMatchedMaterial: 'ASTM A790 UNS S31803',
+  materialCodeNeedsReview: false, materialCodeSource: 'piping-class-fallback',
+  t1: '120',
+}, {});
+assert.equal(corroboratedDss.materialIdentityNeedsReview, false);
+assert.notEqual(corroboratedDss.statusCode, 'GRADE_REVIEW_REQUIRED');
+const wildcardDss = derivePreviewB313AutoBasisRow({
+  material: 'DSS', materialCodeMatchedMaterial: 'ASTM A790 UNS S31803',
+  materialCodeNeedsReview: true, t1: '120',
+}, {});
+assert.equal(wildcardDss.materialIdentityNeedsReview, true);
+
 const explicitRoute = derivePreviewB313AutoBasisRow(a106Row, {
   b313WallUpdate: {
     bases: {
@@ -81,6 +97,9 @@ assert.match(runtimeSource, /data-b313-auto-source-reference/);
 assert.match(runtimeSource, /data-b313-auto-design-approved/);
 assert.match(runtimeSource, /data-b313-mill-basis/);
 assert.match(runtimeSource, /data-b313-cs-fallback/);
+assert.match(runtimeSource, /data-b313-auto-identity-reviewed/);
+assert.match(runtimeSource, /GRADE REVIEW REQUIRED/);
+assert.match(runtimeSource, /candidate statuses:/);
 assert.match(runtimeSource, /no interpolation/i);
 assert.match(diagnosticsSource, /installPreviewB313AutoBasisPanel/);
 
