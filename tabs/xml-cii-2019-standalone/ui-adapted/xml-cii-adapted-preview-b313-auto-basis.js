@@ -192,9 +192,17 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const materialId = text(materialIdentity.material?.materialId);
   const storedBasis = storedBasisForRow(config, row, materialId, t1);
   const explicitRoute = text(storedBasis.manufacturingRoute);
+  // ASTM A106 is a seamless-pipe specification, but a generic CS family
+  // default to A106 is NOT evidence of the physical pipe product.
+  const confirmedA106Pipe = materialId === 'CS-A106-B'
+    && materialIdentity.b313IdentityNeedsReview !== true
+    && materialIdentity.b313FallbackApplied !== true
+    && materialIdentity.requestMode === 'EXACT_PREVIEW_MATERIAL'
+    && !(materialSource === 'piping-class-fallback'
+      && row?.materialCodeCorroborationSource !== 'piping-class-master-exact-DN');
 
   if (!t1 || text(row?.t1Source).toLowerCase() === 'default') {
-    const defaultRoute = materialId === 'CS-A106-B' ? 'SEAMLESS' : '';
+    const defaultRoute = confirmedA106Pipe ? 'SEAMLESS' : '';
     return {
       schema: B313_PREVIEW_AUTO_BASIS_SCHEMA,
       basisKey,
@@ -216,7 +224,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       routeSource: explicitRoute
         ? 'controlled Preview basis'
         : defaultRoute
-          ? 'A106 carbon-steel default'
+          ? 'confirmed ASTM A106 product specification'
           : 'unresolved',
       factorBasis: null,
       fallback: null,
@@ -232,12 +240,12 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   });
   const availability = factorAvailabilityFrom(factorBasis);
   const defaultRoute = routeFromAvailability(availability)
-    || (materialId === 'CS-A106-B' ? 'SEAMLESS' : '');
+    || (confirmedA106Pipe ? 'SEAMLESS' : '');
   const route = explicitRoute || defaultRoute;
   const routeSource = explicitRoute
     ? 'controlled Preview basis'
-    : materialId === 'CS-A106-B' && route === 'SEAMLESS'
-      ? 'A106 carbon-steel default'
+    : confirmedA106Pipe && route === 'SEAMLESS'
+      ? 'confirmed ASTM A106 product specification'
       : route
         ? 'active factor master'
         : 'unresolved';
@@ -405,7 +413,7 @@ function panelHtml(models, config = {}) {
 
   return `<div data-mc-b313-auto-basis-panel style="margin:8px 0;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;padding:8px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>B31.3 automatic basis</strong><span style="font-size:10px;color:#94a3b8;">${models.length} material-temperature group${models.length === 1 ? '' : 's'}</span></div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data.</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data. Only source-confirmed ASTM A106 pipe may imply seamless manufacturing; generic CS does not.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
       <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
       <input type="number" step="any" min="0" data-b313-mill-value value="${esc(tolerance.value ?? 12.5)}" style="width:80px;">
