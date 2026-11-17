@@ -57,6 +57,37 @@ function temperatureText(row) {
 }
 
 /**
+ * A loaded Line List is not proof it covers the active physical branch set.
+ * This diagnostic consumes the ACTUAL current Preview snapshot; it never
+ * assigns or copies material, design pressure, or design temperature.
+ */
+export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
+  const actual = Array.isArray(rows) ? rows.filter(r => r && typeof r === 'object') : [];
+  const missing = actual.filter(r => r.lineMiss === true);
+  const matched = actual.filter(r => r.lineMiss === false);
+  const missingProcess = missing.filter(r => !temperatureText(r) || !text(r.p1));
+  const missingT1 = actual.filter(r => !temperatureText(r));
+  const missingP1 = actual.filter(r => !text(r.p1));
+  const loadedLineListRows = Array.isArray(config?.linelist?.masterRows)
+    ? config.linelist.masterRows.length : null;
+  return {
+    schema: 'b313-preview-linelist-coverage/v1',
+    physicalRows: actual.length,
+    loadedLineListRows,
+    matchedPhysicalRows: matched.length,
+    unmatchedPhysicalRows: missing.length,
+    missingT1Rows: missingT1.length,
+    missingP1Rows: missingP1.length,
+    missingProcessRows: missingProcess.length,
+    missingLineKeys: [...new Set(missingProcess.map(r => text(r.lineKey)).filter(Boolean))].sort(),
+    // Explicit physical line match is required; neither class-specific
+    // material lookup nor a service-consensus candidate is design authority.
+    sourceEvidenceComplete: missingProcess.length === 0 && missingT1.length === 0
+      && missingP1.length === 0,
+  };
+}
+
+/**
  * ASTM A106 is a seamless-pipe specification. The *exact* source pipe
  * product can establish this route; family-default "CS" or a generic
  * class mapping cannot. All other route declarations need physical
@@ -602,6 +633,10 @@ export function collectPreviewB313IndependentIssues(row = {}, config = {}) {
     issues.push({ code: 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED',
       message: 'P1 unit unknown or conflicting: confirm source; never infer from numeric P1 or hydro test' });
   }
+  if (row?.lineMiss === true && (!temperatureText(row) || !text(row?.p1))) {
+    issues.push({ code: 'B313_PREVIEW_LINE_LIST_SOURCE_MISSING',
+      message: 'No matched effective Line List evidence supplies P1/T1 for this physical line. Verify the selected workbook worksheet and exact line key; do not borrow a neighboring line.' });
+  }
   const t1 = temperatureText(row);
   if (!t1 || !Number.isFinite(Number(t1)) || Number(t1) <= -273.15 ||
       ['DEFAULT', 'NONE'].includes(normalizedToken(row?.t1Source))) {
@@ -663,9 +698,11 @@ export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
 
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
+  const lineListCoverage = buildPreviewB313LineListCoverage(branchRows, config);
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
     return { schema: B313_PREVIEW_REPORT_SCHEMA, action: B313_PREVIEW_ACTION_LABEL,
       summary: { inputRows: branchRows.length, calculatedRows: 0, updatedRows: 0, skippedRows: branchRows.length },
+      lineListCoverage,
       rows: branchRows.map((row) => failureRow(row, 'B313_PREVIEW_REBUILD_REQUIRED',
         'Step 4 inputs were edited. Rebuild Preview before B31.3 calculation.')) };
   }
@@ -681,6 +718,18 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
   branchRows.forEach((row, rowIndex) => {
     // A previous proposal must never remain pullable after this row fails revalidation.
     delete basisConfig.proposalsByBranch[String(rowIndex)];
+    // A class/DN material candidate is not the missing physical Line List
+    // design record. Fail on the actual upstream gap before generic T1 or
+    // downstream S/E/W/Y lookup; do not synthesize 120°C or a pressure unit.
+    if (row?.lineMiss === true && (!temperatureText(row) || !text(row?.p1))) {
+      results.push(failureRow(row, 'B313_PREVIEW_LINE_LIST_SOURCE_MISSING',
+        'The selected Line List has no authoritative match for this branch and P1/T1 is missing. Open 1 Source & Masters → Line List; verify the Linelist worksheet, line-key mapping, then Rebuild Preview.',
+        { lineKey: text(row?.lineKey), lineKeyMethod: row?.lineKeyMethod || 'none',
+          loadedLineListRows: lineListCoverage.loadedLineListRows,
+          missingTemperature: !temperatureText(row), missingPressure: !text(row?.p1),
+          nextAction: 'RESELECT_EFFECTIVE_LINE_LIST_WORKSHEET_AND_REBUILD' }));
+      return;
+    }
     const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
     if (!materialIdentity.ok) {
       results.push(failureRow(row, materialIdentity.code, materialIdentity.message || 'Preview Material could not be linked to B31.3 Material Factors.', { materialIdentity }));
@@ -882,6 +931,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
     materialFactorPolicy: 'PREVIEW_MATERIAL_TO_ACTIVE_B313_STRICT_THEN_MANUAL_FALLBACK',
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
+    lineListCoverage,
     summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
     rows: results.map((result, rowIndex) => result.status === 'CALCULATED' || result.status === 'UPDATED'
       ? result : {
