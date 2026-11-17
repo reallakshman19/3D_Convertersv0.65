@@ -31,3 +31,15 @@
 4. CI green only establishes code behavior, not owner session parity; repeat real browser and final emitted CII validation under the restored configuration before any merge/deployment.
 
 **Engineering outcome:** FAIL_CLOSED. This workpack does not approve screening factors, manufacturing route, code-table transcription, wall changes, Pull, merge or deployment.
+
+## Pinned workbook worksheet and model coverage — independent CI
+
+Executed the pinned workbook metadata inspection through the existing authenticated GLRD source-custody workflow. [CI 44121753434](https://github.com/reallakshman19/3D_Convertersv0.65/actions/runs/44121753434) PASS:
+- `Coversheet`: 30 populated Excel rows; **zero** complete P/B line tokens or numeric PSI-02 sequence matches.
+- `Legend`: 33 populated Excel rows; **zero** matching tokens/sequences.
+- `Linelist`: 248 populated Excel rows; **zero complete** P/B joined line tokens and **two numeric** `411XXXX` sequences among 22 distinct PSI-02 branch keys.
+- The whole-cell scan is deliberately heuristic: Excel may separate service prefix/sequence or use transformed identifiers. Raw worksheet counts are NOT normalized/master-usable counts; numeric sequence matches are NOT validated physical line authority.
+
+**Corrected root-cause disposition:** The selected **16-row browser master** does not cover 23 physical PSI-02 occurrences. The original `LL_BM2.xlsx` workbook includes a named `Linelist` sheet, but the scant two raw numeric sequence matches suggest an additional **BM2/PSI-02 master coverage mismatch**. Selecting `Linelist` alone is *not* demonstrated sufficient to restore all 22 distinct source line keys. No source values were exported from the raw workbook.
+
+**Owner-source recovery acceptance:** prove exact matching row+worksheet+line key for *each* physical PSI-02 branch, with source P1/T1, units and class precedence; if the BM2 workbook does not contain all PSI-02 lines, source the correct PSI-02 Line List (or line-specific reviewed engineering overrides). Do not fill all missing lines from one known 120°C row. Rebuild Preview, then assess approved S/E/W/Y and explicit Pull separately.
