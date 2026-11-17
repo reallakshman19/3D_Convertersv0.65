@@ -544,6 +544,7 @@ function previewP1Unit(lineRow, p1) {
 
     branchRows.push({
       branchName,
+      branchOccurrenceIndex,
       lineKey,
       extractionStatus: branchIdentity?.status || 'LEGACY',
       matchedFormatIndex: branchIdentity?.status === 'MATCHED' ? branchIdentity.matchedFormatIndex : null,
