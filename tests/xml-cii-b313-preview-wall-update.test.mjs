@@ -6,6 +6,7 @@ import {
   resolvePreviewB313FactorBasis,
   resolvePreviewB313MaterialIdentity,
 } from '../converters/xml-cii2019-core/b313-preview-wall-update.js';
+import { resolveMaterialCodeFromLineMaterial } from '../converters/xml-cii2019-core/branch-process-resolver.js';
 
 const base = {
   dn: 250,
@@ -140,5 +141,54 @@ assert.equal(blankY.code, 'B313_PREVIEW_COEFFICIENT_Y_REQUIRED');
 const explicitZeroY = calculateAndSelectPreviewB313Wall({ ...base, coefficientY: 0 });
 assert.equal(explicitZeroY.ok, true, JSON.stringify(explicitZeroY, null, 2));
 assert.equal(explicitZeroY.calculation.inputs.coefficientY, 0);
+
+
+// An exact Step 8 material mapping must reach B31.3 without being inferred
+// afresh from a generic material family.
+const step8Ltcs = resolveMaterialCodeFromLineMaterial({
+  lineRow: {}, materialMap: [], pipingClassRow: null,
+  pipingClass: '11472', overrides: {},
+  config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+assert.equal(step8Ltcs.materialCode, '177');
+assert.equal(step8Ltcs.matchedRow.materialName, 'ASTM A333-6');
+assert.equal(step8Ltcs.needsReview, false);
+const ltcsIdentity = resolvePreviewB313MaterialIdentity({
+  material: 'LTCS',
+  corroboratingMaterial: step8Ltcs.matchedRow.materialName,
+  corroboratingSource: 'piping-class-fallback',
+  corroboratingNeedsReview: step8Ltcs.needsReview,
+});
+assert.equal(ltcsIdentity.ok, true, JSON.stringify(ltcsIdentity));
+assert.equal(ltcsIdentity.material.materialId, 'LTCS-A333-6');
+assert.equal(ltcsIdentity.b313IdentityNeedsReview, false);
+
+const genericDss = resolvePreviewB313MaterialIdentity({ material: 'DSS' });
+assert.equal(genericDss.ok, true);
+assert.equal(genericDss.material.materialId, 'DSS-A790-S31803');
+assert.equal(genericDss.b313IdentityNeedsReview, true, 'Family defaults are candidates, not proven exact grades');
+const corroboratedDss = resolvePreviewB313MaterialIdentity({
+  material: 'DSS', corroboratingMaterial: 'ASTM A790 UNS S31803',
+  corroboratingSource: 'reviewed-step8-exact', corroboratingNeedsReview: false,
+});
+assert.equal(corroboratedDss.ok, true, JSON.stringify(corroboratedDss));
+assert.equal(corroboratedDss.b313IdentityNeedsReview, false);
+const unreviewedDss = resolvePreviewB313MaterialIdentity({
+  material: 'DSS', corroboratingMaterial: 'ASTM A790 UNS S31803',
+  corroboratingNeedsReview: true,
+});
+assert.equal(unreviewedDss.b313IdentityNeedsReview, true);
+const crossFamilyConflict = resolvePreviewB313MaterialIdentity({
+  material: 'DSS', corroboratingMaterial: 'ASTM A312-TP316',
+  corroboratingSource: 'reviewed-step8-exact', corroboratingNeedsReview: false,
+});
+assert.equal(crossFamilyConflict.ok, false);
+assert.equal(crossFamilyConflict.code, 'B313_PREVIEW_MATERIAL_CONFLICT');
+const exactGradeConflict = resolvePreviewB313MaterialIdentity({
+  material: 'ASTM A312-TP304', corroboratingMaterial: 'ASTM A312-TP316',
+  corroboratingSource: 'reviewed-step8-exact', corroboratingNeedsReview: false,
+});
+assert.equal(exactGradeConflict.ok, false);
+assert.equal(exactGradeConflict.code, 'B313_PREVIEW_MATERIAL_CONFLICT');
 
 console.log('XML/CII Preview B31.3 material-factor and wall API composition checks passed.');
