@@ -66,14 +66,15 @@ class SourceReceiptTests(unittest.TestCase):
         self.receipt['rows']=[self.record,dict(self.record)]
         self.reject('DUPLICATE_OCCURRENCE')
 
-def element(wall,ident='100 110',other='5'):
+def element(wall,ident='100 110 0 0 0 168.3',other='5'):
     return [ident,f'{wall} 2 3 4 5 6']+[f'FIELD_{i}:{other}' for i in range(13)]
 class NativeCiiOracleTests(unittest.TestCase):
     def setUp(self):
-        self.a=[element('7.112'),element('12.700','200 210')]
+        self.a=[element('7.112'),element('12.700','200 210 0 0 0 168.3')]
         self.b=[element('9.500'),element('12.700','200 210')]
         self.approved=[{'elementOrdinal':1,'approvalReference':'ENG-REF-01',
-          'physicalOccurrenceKey':'0|/GLRD/B1|100','baselineElementHeader':'100 110',
+          'physicalOccurrenceKey':'0|/GLRD/B1|100','baselineElementHeader':'100 110 0 0 0 168.3',
+          'ciiFromNode':100,'ciiToNode':110,'sourceNodeNumber':100,
           'acceptedWallMm':9.5}]
     def reject(self,token):
         with self.assertRaisesRegex(ValueError,token):CII.compare(self.a,self.b,self.approved)
@@ -82,7 +83,7 @@ class NativeCiiOracleTests(unittest.TestCase):
         self.assertEqual(d['changedWallFields'],1)
         self.assertEqual(d['unrelatedFieldChanges'],0)
     def test_unapproved_element_change(self):
-        self.b[1]=element('13.000','200 210')
+        self.b[1]=element('13.000','200 210 0 0 0 168.3')
         self.reject('UNAPPROVED_ELEMENT')
     def test_wrong_emitted_thickness(self):
         self.b[0]=element('9.400');self.reject('DOES_NOT_MATCH')
@@ -92,6 +93,12 @@ class NativeCiiOracleTests(unittest.TestCase):
         self.approved[0]['baselineElementHeader']='999 888';self.reject('LINEAGE')
     def test_duplicate_approval(self):
         self.approved.append(dict(self.approved[0]));self.reject('DUPLICATE')
+    def test_wrong_native_owner_node(self):
+        self.approved[0]['sourceNodeNumber']=110
+        self.reject('SOURCE_FROM_NODE')
+    def test_wrong_native_to_node(self):
+        self.approved[0]['ciiToNode']=999
+        self.reject('SOURCE_FROM_NODE')
     def test_missing_approval_reference(self):
         self.approved[0]['approvalReference']='';self.reject('APPROVAL')
     def test_unapproved_no_selection(self):
