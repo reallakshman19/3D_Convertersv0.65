@@ -49,6 +49,8 @@ export function b313PreviewInputSignature(row = {}, config = {}) {
     materialCodeCorroborationSource: txt(row.materialCodeCorroborationSource),
     materialCodeCorroborationMethod: txt(row.materialCodeCorroborationMethod),
     materialCodeCorroborationConfidence: txt(row.materialCodeCorroborationConfidence),
+    materialCodeCorroborationSizeMm: txt(row.materialCodeCorroborationSizeMm),
+    materialCodeCorroborationCompositeSpecification: row.materialCodeCorroborationCompositeSpecification === true,
     materialCodeCorroborationNeedsReview: row.materialCodeCorroborationNeedsReview === true,
     pipingClassNeedsReview: row.pipingClassNeedsReview === true,
     pipingClassConflict: row.pipingClassConflict || null,
