@@ -67,6 +67,28 @@ the DSS/LTCS cases shown by the user. Software cannot truthfully mark them
 qualified until controlled source data is supplied. The new engine supports
 such data without guessing values.
 
+## Current material-factor qualification intake
+
+The source-bound [DSS / LTCS qualification register](../engineering/b313/material-factor-qualification-intake-v1.json)
+is **REVIEW_ONLY / ENGINEERING_HOLD**. It covers the pipe product variants in
+Piping Classes 11472 and 13831 at their actual nominal sizes. It does not
+assert that either class is present in the current 30-branch Owner model;
+Step 4 occurrence reconciliation remains required.
+
+Class 11472: **ASTM A333 Grade 6** through DN600, but **ASTM A671 CC65
+Class 22** at DN750–1200. Class 13831: **ASTM A790 UNS S31803** through
+DN200, but a composite **ASTM A790/A928** designation at DN250–600.
+The combined A790/A928 designation needs a confirmed actual product and
+manufacturing route. Never use a single class-wide A333 or A790 factor
+basis across these changes.
+
+All intake S/E/W/Y values, sourceReferences and approvalReferences are
+blank. The governing edition of the exact Owner model is also unconfirmed.
+The intake may be completed only against controlled, applicable 2024
+code tables (or the actually approved project edition after a controlled
+code-edition change), verified product manufacturing records, and project
+authorization; the existing factor master is unchanged.
+
 ## Public API
 
 ```js
