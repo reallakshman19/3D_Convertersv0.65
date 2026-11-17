@@ -82,6 +82,10 @@ assert.notEqual(b313PreviewInputSignature(src, config),
   b313PreviewInputSignature({ ...src, materialCodeMatchedMaterial: 'ASTM A333-6' }, config));
 assert.notEqual(b313PreviewInputSignature(src, config),
   b313PreviewInputSignature({ ...src, materialCodeNeedsReview: true }, config));
+assert.notEqual(b313PreviewInputSignature(src, config),
+  b313PreviewInputSignature({ ...src, materialCodeCorroborationCandidate: 'ASTM A333-6' }, config));
+assert.notEqual(b313PreviewInputSignature(src, config),
+  b313PreviewInputSignature({ ...src, pipingClassConflict: 'CLASS_AMBIGUOUS' }, config));
 
 const missing = resolvePreviewB313MaterialFromRow({ material: '', t1: '120' }, config);
 assert.equal(missing.ok, true);
