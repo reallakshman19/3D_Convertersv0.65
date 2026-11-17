@@ -573,6 +573,20 @@ function previewP1Unit(lineRow, p1) {
       pipingClassRowReasons: resolved.pipingClassRowReasons || [],
       pipingClassNeedsReview: resolved.pipingClassNeedsReview,
       pipingClassCandidates: resolved.pipingClassCandidates || [],
+      // Exact-DN Piping Class master evidence is display-only engineering
+      // custody, not a substitute for qualified B31.3 S/E/W/Y code records.
+      pipingClassPipeMaterial: _toText(resolved.pipingClassMatchedRow?.Material_Name
+        ?? resolved.pipingClassMatchedRow?.materialName ?? ''),
+      pipingClassPipeDnMm: resolved.pipingClassMatchedRow?.convertedBore ?? null,
+      pipingClassPipeSourceRow: resolved.pipingClassMatchedRow?._sourceRowIndex ?? null,
+      pipingClassPipeSchedule: _toText(resolved.pipingClassMatchedRow?.SCH
+        ?? resolved.pipingClassMatchedRow?.schedule ?? ''),
+      pipingClassPipeWallMm: resolved.pipingClassMatchedRow?.['Wall thickness']
+        ?? resolved.pipingClassMatchedRow?.wallThickness ?? null,
+      pipingClassPipeCorrosionMm: resolved.pipingClassMatchedRow?.Corrosion
+        ?? resolved.pipingClassMatchedRow?.corrosion ?? null,
+      pipingClassPipeRating: _toText(resolved.pipingClassMatchedRow?.Rating
+        ?? resolved.pipingClassMatchedRow?.rating ?? ''),
       material: resolved.material || '',
       materialSource: resolved.materialSource || _overrideSource(config.overrides, 'material', lineKey),
       materialCode: resolved.materialCode || '',
