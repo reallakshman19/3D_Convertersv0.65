@@ -92,6 +92,20 @@ def main():
     for audited_name in manifest.get("expectedAuditBranches", []):
         if audited_name not in names:
             raise SystemExit("Selected 30-row GLRD audit branch missing: " + audited_name)
+    audit_matrix = json.loads(Path("engineering/b313/glrd-psi02-factor-groups.json").read_text(encoding="utf-8"))
+    if audit_matrix.get("sourceXmlSha256") != next(x["sha256"] for x in checks if x["role"]=="xml"):
+        raise SystemExit("GLRD audit group matrix is stale relative to source XML")
+    audit_rows = audit_matrix["rows"]
+    if len(audit_rows) != len(names):
+        raise SystemExit("GLRD audit group count differs from pinned XML")
+    for index,(name,row) in enumerate(zip(names,audit_rows)):
+        if row["branchName"] != name or row["sourceOrdinal"] != index:
+            raise SystemExit("GLRD audit row mapping/order mismatch at "+str(index))
+        if row.get("qualifiedForPull") is not False or row.get("manufacturingRoute") is not None:
+            raise SystemExit("GLRD source-only group has been promoted without engineering evidence")
+    counts = {g["id"]:sum(r["auditFactorGroup"]==g["id"] for r in audit_rows) for g in audit_matrix["groups"]}
+    if counts != {"DSS-120":26,"LTCS-120":2,"LTCS-82":2}:
+        raise SystemExit("GLRD owner-audit factor-group counts mismatch: "+str(counts))
     bm2 = ET.parse(files["historical_bm2_xml"])
     bm2_branches = [el for el in bm2.iter() if localname(el.tag) == "Branch"]
     bm2_nodes = [el for el in bm2.iter() if localname(el.tag) == "Node"]
@@ -120,7 +134,8 @@ def main():
         "census": {"branches": len(branches), "nodes": len(nodes),
                    "stagedRootEntries": len(stage), "historicalBm2Branches": 31,
                    "historicalBm2Nodes": 1196,
-                   "auditAnchorsMatched": len(manifest.get("expectedAuditBranches", []))},
+                   "auditAnchorsMatched": len(manifest.get("expectedAuditBranches", [])),
+                   "auditFactorGroups": counts},
         "branchNames": names,
         "xmlVariant": "GLRD-1000-PSI-02.xml",
         "stageRelationshipToSelectedXml": "HOLD_NOT_PROVEN_PSI02",
