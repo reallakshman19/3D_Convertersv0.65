@@ -353,7 +353,7 @@ export function resolvePreviewP1LineListHeaderUnit(row = {}, config = {}) {
   const matches = [];
   for (const [key, value] of Object.entries(raw)) {
     const header = normalizedToken(key);
-    if (!/(?:\bP1\b|\bDESIGN\b|\bMAX(?:IMUM)?\b)/.test(header)
+    if (!( /\bP1\b/.test(header) || (/\bPRESSURE\b/.test(header) && /\b(?:DESIGN|MAX|MAXIMUM)\b/.test(header)) )
         || /(?:\bHYDRO\b|\bTEST\b)/.test(header)) continue;
     const unit = pressureUnitFromColumnName(key);
     if (unit && sameNumeric(value, row.p1)) matches.push({ unit, source: `line-list-column:${key}` });
@@ -832,6 +832,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       factorDesignAuthority: factorBasis.designAuthority === true,
       fallbackSourceReference: factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK' ? factorBasis.sourceReference : '',
       pressureSource: row?.p1Source || '',
+      pressureUnit: pressureBasis.unit,
       pressureUnitSource: pressureBasis.source,
       dimensionStandardSource: dimensionBasis.source,
       outsideDiameterSource: odBasis.source,
