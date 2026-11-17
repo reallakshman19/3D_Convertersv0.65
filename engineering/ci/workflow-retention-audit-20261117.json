@@ -12,10 +12,10 @@
   ],
   "summary": {
     "previous": 181,
-    "retained": 32,
-    "removed": 149,
+    "retained": 31,
+    "removed": 150,
     "recentSuccessfulRetained": 22,
-    "otherCriticalRetained": 10
+    "otherCriticalRetained": 9
   },
   "retained": [
     {
@@ -35,11 +35,6 @@
     },
     {
       "path": ".github/workflows/hp-piping-class-real-workbench.yml",
-      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
-      "recent": "NOT_IN_LATEST_100"
-    },
-    {
-      "path": ".github/workflows/inputxml-pages-live-release.yml",
       "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
       "recent": "NOT_IN_LATEST_100"
     },
@@ -263,6 +258,11 @@
     {
       "path": ".github/workflows/hp-piping-class-i1-i3.yml",
       "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/inputxml-pages-live-release.yml",
+      "recent": "NOT_IN_LATEST_100",
+      "reason": "SPECIALIZED_UNVERIFIED_EVIDENCE_WORKFLOW_COMMITS_DIRECTLY_TO_MAIN"
     },
     {
       "path": ".github/workflows/issue-1001-agent-w-weight-contract.yml",
@@ -781,6 +781,7 @@
     "Keep deploy-app-on-main.yml unchanged, including push-to-main and workflow_dispatch",
     "Keep failed but safety-critical canonical-output and native-final gate workflows as engineering HOLD",
     "No workflows merged or deployed by the cleanup PR",
-    "If required status checks exist outside visible rulesets, update those checks before merging this PR"
+    "If required status checks exist outside visible rulesets, update those checks before merging this PR",
+    "Removed inputxml-pages-live-release.yml after verifying it has contents:write and git push origin HEAD:main; retained only the purpose-built Pages deployment for production publishing"
   ]
 }
