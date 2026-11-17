@@ -34,6 +34,31 @@ manufacturing routes, approved factor sources, and native CII output.
 The current code path's synthetic browser Pull test is not a real-material
 CII parity test.
 
+## Executed exact-source and synthetic native-CII witnesses (17 Nov 2026)
+
+CI: `https://github.com/reallakshman19/3D_Convertersv0.65/actions/runs/44025609526`.
+Verified **seven pinned source files by byte length and SHA-256**,
+including **PSI-02 30 Branch / 1,224 Node** and separate
+**BM2 31 Branch / 1,196 Node**. The owner-audit 30-row classification
+matrix matched all 30 PSI-02 branch names in exact source order:
+**26 DSS/T1 120°C, 2 LTCS/T1 120°C, 2 LTCS/T1 82°C**.
+
+A real call of `converters/scripts/xml_to_cii2019_patched.py` on the
+source XML emitted **342 ELEMENTs**. A controlled synthetic wall edit to
+source pipe nodes produced **one modified CII element wall field** and
+**zero unrelated element-field differences** against an original-source
+CII run. This is **TEST-ONLY native writer parity**, not a B31.3
+calculated/accepted/approved owner Pull; the test does not claim the
+historical 434/145 ELEMENT/RIGID output or original effective config.
+
+The dedicated B31.3/Preview regression and browser workflow also passed
+at the matching source revision:
+`https://github.com/reallakshman19/3D_Convertersv0.65/actions/runs/44025609477`.
+The older `XML CII 229 P1 Focused Tests` workflow currently fails on
+a **runtime-vs-docs `branch-format-extraction.js` mirror difference
+already present on main**, not introduced in this branch. That unrelated
+baseline difference is out of the B31.3 change scope.
+
 ## Root cause and architecture
 
 The deployed resolver originally required four individual strict qualified
