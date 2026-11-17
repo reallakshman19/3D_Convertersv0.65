@@ -44,6 +44,13 @@ test('approved B31.3 acceptance blocks DTXR replacement even with a checkbox sel
   assert.equal(validateDtxrWallSelection({review,selectedKeys:['K']}).approved.length,0);
 });
 
+test('source occurrence identity, not displayed row index, guards approved wall', () => {
+  const row={...item('K'),branchOccurrenceIndex:42};
+  const review=plan([row],{acceptedWallByBranch:{'42':{nominalWallMm:9.5}}});
+  assert.deepEqual(review.items[0].acceptanceKeys,['42']);
+  assert.equal(review.items[0].status,'B313_ACCEPTED_WALL_HOLD');
+});
+
 test('a new B31.3 approval after planning invalidates stale DTXR acceptance', () => {
   const review=plan([item('K')]);
   const result=validateDtxrWallSelection({review,selectedKeys:['K'],
