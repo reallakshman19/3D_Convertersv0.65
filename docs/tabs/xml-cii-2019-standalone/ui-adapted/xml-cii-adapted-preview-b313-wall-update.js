@@ -57,6 +57,46 @@ function temperatureText(row) {
 }
 
 export function resolvePreviewB313MaterialFromRow(row, config = {}) {
+  // B31.3 cannot inherit an unresolved choice between the exact Line List
+  // class and the class parsed from the physical branch name.
+  if (row?.pipingClassConflict && row?.pipingClassSelectionExplicit !== true) {
+    return { ok: false, code: 'B313_PREVIEW_PIPING_CLASS_AUTHORITY_UNRESOLVED',
+      message: 'Step 4 Line List and branch Piping Class disagree. Review the existing Piping Class source selection and rebuild before B31.3 calculation.',
+      details: { pipingClass: row.pipingClass, branchClass: row.pipingClassRegex,
+        lineListClass: row.pipingClassLineList, selectedSource: row.pipingClassSelectedSource } };
+  }
+  // The exact-DN project master must be checked AGAINST the governing
+  // Preview material even when a configured Material Code matched first.
+  // A family label (LTCS) cannot silently inherit an A790 DSS class product.
+  // This check is only a contradiction guard; it NEVER certifies S/E/W/Y.
+  const classProduct = text(row?.materialCodeCorroborationCandidate);
+  if (row?.materialCodeCorroborationSource === 'piping-class-master-exact-DN' && classProduct) {
+    const physicalClass = resolvePreviewB313MaterialIdentity({ material: classProduct,
+      materialSource: 'piping-class-master-exact-DN' });
+    const preview = resolvePreviewB313MaterialIdentity({
+      material: materialText(row), materialSource: row?.materialSource || '' });
+    const mapped = text(row?.materialCodeMatchedMaterial)
+      ? resolvePreviewB313MaterialIdentity({ material: row.materialCodeMatchedMaterial,
+          materialSource: row?.materialCodeSource || '' }) : null;
+    const mismatchedFamily = preview.ok && physicalClass.ok
+      && preview.material.family !== physicalClass.material.family;
+    const mismatchedCode = mapped?.ok && physicalClass.ok
+      && mapped.material.materialId !== physicalClass.material.materialId;
+    const mismatchedExactGrade = preview.ok && physicalClass.ok
+      && preview.requestMode === 'EXACT_PREVIEW_MATERIAL'
+      && physicalClass.requestMode === 'EXACT_PREVIEW_MATERIAL'
+      && preview.material.materialId !== physicalClass.material.materialId;
+    if (mismatchedFamily || mismatchedCode || mismatchedExactGrade) {
+      return { ok: false, code: 'B313_PREVIEW_CLASS_DN_MATERIAL_CONFLICT',
+        message: 'The actual Piping Class/DN pipe product contradicts the effective Preview or Material Code designation. Resolve source authority in 4 Preview; never overwrite the Line List material automatically.',
+        details: { branchName: row?.branchName, lineKey: row?.lineKey,
+          pipingClass: row?.pipingClass, sizeMm: row?.sizeMm,
+          previewMaterial: materialText(row), materialCodeMaterial: row?.materialCodeMatchedMaterial || '',
+          exactDnClassMaterial: classProduct, exactDnSource: row?.materialCodeCorroborationSource,
+          previewMaterialId: preview.ok ? preview.material.materialId : null,
+          classMaterialId: physicalClass.ok ? physicalClass.material.materialId : null } };
+    }
+  }
   if (row?.materialCodeConflict) {
     return { ok: false, code: 'B313_PREVIEW_MATERIAL_CODE_CONFLICT',
       message: 'Step 4 Material and Material Code evidence conflict; resolve the existing Preview authority before B31.3 calculation.',
