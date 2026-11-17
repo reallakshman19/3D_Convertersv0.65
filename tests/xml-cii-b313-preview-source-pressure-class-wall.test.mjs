@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 
 import { calculateAndSelectPreviewB313Wall } from '../converters/xml-cii2019-core/b313-preview-wall-update.js';
@@ -14,7 +15,7 @@ const base = {
   negativeMillTolerance:{basis:'percent',value:12.5},
 };
 const pipe={
-  sizeMm:150,pipingClass:'93833',pipingClassPipeDnMm:150,
+  sizeMm:150,pipingClass:'SYNTHETIC-CLASS-40',pipingClassPipeDnMm:150,
   pipingClassPipeSourceRow:10558,pipingClassPipeSchedule:'40',
   pipingClassPipeWallMm:7.112,pipingClassPipeMaterial:'ASTM A106 Gr B',
 };
@@ -99,4 +100,40 @@ test('real 4 Preview calculate path uses header unit + exact class wall and crea
   assert.equal(cfg.b313WallUpdate.proposalsByBranch['0'].evidence.pressureUnitSource,
     'line-list-column:Pressure Max kPa(g)');
   assert.equal(cfg.overrides.wallThickness['PIPE-A'],'10.97','Calculate cannot overwrite manual Preview wall');
+});
+
+
+test('authentic GLRD class 93833 DN150 has A790 S31803 40S at 7.112 mm; dimensional proof is NOT factor approval',()=>{
+  const actual=JSON.parse(readFileSync(new URL('../docs/Masters/SpecwisePipingClass/93833.json',import.meta.url),'utf8'));
+  const exact=actual.rows.find(x=>Number(x.convertedBore)===150);
+  assert.ok(exact);
+  assert.equal(exact.Material_Name,'ASTM A790 UNS S31803');
+  assert.equal(exact.SCH,'40S');
+  assert.ok(Math.abs(Number(exact['Wall thickness'])-7.112)<1e-8);
+  const illustrative=calculateAndSelectPreviewB313Wall({
+    ...base,dimensionStandard:'ASME B36.19M',corrosionAllowanceMm:0
+  });
+  assert.equal(illustrative.ok,true,JSON.stringify(illustrative));
+  const classRow={sizeMm:150,pipingClass:'93833',pipingClassPipeDnMm:exact.convertedBore,
+    pipingClassPipeSourceRow:exact._sourceRowIndex,pipingClassPipeSchedule:exact.SCH,
+    pipingClassPipeWallMm:exact['Wall thickness'],pipingClassPipeMaterial:exact.Material_Name};
+  const dimensional=qualifyPreviewB313ClassWall(classRow,illustrative);
+  assert.equal(dimensional.ok,true,JSON.stringify(dimensional));
+  assert.equal(dimensional.selectedSchedule,'40S');
+  assert.equal(dimensional.selectedNominalWallMm,7.112);
+  // Demonstration pressure/stress factors are synthetic. Actual DSS at 120C
+  // remains HOLD until approved sources/route are loaded; do not promote them.
+  const row={...classRow,branchName:'/GLRD-1000-4"-P4110001-93833-01/B6',
+    lineKey:'P4110001',material:'DSS',materialSource:'process-linelist-material',
+    materialCodeCorroborationCandidate:exact.Material_Name,
+    materialCodeCorroborationNeedsReview:false,
+    t1:'120',t1Source:'linelist',p1:'13001',p1Unit:'KPA',p1Source:'linelist',
+    corrosion:'0'};
+  const config={b313WallUpdate:{bases:{},proposalsByBranch:{}}};
+  const report=buildPreviewB313WallUpdateReport({rows:[row],config,xmlText:'',
+    host:{dataset:{},__xmlCiiPreviewResult:{branchRows:[row],nodeBoreWallRows:[]}}});
+  assert.equal(report.summary.calculatedRows,0);
+  assert.equal(report.summary.skippedRows,1);
+  assert.equal(report.rows[0].code,'B313_PREVIEW_FACTOR_BASIS_UNAVAILABLE');
+  assert.equal(Object.keys(config.b313WallUpdate.proposalsByBranch).length,0);
 });
