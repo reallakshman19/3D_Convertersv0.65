@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'engineering/b313/glrd-pinned-source-manifest.json'
+      - 'engineering/b313/glrd-psi02-factor-groups.json'
       - 'scripts/verify-glrd-b313-authentic-inputs.py'
       - '.github/workflows/glrd-b313-authentic-source-custody.yml'
   workflow_dispatch:
