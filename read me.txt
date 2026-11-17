@@ -1,0 +1,197 @@
+3D_CONVERTERSv0.65 — EXTERNAL STANDARDS & MATERIALS INTEROPERABILITY
+===================================================================
+Date: 2026-11-17
+Status: REVIEW-ONLY INTEROPERABILITY PORT. NOT A FULL UPSTREAM SOURCE COPY.
+Target: https://github.com/reallakshman19/3D_Convertersv0.65
+Target integration: Engineering Calculations > External Reference Review
+Branch: feat/external-standards-matseng-review-port
+
+1. SOURCE CUSTODY / EXACT INPUT REVISIONS
+------------------------------------------
+A) EPCC standards-packs
+   Repository: https://github.com/iman-taheri59/epcc-platform
+   Revision:   afa8b5989733c293bd91752de095376b64b60d98
+   Folder:     standards-packs/
+   At revision: 43 regular files, about 4.06 MB.
+   Contains:
+     - iso.pack.json, ips-iran.pack.json, awp.pack.json
+     - schema/standards-pack.schema.json and validation script/tests
+     - reference/*.ref.json: pipe sizes and schedules, material references,
+       flange pressure-temperature ratings, valves, fittings and other data
+     - reference/schema/*.schema.json
+   Pinned source inventory (every file path, blob SHA and byte length):
+     engineering/external-reference-port/source-inventory.json
+
+B) MatSEng Python core
+   Repository: https://github.com/jvnshirr-collab/matseng
+   Revision:   2d649445356779d7c4c024edf6421844d51b638a
+   Folder:     core/
+   At revision: 47 regular files, about 1.22 MB including 5 .bak files.
+   Includes piping, properties, material selection, corrosion, fatigue,
+   creep, fracture, flange/vessel design, inspection, probabilistic
+   analysis and data/database integration.
+   Its Python modules use other project dependencies and are not executable
+   as native ES modules in this browser-hosted converter.
+
+IMPORTANT RIGHTS/PROVENANCE BOUNDARY:
+   The pinned source trees did not reveal a top-level LICENSE file.
+   EPCC's B31.3 reference declares licensed standard-source provenance.
+   Public visibility of a GitHub repository does not independently grant
+   third-party redistribution rights. Accordingly, this PR does not copy
+   either upstream directory, their Python implementations or their
+   copyrighted/licensed source tables. The manifest records the material
+   needed for a properly authorised, auditable future mirror.
+
+2. WHAT WAS IMPLEMENTED IN v0.65
+--------------------------------
+   converters/external-engineering/reference-review.js
+      Original JavaScript adapters. Recognise EPCC governance packs;
+      validate pipe-size and sparse schedule shape; perform an exact
+      NPS + schedule dimensional lookup with no silent aliases;
+      recognise B31.3 source metadata without promoting factor values;
+      independently compare MatSEng's simplified pipe-wall expression
+      against an explicit S*E*W, Y expression for SCREENING only.
+
+   tabs/external-engineering-reference-tab.js
+      New subtab in the existing Engineering Calculations workspace:
+      1) Upload local EPCC reference JSON files
+      2) Verify known-file pinned Git blob SHA-1 (if WebCrypto available)
+      3) View validation/identity status and exact pipe dimensions
+      4) Run manually entered MatSEng-style parity screening
+      5) Export a review receipt (no imported standard tables)
+
+   tabs/engineering-workspace-tab.js
+   core/engineering-tabs-extension.js
+      Lazy-load subtab registration and route support. Existing
+      calculation and factors UI remain unchanged.
+
+   tests/external-engineering-reference.test.mjs
+      Tests for provenance, validation, exact schedule semantics,
+      missing factors, W/Y divergence and nonpublication boundaries.
+
+   README.md / read me.txt
+      Entrypoint and this detailed provenance/usage record.
+
+3. HOW TO USE IT IN THE EXISTING APP
+-----------------------------------
+   A. Run the repository as a static web app, e.g.
+        python -m http.server 8080
+      Open http://localhost:8080/
+   B. Open Engineering Calculations > External Reference Review.
+   C. From a legitimately accessible local EPCC source checkout at the
+      pinned commit, choose:
+        standards-packs/reference/pipe-sizes.ref.json
+        standards-packs/reference/pipe-schedules.ref.json
+      They remain in the browser session only and never overwrite masters.
+   D. Check each row's validation and pinned-blob identity.
+      PINNED_MATCH means the uploaded bytes match the supplied Git revision;
+      it is not evidence of engineering correctness or licence rights.
+      HASH_UNAVAILABLE / NOT_PINNED_SNAPSHOT must be handled as unverified.
+      Only PINNED_MATCH files are eligible for the exact dimensional lookup.
+   E. Example lookup: NPS 6, Schedule 40. Review the reported OD,
+      nominal wall and calculated nominal ID; absence of a pair is a
+      deliberate failure, not zero thickness or an inferred alias.
+   F. Optional: also upload iso.pack.json to inspect its governance
+      metadata. ISO / IPS / AWP pack workflows are NOT silently applied
+      to a converter, its project approval gates or engineering results.
+   G. For the MatSEng-style comparison, manually provide P in MPa,
+      outside diameter in mm, S in MPa, E, W, Y, corrosion allowance in mm
+      and negative mill tolerance %. The two outputs are:
+        Legacy MatSEng-style: P*D/(2*(S*E + P*0.4))
+        Explicit S/E/W/Y:     P*D/(2*(S*E*W + P*Y))
+      Both add CA and apply the same selected mill tolerance.
+      This exercise exposes differences in assumptions. It is NOT a
+      reproduction of all clauses, exceptions, MAWP or other MatSEng APIs.
+   H. Download the provenance receipt for review. It contains file names,
+      source SHA evidence and statuses, not the standards tables.
+
+4. APP ASSESSMENT: HOW TO USE THE SOURCES EFFECTIVELY
+-----------------------------------------------------
+HIGH ROI  — EPCC pipe size / schedule references
+   Use as independent candidate dimensions to cross-check Step 4 and
+   the existing pipe-wall master. For example, detect wrong NPS mapping,
+   OD versus nominal bore, schedule aliasing and missing schedule entries.
+   Compare against the governed project material and code edition before
+   approving any discrepancy. There is intentionally NO automatic Pull.
+
+HIGH ROI  — EPCC B31.3 / material and reference metadata
+   Use to build an engineering evidence checklist, not as an activated
+   S/E/W/Y table. The existing B31.3 Factor tab requires exact grade,
+   product form, manufacturing route, temperature T1, authority, edition,
+   row/table and project approval. Importing a value alone is not enough.
+   Protected files can contain proprietary standard data; do not mirror
+   without rights and project signoff.
+
+MEDIUM ROI — EPCC flange/valve/fitting references
+   Future opt-in dimension and rating discrepancy reviews may benefit
+   XML-to-CII component enrichment and mass/length audit. Mass and size
+   must remain assigned to the physical component owner; a flange
+   rating is not a verified mass or a new restraint/weight authority.
+
+MEDIUM ROI — MatSEng piping/property/fatigue/creep methods
+   MatSEng is a useful SECOND-OPINION calculation library on a Python
+   service or local engineering workbench. Do not replace the existing
+   governed JavaScript B31.3 engine. The pinned core/piping.py assumes
+   Y=0.4 and does not model W in its wall formula, unlike v0.65.
+   Later integration needs a versioned Python service, dependency
+   isolation, unit checks and per-method benchmark/qualification evidence.
+
+LOW ROI  — EPCC ISO/IPS/AWP process governance inside this converter
+   These packs govern enterprise work packages, lifecycles and KPIs.
+   They do not produce XML-to-CII geometry or B31.3 design factors.
+   Preserve metadata as an audit reference rather than adding unrelated
+   app tabs or permitting pack-driven changes to converter workflows.
+
+5. NON-NEGOTIABLE ENGINEERING BOUNDARIES
+---------------------------------------
+   - Existing XML-to-CII parsing, final emitted CII, rigid mass and
+     restraint identity paths are untouched.
+   - No upstream factor, reference record, schema status or screening
+     result is auto-promoted to VERIFIED / PROJECT_APPROVED.
+   - No S/E/W/Y material-factor master changes or Step 4 wall Pull.
+   - Exact source revision / file hash != approval or licence.
+   - No default material, T1, manufacturing route, S/E/W/Y or schedule
+     is inferred in the port.
+   - No copy of ASME / ISO / other publisher-owned standard tables.
+   - The numerical parity function is a simple comparison, not an
+     independently certified code implementation.
+
+6. ACCEPTANCE AND FUTURE PORTING
+--------------------------------
+LOCAL TEST:
+   node --test tests/external-engineering-reference.test.mjs
+
+ADDITIONAL CHECKS REQUIRED BEFORE MERGE / DEPLOY:
+   - Full impacted Engineering Calculations tests and application build
+   - Actual Chromium smoke test: upload two pinned JSON files, verify
+     identity, exact lookup, invalid/missing pairs and export receipt
+   - GitHub Pages docs mirror/release check after build
+   - Legal/owner approval before any verbatim upstream code/data mirror
+   - Independent engineering validation before allowing production use
+
+FOR A FULL AUTHORISED PORT:
+   1) Record both upstream code/data licences and standards-data rights.
+   2) Vet file-by-file scope (exclude .bak, incompatible services and
+      files containing restricted table data).
+   3) Import eligible modules into isolated vendored packages, preserving
+      attribution and pinned SHA inventory.
+   4) Add typed adapters, deterministic fixtures, conflict/revision
+      checks and independent numerical comparisons.
+   5) Promote only separately approved calculation/factor workflows
+      via the existing material authority controls.
+
+This scope is intentionally a useful, testable, read-only interoperability
+slice; it is NOT a claim that 90 upstream files were copied or integrated.
+
+7. NOVEMBER 17 PR #5 RECONCILIATION
+----------------------------------
+PR #5 has since merged at cbfbcd93d8a10ec7dab952cc641723079d856efa.
+Its governed material/route factor authority, Config8 → exact-DN Piping Class →
+4 Preview source traces and per-occurrence Calculate/Pull/Fill boundary take
+precedence over any new external calculations. EPCC B31.3 candidate evidence
+already exists in engineering/b313/glrd-b313-2024-external-reference-intake-v1.json.
+Do NOT duplicate that candidate register or publish it into S/E/W/Y.
+The follow-on in-place, read-only comparison is planned in
+engineering/external-reference-port/PR5-PR6-INTEGRATION-PLAN.md.
+This PR's current external-review tab is a standalone source inspector;
+it is NOT yet wired to live 4 Preview rows. Full application approval remains HOLD.

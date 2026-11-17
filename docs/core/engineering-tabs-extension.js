@@ -13,6 +13,7 @@ const ENGINEERING_TABS = Object.freeze([
 const TAB_IDS = new Set(ENGINEERING_TABS.map((tab) => tab.id));
 const ENGINEERING_SUBTAB_IDS = new Set([
   'b313-material-factors',
+  'external-reference-review',
   'empirical-weight-tuning',
   'hp-piping-class',
 ]);
