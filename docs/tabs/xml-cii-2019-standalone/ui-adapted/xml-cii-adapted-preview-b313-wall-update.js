@@ -564,6 +564,43 @@ function failureRow(row, code, message, details = {}) {
   return { branchName: row?.branchName || '', lineKey: row?.lineKey || '', status: 'NOT_UPDATED', code, message, details };
 }
 
+
+/**
+ * Audit independent source prerequisites even when a preceding material or
+ * S/E/W/Y HOLD stops the numeric wall calculation. Never changes eligibility.
+ */
+export function collectPreviewB313IndependentIssues(row = {}, config = {}) {
+  const issues = [];
+  const cfg = config?.b313WallUpdate || { bases: {} };
+  const key = previewB313BasisKey(row, config);
+  const basis = basisForRow(cfg, row, key).basis || {};
+  const rawP1 = text(row?.p1);
+  const p1Numeric = rawP1.replace(/,/g, '').match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0];
+  if (!p1Numeric || !(Number(p1Numeric) > 0)) {
+    issues.push({ code: 'B313_PREVIEW_PRESSURE_REQUIRED',
+      message: 'P1 positive design pressure missing: confirm in effective 4 Preview' });
+  }
+  const unit = inferPreviewPressureUnit(row, config, { pressureUnit: '', byBranch: new Map() }, basis, true);
+  if (!unit?.unit) {
+    issues.push({ code: 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED',
+      message: 'P1 unit unknown or conflicting: confirm source; never infer from numeric P1 or hydro test' });
+  }
+  const t1 = temperatureText(row);
+  if (!t1 || !Number.isFinite(Number(t1)) || Number(t1) <= -273.15 ||
+      ['DEFAULT', 'NONE'].includes(normalizedToken(row?.t1Source))) {
+    issues.push({ code: 'B313_PREVIEW_T1_SOURCE_UNVERIFIED',
+      message: 'T1 missing or default-only: verify design temperature in 4 Preview and rebuild' });
+  }
+  const identity = resolvePreviewB313MaterialFromRow(row, config);
+  if (identity?.ok && !b313SourceConfirmsA106Seamless(row, identity) &&
+      !(text(basis.manufacturingRoute) && text(basis.manufacturingRouteSourceReference) &&
+        basis.manufacturingRouteEvidenceReviewed === true)) {
+    issues.push({ code: 'B313_PREVIEW_MANUFACTURING_ROUTE_EVIDENCE_REQUIRED',
+      message: 'Pipe manufacturing route or independently reviewed MTR/pipe-spec source not established' });
+  }
+  return issues;
+}
+
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
@@ -776,7 +813,14 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     materialFactorPolicy: 'PREVIEW_MATERIAL_TO_ACTIVE_B313_STRICT_THEN_MANUAL_FALLBACK',
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
     summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
-    rows: results,
+    rows: results.map((result, rowIndex) => result.status === 'CALCULATED' || result.status === 'UPDATED'
+      ? result : {
+        ...result,
+        details: {
+          ...(result.details || {}),
+          independentInputIssues: collectPreviewB313IndependentIssues(branchRows[rowIndex], config),
+        },
+      }),
   };
 }
 
