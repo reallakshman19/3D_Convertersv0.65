@@ -120,7 +120,7 @@ function _useParsedCustomInputSource(config) {
 }
 
 function _manualPreviewActionHtml(label = 'Build Preview', includeDtxrWall = false, config = {}) {
-  return `<div class="model-converters-workflow-master-card mc-preview-manual-card" style="margin-bottom:10px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;"><div class="model-converters-workflow-detail-text" style="margin:0;">Preview is manual to protect saved overrides. Edit Regex/Masters freely, then click Build Preview.</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><label class="xml-cii-native-check" title="Use the imported JSON Trace staged source instead of the sidebar staged JSON when available." style="margin:0;"><input type="checkbox" data-mc-use-parsed-custom-source ${_useParsedCustomInputSource(config)?'checked':''}> Use JSON Trace staged source</label><button type="button" class="model-converters-run-btn" data-mc-preview-build style="padding:8px 14px;min-width:140px;">${_esc(label)}</button>${includeDtxrWall ? '<button type="button" class="model-converters-download-btn" data-mc-dtxr-wall-update style="padding:8px 14px;min-width:220px;">Update Wall thickness based on DTXR</button>' : ''}</div></div>`;
+  return `<div class="model-converters-workflow-master-card mc-preview-manual-card" style="margin-bottom:10px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;"><div class="model-converters-workflow-detail-text" style="margin:0;">Preview is manual to protect saved overrides. Edit Regex/Masters freely, then click Build Preview.</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><label class="xml-cii-native-check" title="Use the imported JSON Trace staged source instead of the sidebar staged JSON when available." style="margin:0;"><input type="checkbox" data-mc-use-parsed-custom-source ${_useParsedCustomInputSource(config)?'checked':''}> Use JSON Trace staged source</label><button type="button" class="model-converters-run-btn" data-mc-preview-build style="padding:8px 14px;min-width:140px;">${_esc(label)}</button></div></div>${includeDtxrWall ? "<details data-mc-wall-review open style=\"margin:8px 0;border:1px solid #64748b;border-radius:8px;padding:9px;background:#f8fafc;color:#0f172a;\"><summary style=\"cursor:pointer;font-weight:700;\">Wall Thickness Review — DTXR source / ASME B31.3 pressure design</summary><div style=\"font-size:11px;margin:5px 0 8px;\">One review workspace, two independent evidence paths. DTXR suggests source schedule walls; B31.3 calculates a code minimum and class-eligible proposal. Neither action silently replaces a saved wall: DTXR requires selected approval; B31.3 requires Pull.</div><div data-mc-wall-review-actions style=\"display:flex;gap:8px;flex-wrap:wrap;\"><button type=\"button\" class=\"model-converters-download-btn\" data-mc-dtxr-wall-update style=\"padding:8px 14px;\">Review DTXR wall candidates</button></div></details>" : ''}`;
 }
 
 function _bindParsedCustomSourceToggle(host, config, options = {}) {
@@ -245,41 +245,85 @@ import {
   _dtxrWallCandidateForRow,
   _dtxrWallCandidateIndex
 } from './xml-cii-adapted-preview-dryrun.js?v=20261001-weight-output-2';
+import { buildDtxrWallReview, validateDtxrWallSelection } from './xml-cii-adapted-preview-dtxr-wall-review.js';
 
 function _bindDtxrWallUpdateButtonBranchScoped({ host, branchRows, config, ensureOverrides, onSaveConfig, stagedSourceLabel = '' }) {
-  host?.querySelector('[data-mc-dtxr-wall-update]')?.addEventListener('click', () => {
-    const sourceSuffix = stagedSourceLabel ? ` using ${stagedSourceLabel}` : '';
-    const overrides = ensureOverrides(config);
-    overrides.wallThickness = overrides.wallThickness && typeof overrides.wallThickness === 'object' && !Array.isArray(overrides.wallThickness) ? { ...overrides.wallThickness } : {};
-    overrides.__dtxrWallKeys = overrides.__dtxrWallKeys && typeof overrides.__dtxrWallKeys === 'object' ? overrides.__dtxrWallKeys : {};
-    const { index, available } = _dtxrWallCandidateIndex(branchRows);
-    let applied = 0;
-    branchRows.forEach((row, ri) => {
-      const candidate = _dtxrWallCandidateForRow(row, index);
-      if (!candidate) return;
-      const key = row.wallThicknessKey || _classSizeKey(row) || row.lineKey || row.branchName;
-      if (!key) return;
-      overrides.wallThickness[key] = candidate.value;
-      overrides.__dtxrWallKeys[key] = true;
-      markAdaptedPreviewOverrideManual({ config, ensureOverrides, field: 'wallThickness', key, value: candidate.value });
-      const cell = host.querySelector(`[data-mc-edit-type="wallThickness"][data-mc-edit-row="${ri}"]`);
-      _updateEditedPreviewCell(cell, candidate.value);
-      if (cell) {
-        cell.dataset.mcFillState = 'manual';
-        cell.title = `Wall thickness from any DTXR schedule in this branch/class group. Sch ${candidate.schedule || ''}: ${candidate.dtxr || ''}${sourceSuffix}`;
-        const badge = cell.querySelector('.mc-preview-badge');
-        if (badge) { badge.textContent = 'DTXR Sch'; badge.className = 'mc-preview-badge exact'; }
-        else cell.insertAdjacentHTML('beforeend', ' <span class="mc-preview-badge exact">DTXR Sch</span>');
-      }
-      applied += 1;
+  const action = host?.querySelector('[data-mc-dtxr-wall-update]');
+  if (!action) return;
+  const review = () => {
+    const currentRows = Array.isArray(host.__xmlCiiPreviewResult?.branchRows)
+      ? host.__xmlCiiPreviewResult.branchRows : branchRows;
+    const proposals = buildDtxrWallReview({
+      rows: currentRows,
+      existingWalls: config?.overrides?.wallThickness || {},
+      acceptedWallByBranch: config?.b313WallUpdate?.acceptedWallByBranch || {},
+      candidateIndex: _dtxrWallCandidateIndex,
+      candidateForRow: _dtxrWallCandidateForRow,
+      keyForRow: row => row.wallThicknessKey || _classSizeKey(row) || row.lineKey || row.branchName,
     });
-    if (applied > 0) {
-      onSaveConfig?.(config);
-      _markPreviewSaved(host, `${applied} Wall Thk override${applied === 1 ? '' : 's'} updated from ${available} DTXR schedule source row${available === 1 ? '' : 's'}${sourceSuffix}. Click Rebuild Preview to recompute enriched XML.`);
-    } else {
-      _markPreviewSaved(host, available ? `No Wall Thk keys could be updated from DTXR${sourceSuffix}.` : `No DTXR schedule + bore matches found for Wall Thk update${sourceSuffix}.`);
+    let slot = host.querySelector('[data-mc-dtxr-unified-review-slot]');
+    if (!slot) {
+      slot = document.createElement('section');
+      slot.dataset.mcDtxrUnifiedReviewSlot = 'true';
+      (host.querySelector('[data-mc-wall-review]') || action.parentElement).appendChild(slot);
     }
-  });
+    const rowsHtml = proposals.items.map((item, idx) => {
+      const blocked = !item.eligible;
+      const existing = item.existingValue === '' ? '—' : item.existingValue;
+      return `<tr data-mc-dtxr-plan-row="${idx}"><td style="padding:4px;"><input type="checkbox" data-mc-dtxr-review-select="${idx}" ${blocked?'disabled':''} aria-label="Approve DTXR candidate for physical key ${_esc(item.key)}"></td>
+        <td style="padding:4px;">${_esc(item.branchNames.join(' / '))}</td>
+        <td style="padding:4px;">${_esc(item.key)}</td><td style="padding:4px;">${_esc(existing)}</td>
+        <td style="padding:4px;">${_esc(item.value)} mm · ${_esc(item.schedule || 'schedule unknown')}</td>
+        <td style="padding:4px;">${_esc(item.status)}</td></tr>`;
+    }).join('');
+    slot.innerHTML = `<section data-mc-dtxr-review-results style="margin:9px 0;padding:9px;border:1px solid #94a3b8;border-radius:6px;background:#fff;color:#0f172a;">
+      <strong>DTXR source-wall candidates — review before applying</strong>
+      <div style="font-size:11px;margin:5px 0;">${proposals.inputRows} physical rows · ${proposals.matchedRows} schedule matches · ${proposals.items.length} unique override keys · ${proposals.eligibleKeys} eligible to review. ${_esc(stagedSourceLabel)}. Existing overrides are never selected automatically. Accepted B31.3 walls and conflicting shared keys are blocked.</div>
+      <div style="overflow:auto;max-height:350px"><table style="font-size:11px;width:100%;border-collapse:collapse"><thead><tr><th>Approve</th><th>Branch</th><th>Override key</th><th>Existing wall</th><th>DTXR source proposal</th><th>Review status</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="6">No source-matched DTXR schedule candidates.</td></tr>'}</tbody></table></div>
+      <button type="button" data-mc-dtxr-apply-selected class="model-converters-run-btn" style="margin-top:7px;padding:7px 12px;">Apply selected DTXR overrides</button>
+      <div data-mc-dtxr-review-feedback role="status" style="font-size:11px;margin-top:4px;">Only checked physical-key proposals will be committed. Rebuild Preview afterward.</div>
+    </section>`;
+    slot.querySelector('[data-mc-dtxr-apply-selected]')?.addEventListener('click', () => {
+      const selected = [...slot.querySelectorAll('[data-mc-dtxr-review-select]:checked')]
+        .map(input => proposals.items[Number(input.dataset.mcDtxrReviewSelect)]?.key).filter(Boolean);
+      if (!selected.length) {
+        slot.querySelector('[data-mc-dtxr-review-feedback]').textContent = 'No DTXR proposal selected; saved walls unchanged.';
+        return;
+      }
+      const outcome = validateDtxrWallSelection({
+        review: proposals, selectedKeys: selected,
+        currentWalls: config?.overrides?.wallThickness || {},
+        acceptedWallByBranch: config?.b313WallUpdate?.acceptedWallByBranch || {},
+      });
+      if (!outcome.approved.length) {
+        slot.querySelector('[data-mc-dtxr-review-feedback]').textContent = `No changes: ${outcome.skipped.length} selection(s) held by accepted-wall, source-conflict or stale-override guards.`;
+        return;
+      }
+      const overrides = ensureOverrides(config);
+      if (!overrides.wallThickness || typeof overrides.wallThickness !== 'object' || Array.isArray(overrides.wallThickness)) overrides.wallThickness = {};
+      if (!overrides.__dtxrWallKeys || typeof overrides.__dtxrWallKeys !== 'object' || Array.isArray(overrides.__dtxrWallKeys)) overrides.__dtxrWallKeys = {};
+      for (const item of outcome.approved) {
+        overrides.wallThickness[item.key] = item.value;
+        overrides.__dtxrWallKeys[item.key] = true;
+        markAdaptedPreviewOverrideManual({ config, ensureOverrides, field: 'wallThickness', key: item.key, value: item.value });
+        for (const ri of item.rowIndices) {
+          const cell = host.querySelector(`[data-mc-edit-type="wallThickness"][data-mc-edit-row="${ri}"]`);
+          _updateEditedPreviewCell(cell, item.value);
+          if (!cell) continue;
+          cell.dataset.mcFillState = 'manual';
+          cell.title = `DTXR source schedule ${item.schedule}; explicitly approved in Wall Thickness Review.`;
+          const badge = cell.querySelector('.mc-preview-badge');
+          if (badge) { badge.textContent = 'DTXR approved'; badge.className = 'mc-preview-badge exact'; }
+          else cell.insertAdjacentHTML('beforeend', ' <span class="mc-preview-badge exact">DTXR approved</span>');
+        }
+      }
+      host.dataset.mcB313PreviewDirty = 'true';
+      onSaveConfig?.(config);
+      _markPreviewSaved(host, `${outcome.approved.length} explicitly selected DTXR wall key(s) saved; ${outcome.skipped.length} held. Rebuild Preview to refresh engineering output. B31.3 acceptance remains separate.`);
+      review();
+    });
+  };
+  action.addEventListener('click', review);
 }
 
 function _bindDtxrWallUpdateButton(args) {
