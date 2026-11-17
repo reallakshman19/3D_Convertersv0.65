@@ -23,7 +23,7 @@ class SourceReceiptTests(unittest.TestCase):
         self.rows=[{'branchName':'/GLRD/B1','lineKey':'P4110001'}]
         self.record={'sourceOrdinal':0,'branchName':'/GLRD/B1','lineKey':'P4110001',
           'lineCell':'A2','p1Cell':'B2','p1HeaderCell':'B1',
-          't1Cell':'C2','t1HeaderCell':'C1','p1':13001,'p1Unit':'KPA','t1C':120}
+          't1Cell':'C2','t1HeaderCell':'C1','p1':13001,'p1Unit':'KPA','pressureBasis':'GAUGE','t1C':120}
         self.receipt={'schema':'glrd-psi02-line-receipt/v1','sourceXmlSha256':'TEST_XML_SHA',
            'workbookSha256':SRC.digest(self.book),'worksheet':'Linelist','rows':[self.record]}
     def tearDown(self):self.tmp.cleanup()
@@ -51,6 +51,15 @@ class SourceReceiptTests(unittest.TestCase):
         ws['C1']='T1 (°C)';ws['C2']=120;wb.save(self.book)
         self.receipt['workbookSha256']=SRC.digest(self.book)
         self.reject('DESIGN_P1')
+    def test_cross_row_pressure_from_neighboring_line(self):
+        self.record['p1Cell']='B3'
+        self.reject('CROSS_ROW')
+    def test_wrong_pressure_header_column(self):
+        self.record['p1HeaderCell']='D1'
+        self.reject('HEADER_NOT_BOUND')
+    def test_pressure_basis_misrepresented(self):
+        self.record['pressureBasis']='ABSOLUTE'
+        self.reject('PRESSURE_BASIS')
     def test_wrong_workbook_hash(self):
         self.receipt['workbookSha256']='0'*64;self.reject('WORKBOOK_SHA')
     def test_duplicate_physical_occurrence(self):
