@@ -54,6 +54,20 @@ assert.equal(tp304NoRoute.factors.E.status, 'MANUFACTURING_ROUTE_REQUIRED');
 assert(tp304NoRoute.factors.E.availableManufacturingRoutes.includes('SEAMLESS'));
 assert.equal(tp304NoRoute.factors.E.strictAvailable, false);
 
+const ltcsAt82 = explainPreviewB313FactorAvailability({
+  materialId: 'LTCS-A333-6',
+  designTemperatureC: 82,
+  manufacturingRoute: 'SEAMLESS',
+});
+assert.equal(ltcsAt82.factors.S.strictAvailable, false);
+assert.equal(ltcsAt82.factors.S.status, 'NO_QUALIFIED_TEMPERATURE_BASIS');
+assert.deepEqual(ltcsAt82.factors.S.nearbyTemperaturesC, [80,120]);
+assert.deepEqual(ltcsAt82.factors.S.nearbySourceStatuses, ['SCREENING']);
+assert.equal(ltcsAt82.factors.E.strictAvailable, false);
+assert.equal(explainPreviewB313FactorAvailability({
+  materialId: 'LTCS-A333-6', designTemperatureC: '',
+}), null, 'Blank temperature must not become 0°C');
+
 const incompleteManual = resolvePreviewB313FactorBasis({
   materialIdentity: a106Identity,
   designTemperatureC: 0,
