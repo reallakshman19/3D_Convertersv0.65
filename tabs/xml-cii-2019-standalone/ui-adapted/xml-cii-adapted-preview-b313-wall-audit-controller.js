@@ -237,7 +237,7 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
   const border = summary.allUpdated ? '#86efac' : '#f59e0b';
   const countsLabel = summary.calculatedRows > 0
     ? `Calculated ${summary.calculatedRows} · Awaiting Pull · Held ${summary.notUpdatedRows}`
-    : `Updated ${summary.updatedRows} · Not updated ${summary.notUpdatedRows}`;
+    : `Eligible proposals 0 · Held ${summary.notUpdatedRows}`;
   const titleColor = summary.allUpdated ? '#166534' : '#92400e';
   const tableRows = rows.map((row) => ['UPDATED', 'CALCULATED'].includes(row.status) ? updatedRowHtml(row) : failedRowHtml(row)).join('');
   const emptyRows = rows.length ? '' : '<tr><td colspan="5" style="padding:12px;text-align:center;color:#64748b;">No row-level audit evidence available.</td></tr>';
