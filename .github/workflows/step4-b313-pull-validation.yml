@@ -6,8 +6,10 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'converters/b313-material-factors/index.js'
       - 'converters/xml-cii2019-core/b313-preview-*.js'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
+      - 'tests/b313-material-factors.test.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
       - 'tests/xml-cii-issue-781-b313-*.test.mjs'
       - '.github/workflows/step4-b313-pull-validation.yml'
@@ -22,14 +24,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Verify syntax
         run: |
+          node --check converters/b313-material-factors/index.js
           node --check converters/xml-cii2019-core/b313-preview-pull-authority.js
           node --check converters/xml-cii2019-core/b313-preview-wall-update.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer.js
@@ -41,6 +44,7 @@ jobs:
       - name: Test Pull, B31.3 adapters, Preview and legacy custody
         run: |
           node --test \
+            tests/b313-material-factors.test.mjs \
             tests/xml-cii-b313-preview-pull-v065.test.mjs \
             tests/xml-cii-b313-preview-wall-update.test.mjs \
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
@@ -55,10 +59,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Install browser
