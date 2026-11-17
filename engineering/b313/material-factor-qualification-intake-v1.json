@@ -1,0 +1,379 @@
+{
+  "schema": "xml-cii-b313-factor-qualification-intake/v1",
+  "createdDate": "2026-11-17",
+  "targetCodeEdition": "2024",
+  "authority": "REVIEW_ONLY_NOT_ACTIVE_MASTER",
+  "reviewStatus": "ENGINEERING_HOLD",
+  "sourcePolicy": "No SCREENING/BENCHMARK data or project unrelated code edition may count as qualification",
+  "modelScope": "Candidate mappings derived from bundled Piping Class master; not yet reconciled to exact supplied 30-branch Owner XML",
+  "sourceReferences": [
+    {
+      "id": "PIPING-CLASS-DSS",
+      "path": "docs/Masters/SpecwisePipingClass/13831.json",
+      "usage": "Material identity and schedule by DN only"
+    },
+    {
+      "id": "PIPING-CLASS-LTCS",
+      "path": "docs/Masters/SpecwisePipingClass/11472.json",
+      "usage": "Material identity and schedule by DN only"
+    },
+    {
+      "id": "B313-2024",
+      "url": "https://www.asme.org/codes-standards/find-codes-standards/b31-3-process-piping",
+      "usage": "Official standard identification; not a certified factor extraction"
+    }
+  ],
+  "qualificationCases": [
+    {
+      "id": "B313-Q-01",
+      "pipingClass": "13831",
+      "family": "DSS",
+      "materialDesignation": "ASTM A790 UNS S31803",
+      "previewTemperatureC": 120,
+      "temperatureAuthority": "USER_SCREENSHOT_ONLY_NOT_LINKED_TO_EACH_DN",
+      "sourceRowIndices": [
+        2486,
+        2487,
+        2488,
+        2489,
+        2490,
+        2491,
+        2492,
+        2493,
+        2494
+      ],
+      "sizeDNmm": [
+        15,
+        20,
+        25,
+        40,
+        50,
+        80,
+        100,
+        150,
+        200
+      ],
+      "designP1": null,
+      "manufacturingRoute": null,
+      "materialIdentityVerifiedForOwnerOccurrence": false,
+      "factorRecords": [
+        {
+          "factor": "S",
+          "codeBasis": "ASME B31.3-2024 Table A-1 (SI) or A-1C (USCS)",
+          "requirements": "Exact material, product/size, temperature brackets enclosing T1, material notes, code edition, source reference",
+          "value": null,
+          "unit": "MPa",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "E",
+          "codeBasis": "ASME B31.3-2024 para 302.3.4; Tables A-3 / 302.3.4-1",
+          "requirements": "Pipe manufacturing specification and longitudinal seam method, supplementary examination, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "W",
+          "codeBasis": "ASME B31.3-2024 para 302.3.5; Table 302.3.5-1",
+          "requirements": "Material grade, welded-component applicability and temperature, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "Y",
+          "codeBasis": "ASME B31.3-2024 Table 304.1.1-1",
+          "requirements": "Material group, design temperature and pressure equation applicability, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        }
+      ],
+      "issueCode": "CONFIRM_GRADE_MANUFACTURING_ROUTE_AND_CODE_FACTORS",
+      "requiredOwnerEvidence": [
+        "Effective Step 4 row and unique physical pipe occurrence",
+        "Approved material/piping class revision and material trace",
+        "Applicable code edition and table notes",
+        "Exact manufacturing route/longitudinal weld category",
+        "Authorized factor table source with version, units and temperature applicability",
+        "Independent project acceptance"
+      ],
+      "qualifiesForPull": false
+    },
+    {
+      "id": "B313-Q-02",
+      "pipingClass": "13831",
+      "family": "DSS",
+      "materialDesignation": "ASTM A790/A928 CL1 UNS S31803",
+      "previewTemperatureC": 120,
+      "temperatureAuthority": "USER_SCREENSHOT_ONLY_NOT_LINKED_TO_EACH_DN",
+      "sourceRowIndices": [
+        2495,
+        2496,
+        2497,
+        2498,
+        2499,
+        2500,
+        2501
+      ],
+      "sizeDNmm": [
+        250,
+        300,
+        350,
+        400,
+        450,
+        500,
+        600
+      ],
+      "designP1": null,
+      "manufacturingRoute": null,
+      "materialIdentityVerifiedForOwnerOccurrence": false,
+      "factorRecords": [
+        {
+          "factor": "S",
+          "codeBasis": "ASME B31.3-2024 Table A-1 (SI) or A-1C (USCS)",
+          "requirements": "Exact material, product/size, temperature brackets enclosing T1, material notes, code edition, source reference",
+          "value": null,
+          "unit": "MPa",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "E",
+          "codeBasis": "ASME B31.3-2024 para 302.3.4; Tables A-3 / 302.3.4-1",
+          "requirements": "Pipe manufacturing specification and longitudinal seam method, supplementary examination, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "W",
+          "codeBasis": "ASME B31.3-2024 para 302.3.5; Table 302.3.5-1",
+          "requirements": "Material grade, welded-component applicability and temperature, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "Y",
+          "codeBasis": "ASME B31.3-2024 Table 304.1.1-1",
+          "requirements": "Material group, design temperature and pressure equation applicability, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        }
+      ],
+      "issueCode": "COMPOSITE_A790_A928_SPECIFICATION_AND_WELD_ROUTE_UNRESOLVED",
+      "requiredOwnerEvidence": [
+        "Effective Step 4 row and unique physical pipe occurrence",
+        "Approved material/piping class revision and material trace",
+        "Applicable code edition and table notes",
+        "Exact manufacturing route/longitudinal weld category",
+        "Authorized factor table source with version, units and temperature applicability",
+        "Independent project acceptance"
+      ],
+      "qualifiesForPull": false
+    },
+    {
+      "id": "B313-Q-03",
+      "pipingClass": "11472",
+      "family": "LTCS",
+      "materialDesignation": "ASTM A333 Grade 6",
+      "previewTemperatureC": 82,
+      "temperatureAuthority": "USER_SCREENSHOT_ONLY_NOT_LINKED_TO_EACH_DN",
+      "sourceRowIndices": [
+        1821,
+        1822,
+        1823,
+        1824,
+        1825,
+        1826,
+        1827,
+        1828,
+        1829,
+        1830,
+        1831,
+        1832,
+        1833,
+        1834,
+        1835,
+        1836
+      ],
+      "sizeDNmm": [
+        15,
+        20,
+        25,
+        40,
+        50,
+        80,
+        100,
+        150,
+        200,
+        250,
+        300,
+        350,
+        400,
+        450,
+        500,
+        600
+      ],
+      "designP1": null,
+      "manufacturingRoute": null,
+      "materialIdentityVerifiedForOwnerOccurrence": false,
+      "factorRecords": [
+        {
+          "factor": "S",
+          "codeBasis": "ASME B31.3-2024 Table A-1 (SI) or A-1C (USCS)",
+          "requirements": "Exact material, product/size, temperature brackets enclosing T1, material notes, code edition, source reference",
+          "value": null,
+          "unit": "MPa",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "E",
+          "codeBasis": "ASME B31.3-2024 para 302.3.4; Tables A-3 / 302.3.4-1",
+          "requirements": "Pipe manufacturing specification and longitudinal seam method, supplementary examination, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "W",
+          "codeBasis": "ASME B31.3-2024 para 302.3.5; Table 302.3.5-1",
+          "requirements": "Material grade, welded-component applicability and temperature, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "Y",
+          "codeBasis": "ASME B31.3-2024 Table 304.1.1-1",
+          "requirements": "Material group, design temperature and pressure equation applicability, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        }
+      ],
+      "issueCode": "QUALIFIED_A1_STRESS_BRACKETS_AND_ROUTE_FACTORS_REQUIRED",
+      "requiredOwnerEvidence": [
+        "Effective Step 4 row and unique physical pipe occurrence",
+        "Approved material/piping class revision and material trace",
+        "Applicable code edition and table notes",
+        "Exact manufacturing route/longitudinal weld category",
+        "Authorized factor table source with version, units and temperature applicability",
+        "Independent project acceptance"
+      ],
+      "qualifiesForPull": false
+    },
+    {
+      "id": "B313-Q-04",
+      "pipingClass": "11472",
+      "family": "LTCS",
+      "materialDesignation": "ASTM A671 CC65 CL22",
+      "previewTemperatureC": 82,
+      "temperatureAuthority": "USER_SCREENSHOT_ONLY_NOT_LINKED_TO_EACH_DN",
+      "sourceRowIndices": [
+        1837,
+        1838,
+        1839,
+        1840
+      ],
+      "sizeDNmm": [
+        750,
+        900,
+        1050,
+        1200
+      ],
+      "designP1": null,
+      "manufacturingRoute": null,
+      "materialIdentityVerifiedForOwnerOccurrence": false,
+      "factorRecords": [
+        {
+          "factor": "S",
+          "codeBasis": "ASME B31.3-2024 Table A-1 (SI) or A-1C (USCS)",
+          "requirements": "Exact material, product/size, temperature brackets enclosing T1, material notes, code edition, source reference",
+          "value": null,
+          "unit": "MPa",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "E",
+          "codeBasis": "ASME B31.3-2024 para 302.3.4; Tables A-3 / 302.3.4-1",
+          "requirements": "Pipe manufacturing specification and longitudinal seam method, supplementary examination, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "W",
+          "codeBasis": "ASME B31.3-2024 para 302.3.5; Table 302.3.5-1",
+          "requirements": "Material grade, welded-component applicability and temperature, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        },
+        {
+          "factor": "Y",
+          "codeBasis": "ASME B31.3-2024 Table 304.1.1-1",
+          "requirements": "Material group, design temperature and pressure equation applicability, source reference",
+          "value": null,
+          "unit": "dimensionless",
+          "sourceReference": null,
+          "approvalReference": null,
+          "status": "SOURCE_AND_APPROVAL_REQUIRED"
+        }
+      ],
+      "issueCode": "MATERIAL_NOT_PRESENT_IN_ACTIVE_B313_CATALOG",
+      "requiredOwnerEvidence": [
+        "Effective Step 4 row and unique physical pipe occurrence",
+        "Approved material/piping class revision and material trace",
+        "Applicable code edition and table notes",
+        "Exact manufacturing route/longitudinal weld category",
+        "Authorized factor table source with version, units and temperature applicability",
+        "Independent project acceptance"
+      ],
+      "qualifiesForPull": false
+    }
+  ],
+  "publication": {
+    "target": "docs/Masters/b313-material-factor-master.json",
+    "generator": "node scripts/generate-b313-material-factors.mjs --write && node scripts/generate-b313-material-factors.mjs --check",
+    "requiredOutcome": "Exact-head tests PASS and independent engineering sign-off before publication",
+    "prohibited": [
+      "Do not set status VERIFIED or PROJECT_APPROVED solely from this intake",
+      "Do not interpolate from screening values or across dissimilar products",
+      "Do not copy T1 from another branch or T2/T3",
+      "Do not treat ASTM A790/A928 class as a single qualified manufacturing route"
+    ]
+  }
+}
