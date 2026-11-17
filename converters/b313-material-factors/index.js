@@ -54,6 +54,12 @@ export function resolveB313QualifiedTemperatureFactor({
   const route = norm(manufacturingRoute);
   const candidates = records.filter(row => row.materialId === id
     && statuses.has(row.status)
+    // Status alone never qualifies a factor. Retain a traceable code source;
+    // project-approved rows also need an explicit approval reference.
+    && String(row.sourceAuthority || '').trim()
+    && String(row.sourceReference || '').trim()
+    && !/SCREENING|BENCHMARK|CANDIDATE/i.test(String(row.sourceAuthority))
+    && (row.status !== 'PROJECT_APPROVED' || String(row.approvalReference || '').trim())
     && (row.edition == null || String(row.edition) === String(edition))
     && (!row.productForm || norm(row.productForm) === norm(productForm)));
   const routeRows = candidates.filter(row => !row.manufacturingRoute || (route && norm(row.manufacturingRoute) === route));
