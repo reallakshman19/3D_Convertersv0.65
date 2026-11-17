@@ -1,0 +1,36 @@
+name: GLRD authenticated-source custody (B31.3)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'engineering/b313/glrd-pinned-source-manifest.json'
+      - 'scripts/verify-glrd-b313-authentic-inputs.py'
+      - '.github/workflows/glrd-b313-authentic-source-custody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  glrd-input-integrity:
+    name: GLRD pinned input integrity and branch census
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download exact pinned GLRD XML, stage and masters, then verify SHA256
+        run: |
+          python3 scripts/verify-glrd-b313-authentic-inputs.py --fetch --output out/glrd-b313-source-custody.json
+      - name: Upload machine-readable source custody without redistributing owner input files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glrd-b313-source-custody
+          path: out/glrd-b313-source-custody.json
+          if-no-files-found: warn
