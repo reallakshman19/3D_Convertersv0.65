@@ -49,8 +49,8 @@ test('LTCS remains fail-closed outside supplied exact screening temperatures', (
   assert.deepEqual(r.details.missing, ['S', 'E', 'W', 'Y']);
 });
 
-test('caller overrides complete DSS without hidden family defaults', () => {
-  const r = resolveB313DesignFactors({ material: { family: 'DSS' }, allowProjectFamilyDefault: true, designTemperature: 50, factorOverrides: { S: 170, E: 1, W: 1, Y: .4 } });
+test('caller overrides require explicitly non-strict manual diagnostic mode', () => {
+  const r = resolveB313DesignFactors({ material: { family: 'DSS' }, allowProjectFamilyDefault: true, designTemperature: 50, qualificationMode: 'manual', factorOverrides: { S: 170, E: 1, W: 1, Y: .4 } });
   assert.equal(r.ok, true);
   assert.equal(r.material.materialId, 'DSS-A790-S31803');
   assert.equal(r.factorSources.S.authority, 'CALLER_OVERRIDE');
@@ -201,6 +201,10 @@ test('strict resolver rejects blank T1 and caller overrides do not count as qual
   assert.equal(blank.code,'INVALID_DESIGN_TEMPERATURE');
   const user=resolveB313DesignFactors({material:{materialId:'LTCS-A333-6'},designTemperature:82,
     factorOverrides:{S:125,E:1,W:1,Y:.4}});
-  assert.equal(user.ok,true);
-  assert.equal(user.designAuthority,false,'Numeric caller overrides are not qualified master data');
+  assert.equal(user.ok,false);
+  assert.equal(user.code,'B313_STRICT_FACTOR_OVERRIDE_FORBIDDEN');
+  const manual=resolveB313DesignFactors({material:{materialId:'LTCS-A333-6'},designTemperature:82,
+    qualificationMode:'manual',factorOverrides:{S:125,E:1,W:1,Y:.4}});
+  assert.equal(manual.ok,true);
+  assert.equal(manual.designAuthority,false,'Manual numeric factors are not qualified master data');
 });
