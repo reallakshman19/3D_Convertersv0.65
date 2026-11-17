@@ -576,7 +576,14 @@ function previewP1Unit(lineRow, p1) {
       materialSource: resolved.materialSource || _overrideSource(config.overrides, 'material', lineKey),
       materialCode: resolved.materialCode || '',
       materialCodeMethod: matMethod,
-      materialCodeNeedsReview: !resolved.materialCode,
+      materialCodeMatchedMaterial: resolved.materialCodeMatchedMaterial || '',
+      materialCodeSource: resolved.materialCodeEvidenceSource || resolved.materialSource || '',
+      materialCodeResolutionMethod: resolved.materialCodeMatchMethod || '',
+      materialCodeConfidence: resolved.materialCodeConfidence ?? null,
+      // Preserve wildcard and conflict review state even when a code exists.
+      materialCodeNeedsReview: resolved.materialCodeNeedsReview === true
+        || !!resolved.materialCodeConflict || !resolved.materialCode,
+      materialCodeConflict: resolved.materialCodeConflict || null,
       rating: branchRating || '',
       ratingDerived: resolved.rating || _deriveRatingFromPipingClass(resolved.pipingClass, config) || rowRating || '',
       ratingSource,
