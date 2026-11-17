@@ -22,6 +22,10 @@ for (const [i,r] of pack.records.entries()) {
       || (r.scope === 'EXACT_MATERIAL' && !r.materialId)
       || (r.scope === 'CODE_MATERIAL_FAMILY' && (!r.materialFamily || r.familyScopeCodeApproved !== true))
       || !r.productForm || !r.sourceAuthority || !r.sourceReference || !r.codeClause
+      || !/^[a-f0-9]{64}$/i.test(String(r.sourceDocumentSha256||''))
+      || !String(r.sourceReviewedBy||'').trim()
+      || !/^20\d{2}-\d{2}-\d{2}$/.test(String(r.sourceReviewDate||''))
+      || !String(r.sourceRevision||'').trim()
       || /SCREENING|BENCHMARK|CANDIDATE/i.test(String(r.sourceAuthority))
       || String(r.edition) !== String(pack.edition)
       || (r.status === 'PROJECT_APPROVED' && !r.approvalReference)
