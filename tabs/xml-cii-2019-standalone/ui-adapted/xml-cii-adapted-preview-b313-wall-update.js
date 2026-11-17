@@ -696,6 +696,113 @@ export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
     masterCandidateSchedule:calc.selectedSchedule,masterCandidateWallMm:calc.selectedNominalWallMm};
 }
 
+
+/**
+ * Separate, read-only numerical reference generated from the actual 4 Preview
+ * fields and screening master. A result here is NEVER stored in proposalsByBranch,
+ * overrides.wallThickness or acceptedWallByBranch. No Pull authority is granted.
+ */
+export function buildPreviewB313ScreeningReference({
+  row = {}, config = {}, previewNodeRows = [], rowIndex = 0,
+} = {}) {
+  const identity = resolvePreviewB313MaterialFromRow(row, config);
+  if (!identity.ok) return { ok:false,authority:'SCREENING_REFERENCE_ONLY',
+    code:identity.code,holdReasons:['Preview material/class identity unresolved'] };
+  const basisConfig = config?.b313WallUpdate || {};
+  const key = previewB313BasisKey(row, {b313WallUpdate:basisConfig});
+  const manualBasis = basisForRow({bases:basisConfig.bases||{}},row,key).basis || {};
+  const sourceSeamless = b313SourceConfirmsA106Seamless(row,identity);
+  const declaredRoute = text(manualBasis.manufacturingRoute)
+    || (sourceSeamless ? 'SEAMLESS' : '');
+  const reference = lookupB313ScreeningFactors({
+    materialId:identity.material.materialId,
+    temperatureC:temperatureText(row),
+    manufacturingRoute:declaredRoute,
+  });
+  if (!reference.ok) return {...reference,holdReasons:[],materialId:identity.material.materialId};
+  const holdReasons = [];
+  const rawP1=text(row?.p1).replace(/,/g,'');
+  const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
+  if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
+    holdReasons.push('Positive source P1 is missing or default-only');
+  const pressureBasis = inferPreviewPressureUnit(row,config,
+    {pressureUnit:'',byBranch:new Map()},manualBasis,true);
+  if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
+  const corrosion=nonNegative(row?.corrosion);
+  if (corrosion===null) holdReasons.push('Corrosion allowance missing');
+  const t1Source=normalizedToken(row?.t1Source);
+  if (t1Source==='NONE'||t1Source==='DEFAULT') holdReasons.push('T1 source is not established');
+  const dimension=inferPreviewDimensionStandard(row,manualBasis,identity);
+  if (!dimension.standard) holdReasons.push('Pipe dimension standard unresolved');
+  const scoped=previewNodeRows.filter(n=>Number(n.branchOccurrenceIndex)===rowIndex
+    && positive(n.outsideDiameterMm));
+  const ods=[...new Set(scoped.map(n=>positive(n.outsideDiameterMm)).filter(Boolean))];
+  const od=ods.length===1?ods[0]:null;
+  if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
+    :'Source node outside diameter missing');
+  const referenceOd=dimension.standard
+    ? masterOutsideDiameterMm(row?.sizeMm??row?.boreMm,dimension.standard):null;
+  if (od && (!referenceOd || Math.abs(od-referenceOd)>Math.max(1.5,referenceOd*0.02)))
+    holdReasons.push('Source OD and size-master reference do not agree');
+  // Each route is a WHAT-IF scenario if the source did not establish a route.
+  // The route alternatives come from the actual screening master, not guesses.
+  const routes=reference.E!==null
+    ? [{route:reference.selectedRoute,value:reference.E}]
+    : reference.routeOptions;
+  const scenarios=[];
+  if (!holdReasons.length) for(const candidate of routes){
+    const calc=calculateAndSelectPreviewB313Wall({
+      dn:row?.sizeMm??row?.boreMm,
+      outsideDiameterMm:od,
+      designPressure:pressure,
+      pressureUnit:pressureBasis.unit,
+      corrosionAllowanceMm:corrosion,
+      allowableStress:reference.S.MPa,
+      stressUnit:'MPa',
+      qualityFactorE:candidate.value,
+      weldStrengthReductionW:reference.W,
+      coefficientY:reference.Y,
+      dimensionStandard:dimension.standard,
+      negativeMillTolerance:manualBasis.negativeMillTolerance
+        || basisConfig.millTolerance || {basis:'percent',value:12.5},
+      mechanicalAllowanceMm:manualBasis.mechanicalAllowanceMm??0,
+      erosionAllowanceMm:manualBasis.erosionAllowanceMm??0,
+      otherAllowanceMm:manualBasis.otherAllowanceMm??0,
+      edition:'2024',
+    });
+    const classSelection=calc.ok?qualifyPreviewB313ClassWall(row,calc):null;
+    scenarios.push({
+      manufacturingRoute:candidate.route,
+      routeAssumed:!reference.selectedRoute,
+      E:candidate.value,
+      code:calc.code,
+      calculationOk:calc.ok===true,
+      pressureDesignThicknessMm:calc.calculation?.pressureDesignThicknessMm??null,
+      requiredNominalThicknessMm:calc.calculation?.requiredNominalThicknessMm??null,
+      pipeWallMasterSelectedMm:calc.ok?calc.selectedNominalWallMm:null,
+      classNominalWallMm:positive(row?.pipingClassPipeWallMm),
+      classSchedule:text(row?.pipingClassPipeSchedule)||null,
+      classPass:classSelection?.ok===true,
+      classCode:classSelection?.code||null,
+      classMarginMm:classSelection?.ok?classSelection.marginMm:null,
+    });
+  }
+  return {
+    ...reference,
+    rowIndex,branchName:text(row?.branchName),lineKey:text(row?.lineKey),
+    materialSource:text(row?.materialSource),
+    pressure:pressure||null,pressureUnit:pressureBasis.unit||null,
+    pressureUnitSource:pressureBasis.source||null,
+    outsideDiameterMm:od,corrosionAllowanceMm:corrosion,
+    negativeMillTolerance:manualBasis.negativeMillTolerance
+      || basisConfig.millTolerance || {basis:'percent',value:12.5},
+    declaredRoute:declaredRoute||null,
+    holdReasons,
+    scenarios,
+    eligibleForPull:false,
+  };
+}
+
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   const lineListCoverage = buildPreviewB313LineListCoverage(branchRows, config);
@@ -933,14 +1040,20 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
     lineListCoverage,
     summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
-    rows: results.map((result, rowIndex) => result.status === 'CALCULATED' || result.status === 'UPDATED'
-      ? result : {
-        ...result,
-        details: {
-          ...(result.details || {}),
-          independentInputIssues: collectPreviewB313IndependentIssues(branchRows[rowIndex], config),
-        },
-      }),
+    rows: results.map((result, rowIndex) => {
+      const screeningReference=buildPreviewB313ScreeningReference({
+        row:branchRows[rowIndex],config,previewNodeRows,rowIndex,
+      });
+      return result.status === 'CALCULATED' || result.status === 'UPDATED'
+        ? {...result,screeningReference}
+        : {
+          ...result,screeningReference,
+          details: {
+            ...(result.details || {}),
+            independentInputIssues: collectPreviewB313IndependentIssues(branchRows[rowIndex], config),
+          },
+        };
+    }),
   };
 }
 
