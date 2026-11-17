@@ -182,3 +182,16 @@ FOR A FULL AUTHORISED PORT:
 
 This scope is intentionally a useful, testable, read-only interoperability
 slice; it is NOT a claim that 90 upstream files were copied or integrated.
+
+7. NOVEMBER 17 PR #5 RECONCILIATION
+----------------------------------
+PR #5 has since merged at cbfbcd93d8a10ec7dab952cc641723079d856efa.
+Its governed material/route factor authority, Config8 → exact-DN Piping Class →
+4 Preview source traces and per-occurrence Calculate/Pull/Fill boundary take
+precedence over any new external calculations. EPCC B31.3 candidate evidence
+already exists in engineering/b313/glrd-b313-2024-external-reference-intake-v1.json.
+Do NOT duplicate that candidate register or publish it into S/E/W/Y.
+The follow-on in-place, read-only comparison is planned in
+engineering/external-reference-port/PR5-PR6-INTEGRATION-PLAN.md.
+This PR's current external-review tab is a standalone source inspector;
+it is NOT yet wired to live 4 Preview rows. Full application approval remains HOLD.
