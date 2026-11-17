@@ -93,13 +93,29 @@ function legacyPreviewB313BasisKey(row) {
 export function previewB313BasisKey(row, config = {}) {
   const temperature = normalizedToken(temperatureText(row));
   const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
-  if (materialIdentity.ok) return `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
+  if (materialIdentity.ok) {
+    const base = `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
+    if (materialIdentity.b313IdentityNeedsReview !== true) return base;
+    // Manual grade approval cannot be shared merely because multiple lines
+    // happen to resolve to the same project-family candidate and T1.
+    const scope = [
+      row?.branchOccurrenceIndex ?? '', row?.branchName ?? '',
+      row?.lineKey ?? '', row?.pipingClass ?? '',
+      row?.materialCode ?? '', row?.materialCodeMatchedMaterial ?? '',
+    ].map(normalizedToken);
+    return scope.some(Boolean)
+      ? `${base}|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}`
+      : base;
+  }
   const legacy = legacyPreviewB313BasisKey(row);
   return legacy ? `RAW:${legacy}` : '';
 }
 
 function basisForRow(cfg, row, key = previewB313BasisKey(row)) {
   if (key && cfg.bases[key]) return { key, basis: cfg.bases[key], source: 'canonical-material-id-key' };
+  // Do not import a legacy group-wide approval into an occurrence-scoped
+  // family-default review: it may belong to another physical line.
+  if (key.includes('|GRADE_SCOPE:')) return { key, basis: {}, source: 'unreviewed-family-occurrence' };
   const legacy = legacyPreviewB313BasisKey(row);
   if (legacy && cfg.bases[legacy]) return { key, basis: cfg.bases[legacy], source: 'legacy-material-text-key' };
   return { key, basis: {}, source: 'none' };
