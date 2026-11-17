@@ -103,6 +103,20 @@ export function resolveXmlCiiB313ClassMaterialEvidence({
   };
 }
 
+export function resolveXmlCiiB313MaterialCodeClassConflict({ materialCodeMatchedMaterial, classEvidence } = {}) {
+  const mapped = text(materialCodeMatchedMaterial);
+  const exactSize = classEvidence?.materialCodeCorroborationSource === 'piping-class-master-exact-DN';
+  const selected = text(classEvidence?.materialCodeCorroborationCandidate);
+  if (!mapped || !selected || !exactSize || normalKey(mapped) === normalKey(selected)) return null;
+  return {
+    code: 'B313_MATERIAL_CODE_VS_CLASS_DN_CONFLICT',
+    mappedMaterial: mapped,
+    exactClassMaterial: selected,
+    sizeMm: classEvidence.materialCodeCorroborationSizeMm,
+    message: 'Material Code designation disagrees with exact Piping Class/DN product; confirm the effective material before B31.3.',
+  };
+}
+
 function directMaterialCode(row) {
   return cleanMaterialCode(readAny(row, [
     'materialCode', 'Material Code', 'MATERIAL_CODE', 'MAT_CODE',
@@ -566,6 +580,12 @@ export function resolveBranchProcessData({
     pipingClass: resolvedPipingClass, config, pipingClassRow,
     sizeMm: boreMm, pipingClassNeedsReview: classMatch.classMatch?.needsReview || classMatch.needsReview,
   });
+  const mappedMaterialDesignation = material.materialCode ? classRowMaterial(material.matchedRow) : '';
+  const classGradeConflict = resolveXmlCiiB313MaterialCodeClassConflict({
+    materialCodeMatchedMaterial: mappedMaterialDesignation,
+    classEvidence: configuredMaterialEvidence,
+  });
+  const effectiveMaterialConflict = material.conflict || classGradeConflict;
   const corrosion = resolveCorrosionFromPipingClass({
     lineRow: resolverLineRow,
     boreMm,
@@ -600,13 +620,11 @@ export function resolveBranchProcessData({
     materialCodeMatchMethod: material.matchMethod || null,
     // Preserve the exact specification from the resolved Step 8 or material-map
     // row. A material code/family by itself is not an exact B31.3 grade.
-    materialCodeMatchedMaterial: material.materialCode
-      ? classRowMaterial(material.matchedRow)
-      : '',
+    materialCodeMatchedMaterial: mappedMaterialDesignation,
     materialCodeEvidenceSource: material.source,
     ...configuredMaterialEvidence,
-    materialCodeNeedsReview: material.needsReview === true || !!material.conflict || !material.materialCode,
-    materialCodeConflict: material.conflict || null,
+    materialCodeNeedsReview: material.needsReview === true || !!effectiveMaterialConflict || !material.materialCode,
+    materialCodeConflict: effectiveMaterialConflict || null,
     corrosionAllowanceMm: corrosion.corrosionAllowanceMm,
     corrosionSource: corrosion.source,
     wallThicknessMm: wall.valueMm,
