@@ -1,0 +1,786 @@
+{
+  "schema": "github-actions-retention-audit/v1",
+  "date": "2026-11-17",
+  "repository": "reallakshman19/3D_Convertersv0.65",
+  "baseMainSha": "91c1a28d248d0053dfdb38d4cc05402a4fb12013",
+  "policy": "Retain proven-green recent workflows plus essential domain/release engineering gates. Remove one-off obsolete, failing, redundant or unobserved historical workflows; preserve all tests/scripts (Git history recovers every deleted workflow).",
+  "limitations": [
+    "Recent functional evidence limited to latest 100 Actions runs, not complete historical CI",
+    "Preserved critical workflows may themselves currently fail to enforce engineering HOLD",
+    "Read access to branch-protection settings unavailable (403), GitHub rulesets list empty",
+    "Deletion does not fix unrelated test failures or validate substantive software quality"
+  ],
+  "summary": {
+    "previous": 181,
+    "retained": 32,
+    "removed": 149,
+    "recentSuccessfulRetained": 22,
+    "otherCriticalRetained": 10
+  },
+  "retained": [
+    {
+      "path": ".github/workflows/att-native-integration-release.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/deploy-app-on-main.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/fbx-stagedjson.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/hp-piping-class-real-workbench.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/inputxml-pages-live-release.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-781-b313-auto-basis-validation.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-781-linelist-sheet-validation.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-781-p0-validation.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-855-c05-4-1-valve-weight-red.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-856-c05-4-2-valve-weight.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-857-c05-4-3-valve-weight.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-858-c05-4-4-weight-match.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-871-c05-5-1-persistence-failure.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-872-c05-5-2-worker-session.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-873-c05-5-3-session-custody.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-880-c05-5-4-1-corrupt-restore.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-881-c05-5-4-2-restore-isolation.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-882-c05-5-4-3-session-precedence.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-883-c05-5-4-4-restore-failure-identity.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/issue-921-recovery-j01-intent.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/lfj-v41-deploy.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/step4-b313-pull-validation.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/vibration-mechanical-stage4-validation.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-combined-main-qa.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-p2-format-diagnostics.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-p3b4-node-occurrence.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/xml229-canonical-output-readiness.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-explicit-zero-applied-weight.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/xml229-native-final-cii-consumption.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-output-run-audit.yml",
+      "reason": "PRODUCT_OR_ENGINEERING_GATE_RETAINED",
+      "recent": "in_progress"
+    },
+    {
+      "path": ".github/workflows/xml229-resolver-grouping-modes.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    },
+    {
+      "path": ".github/workflows/xml229-staged-field-precedence.yml",
+      "reason": "LATEST_SAMPLED_RUN_SUCCESS",
+      "recent": "success"
+    }
+  ],
+  "removed": [
+    {
+      "path": ".github/workflows/att-native-conversion-scope.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-hierarchy-index.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-private-chromium-contract.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-runtime-h5.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-scope-selection.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-tree-projection.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-txt-chromium-ux.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-txt-output-preflight.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-txt-selection-ux.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/att-native-txt-tree-ux.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/categorized-inputxml-authority-pin.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/cii-v11-v14-dropdown-qualification.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/cii14-merge-qualification.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/fbx-governed-wasm.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/fbx-live-ui-cache-chain.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/fbx-pages-deployment-smoke.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/fbx-preview-shell-pages-smoke.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/fbx2-benchmark-audit.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/fbx2-browser-managed-reference.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/hp-kd320-q1-qualification.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/hp-piping-class-i1-i3.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-1001-agent-w-weight-contract.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-776-validation.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-781-auto-authority-followup-validation.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-781-material-suggestion-validation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-781-postmerge-screenshot-repair-validation.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-781-regex-master-evidence.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-781-weight-build-validation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-781-weight-match-ux-validation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-781-worker-weight-validation.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-835-c05-1-baseline.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-836-c05-2-piping-class.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-837-c05-3-mat-map.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-841-c05-7-final-qualification.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-859-c05-4-5-valve-weight.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-860-c05-4-6-valve-weight-final.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-875-c05-5-5-persistence-status-retry.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-884-c05-5-4-5-final.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-892-c05-6-1-three-master.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-893-c05-6-2-consumer-authority.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-894-c05-6-3-dataset-scale.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-895-c05-6-4-final-qualification.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-902-c06-2-combined-authority.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-903-c06-3-topology-delta.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-905-c06-5-final-qualification.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/issue-921-j04-p0-recovery.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/issue-980-mode-b-parity.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1105-admission.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1105-original-idb.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1105-provisional-stage.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1105-source-session.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1120-r09-wire.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1128-source-page-budget.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-06-page-integrity.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-07-head-fencing.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-authentic-firstpass-source-parity.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-consumer-projection.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-query-experiment.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-sparse-experiment.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-1147-b0-xml-csv-parity.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-default-route.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-generated-capacity.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-lifecycle.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-policy-boundaries.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-semantic-served.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-w10-asset-parity.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-w11-scope-nc.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-w15-joint-boundary.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/lfj-226-o1-worker-intake.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r01-profiles.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r02-ownership.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r03-source.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r04-tokenizer.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r05-index.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r06-worker-isolation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r07-job-lifecycle.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r08-selection.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r09-pages.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-r10-ports.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-v4-decomposition.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-v4-integrated-consumers.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-v41-amendment.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-v41-store.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-v42-bridge-authority.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/lfj-v42-durable-bridge.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/rvmattr-scope-tree.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/stagedjson-pages-runtime-contract.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/topology-edit-support-reprojection.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/vibration-aiv-controlled-source.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/vibration-mitigation-custody-regression.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/vibration-project-v2-lifecycle-regression.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/vibration-roadmap-portability-audit.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/vibration-roadmap-ui-regression.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/vibration-roadmap-ui012-viewport-audit.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-builder-producer-shadow-conformance.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-chromium-witness.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-lfj-progress.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-p1-focused.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-p1b-source-badge-browser.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-p3a-preview-worker-authority.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-p3b3-real-preview.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-r02-master-rows.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-229-weight-blank.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-browser-semantic-core-timing.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml-cii-gc-pw-contract.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-gc-pw-mass-oracle.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-gc-pw-occurrence-bridge.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-gc-pw-session.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-gc-pw-source-oracle.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-gc-pw-worker-fact-gate.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-b2a-worker-rebuild.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-basis-contract.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-facts-read-model.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-modeb-basis.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-modeb-custody.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-modeb-real-button.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-modeb-session.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-occurrence-contract.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-p0-red.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-p22a-worker.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-p22b-job-lifecycle.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-p3a-button.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-p3b1-source-pages.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-p4-a1-golden.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-preview-v7-observer-feedback.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml-cii-source-schema-pr612.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-bc4-fixture.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-bc4-historical-linelist-attestation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-bc4-real-ef05-production-candidate.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-bundled-weight-existing-workflow.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-full-master-original-preview-integrity.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-g5-native-element-lineage.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-historical-three-master-recovery.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-immutable-engineering-basis.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-issue364-bm2-linelist.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-issue364-descriptor-gap.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-l2-psi116-prefinal-lineage.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-original-weight-ui-wiring.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-p263-existing-workflow-browser.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-p263-integration-correction.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-p4-weight-presentation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-p4-worker-weight-integration.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-postmerge-full-regression.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-published-pages-smoke.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-r2-external-log.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-run-stage-truth.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-simple-applied-weight-ui.yml",
+      "recent": "failure"
+    },
+    {
+      "path": ".github/workflows/xml229-staged-position-owner-proof.yml",
+      "recent": "NOT_IN_LATEST_100"
+    },
+    {
+      "path": ".github/workflows/xml229-weight-review-session-navigation.yml",
+      "recent": "NOT_IN_LATEST_100"
+    }
+  ],
+  "notes": [
+    "Keep deploy-app-on-main.yml unchanged, including push-to-main and workflow_dispatch",
+    "Keep failed but safety-critical canonical-output and native-final gate workflows as engineering HOLD",
+    "No workflows merged or deployed by the cleanup PR",
+    "If required status checks exist outside visible rulesets, update those checks before merging this PR"
+  ]
+}
