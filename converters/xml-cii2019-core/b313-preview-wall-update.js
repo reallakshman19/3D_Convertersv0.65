@@ -4,6 +4,7 @@ import {
   normalizeB313MaterialFamily,
   resolveB313DesignFactors,
   resolveB313MaterialIdentity,
+  resolveB313QualifiedTemperatureFactor,
 } from '../b313-material-factors/index.js';
 import { selectPipeWallForCalculation } from '../pipe-wall-master/index.js';
 
@@ -272,9 +273,22 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
   }
   const strictRows = applicableRows.filter((row) => STRICT_FACTOR_STATUSES.has(text(row.status).toUpperCase()));
   const rejectedRows = applicableRows.filter((row) => !STRICT_FACTOR_STATUSES.has(text(row.status).toUpperCase()));
-  let status = 'STRICT_AVAILABLE';
-  if (!strictRows.length) {
-    if (!exactTemperatureRows.length) status = 'NO_EXACT_TEMPERATURE_RECORD';
+  const qualifiedResolution = resolveB313QualifiedTemperatureFactor({
+    factor, records, materialId, temperatureC: designTemperatureC,
+    manufacturingRoute: requestedRoute, edition: B313_MATERIAL_FACTOR_MASTER.edition,
+  });
+  const eligible = !!qualifiedResolution;
+  const sourceTemperaturesC = uniqueSortedNumbers(qualifiedResolution?.sourceTemperaturesC || []);
+  const nearbyTemps = uniqueSortedNumbers(materialRows.map((row)=>row.temperatureC));
+  const lower = nearbyTemps.filter((t)=>t<designTemperatureC).at(-1);
+  const upper = nearbyTemps.find((t)=>t>designTemperatureC);
+  const surroundingRows = materialRows.filter((row) => Number(row.temperatureC)===lower || Number(row.temperatureC)===upper);
+  let status = qualifiedResolution?.resolution === 'LINEAR_QUALIFIED'
+    ? 'QUALIFIED_INTERPOLATION_AVAILABLE'
+    : qualifiedResolution?.resolution === 'QUALIFIED_CONSTANT_RANGE'
+      ? 'QUALIFIED_RANGE_AVAILABLE' : 'STRICT_AVAILABLE';
+  if (!eligible) {
+    if (!exactTemperatureRows.length) status = 'NO_QUALIFIED_TEMPERATURE_BASIS';
     else if (routeSensitive && !requestedRoute && !applicableRows.length) status = 'MANUFACTURING_ROUTE_REQUIRED';
     else if (routeSensitive && requestedRoute && !applicableRows.length) status = 'MANUFACTURING_ROUTE_NO_MATCH';
     else if (rejectedRows.length) status = 'QUALIFICATION_STATUS_REJECTED';
@@ -283,7 +297,11 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
   return {
     factor,
     status,
-    strictAvailable: strictRows.length > 0,
+    strictAvailable: eligible,
+    qualifiedResolution: qualifiedResolution?.resolution || null,
+    qualifiedSourceTemperaturesC: sourceTemperaturesC,
+    nearbyTemperaturesC: [lower, upper].filter(Number.isFinite),
+    nearbySourceStatuses: uniqueText(surroundingRows.map(row=>row.status)),
     materialRecordCount: materialRows.length,
     exactTemperatureRecordCount: exactTemperatureRows.length,
     applicableRecordCount: applicableRows.length,
@@ -291,13 +309,14 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
     requestedManufacturingRoute: requestedRoute,
     availableManufacturingRoutes: uniqueText(exactTemperatureRows.map((row) => row.manufacturingRoute)),
     candidateStatuses: uniqueText(exactTemperatureRows.map((row) => row.status)),
+    nearbySourceAuthorities: uniqueText(surroundingRows.map(row=>row.sourceAuthority || row.basisId)),
     rejectedStatuses: uniqueText(rejectedRows.map((row) => row.status)),
     candidateAuthorities: uniqueText(exactTemperatureRows.map((row) => row.sourceAuthority || row.basisId)),
   };
 }
 
 export function explainPreviewB313FactorAvailability({ materialId, designTemperatureC, manufacturingRoute = '' } = {}) {
-  const temperature = Number(designTemperatureC);
+  const temperature = text(designTemperatureC)==='' ? NaN : Number(designTemperatureC);
   if (!text(materialId) || !Number.isFinite(temperature)) return null;
   const factors = Object.fromEntries(['S', 'E', 'W', 'Y'].map((factor) => [
     factor,
