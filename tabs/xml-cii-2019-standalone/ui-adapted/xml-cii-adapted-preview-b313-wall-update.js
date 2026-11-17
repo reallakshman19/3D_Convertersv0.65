@@ -635,6 +635,18 @@ export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
       message:'Exact-DN Piping Class product, schedule, wall or source row missing. Do not substitute an unapproved schedule.',
       details:{cls,dn,classDn,wall,schedule,product,sourceRow}};
   }
+  const listed=listPipeWallsForSize({ dimensionStandard:calc.dimensionStandard, dn });
+  const normalizedSchedule=(value)=>text(value).toUpperCase().replace(/^SCH(?:EDULE)?\\s*/,'').replace(/\\s+/g,'');
+  const matching=listed.ok ? listed.rows.filter(item=>
+    normalizedSchedule(item.schedule)===normalizedSchedule(schedule)) : [];
+  if (!matching.length) return {ok:false,code:'B313_PREVIEW_CLASS_SCHEDULE_NOT_IN_MASTER',
+    message:'Exact-DN class schedule is not present for the selected dimension standard. Confirm class schedule/standard; do not substitute a different schedule.',
+    details:{cls,dn,schedule,dimensionStandard:calc.dimensionStandard}};
+  if (!matching.some(item=>Math.abs(Number(item.nominalWallMm)-wall)<=0.08)) {
+    return {ok:false,code:'B313_PREVIEW_CLASS_WALL_DIMENSION_CONFLICT',
+      message:'Exact-DN class nominal wall conflicts with the pipe-wall master for the same schedule and dimension standard.',
+      details:{cls,dn,schedule,classWallMm:wall,referenceWallsMm:matching.map(item=>item.nominalWallMm)}};
+  }
   if (wall>=Number(calc.outsideDiameterMm)/2) return {
     ok:false,code:'B313_PREVIEW_CLASS_WALL_GEOMETRY_INVALID',
     message:'Class wall is geometrically inconsistent with actual pipe OD.'};
