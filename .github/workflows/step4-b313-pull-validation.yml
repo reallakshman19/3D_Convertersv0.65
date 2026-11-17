@@ -52,6 +52,8 @@ jobs:
         run: |
           node --test \
             tests/b313-material-factors.test.mjs \
+            tests/xml-cii-b313-factor-qualification-intake.test.mjs \
+            tests/xml-cii-b313-preview-blocker-ui-static.test.mjs \
             tests/xml-cii-b313-preview-pull-v065.test.mjs \
             tests/xml-cii-b313-preview-wall-update.test.mjs \
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
