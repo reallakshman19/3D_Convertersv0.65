@@ -375,7 +375,7 @@ function stressUnitCell(model) {
   return `<select data-b313-auto-field="stressUnit" style="background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${['MPa','ksi','psi'].map((unit) => `<option value="${unit}" ${current === unit.toUpperCase() ? 'selected' : ''}>${unit}</option>`).join('')}</select>`;
 }
 
-function panelHtml(models, config = {}) {
+function panelHtml(models, config = {}, physicalRowCount = models.length) {
   const tolerance = config?.b313WallUpdate?.millTolerance || { basis: 'percent', value: 12.5 };
   const csFallback = config?.b313WallUpdate?.materialFallback?.enabled !== false;
   const rowsHtml = models.map((model) => {
@@ -421,7 +421,7 @@ function panelHtml(models, config = {}) {
   }).join('');
 
   return `<div data-mc-b313-auto-basis-panel style="margin:8px 0;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;padding:8px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>B31.3 automatic basis</strong><span style="font-size:10px;color:#94a3b8;">${models.length} material-temperature group${models.length === 1 ? '' : 's'}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>B31.3 Wall Review — Basis &amp; Results</strong><span style="font-size:10px;color:#94a3b8;">${physicalRowCount} physical Preview row(s) · ${models.length} occurrence-scoped basis entry/entries</span></div>
     <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data. Only source-confirmed ASTM A106 pipe may imply seamless manufacturing; generic CS does not.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
       <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
@@ -430,6 +430,9 @@ function panelHtml(models, config = {}) {
       <small>Changed tolerance requires recalculation; qualified factors are still mandatory.</small>
     </div>
     <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th>Basis / source / review</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+    <div data-mc-b313-unified-audit-slot style="margin-top:10px;border-top:1px solid #475569;padding-top:8px;">
+      <div style="font-size:11px;color:#94a3b8;">Calculation results appear here after the B31.3 calculate action. DTXR source wall and B31.3 design wall remain separate authorities. Calculating does not update wall thickness: explicit Pull remains required.</div>
+    </div>
   </div>`;
 }
 
@@ -640,10 +643,10 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
 
   host.querySelector?.('[data-mc-b313-auto-basis-panel]')?.remove?.();
   if (models.length) {
-    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config));
+    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config, rows.length));
     else {
       const actionBar = host.querySelector?.('[data-mc-preview-build]')?.parentElement;
-      actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models));
+      actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models, config, rows.length));
     }
     const panel = host.querySelector?.('[data-mc-b313-auto-basis-panel]');
     bindTableLinks(panel);
