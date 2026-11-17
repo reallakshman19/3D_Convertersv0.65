@@ -6,7 +6,10 @@ import {
   resolvePreviewB313FactorBasis,
   resolvePreviewB313MaterialIdentity,
 } from '../converters/xml-cii2019-core/b313-preview-wall-update.js';
-import { resolveMaterialCodeFromLineMaterial } from '../converters/xml-cii2019-core/branch-process-resolver.js';
+import {
+  resolveMaterialCodeFromLineMaterial,
+  resolveXmlCiiB313ClassMaterialEvidence,
+} from '../converters/xml-cii2019-core/branch-process-resolver.js';
 import { resolvePreviewB313MaterialFromRow } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const base = {
@@ -164,14 +167,24 @@ const processLtcs = resolveMaterialCodeFromLineMaterial({
 });
 assert.equal(processLtcs.material, 'LTCS');
 assert.equal(processLtcs.materialCode, '');
-assert.equal(processLtcs.materialCodeCorroborationCandidate, 'ASTM A333-6');
-assert.equal(processLtcs.materialCodeCorroborationNeedsReview, false);
+const classEvidence = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass: '11472', config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+assert.equal(classEvidence.materialCodeCorroborationCandidate, 'ASTM A333-6');
+assert.equal(classEvidence.materialCodeCorroborationNeedsReview, false);
+assert.equal(classEvidence.materialCodeCorroborationMethod, 'exact');
+const weakClassEvidence = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass: '31148', config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+if (weakClassEvidence.materialCodeCorroborationCandidate) {
+  assert.equal(weakClassEvidence.materialCodeCorroborationNeedsReview, true);
+}
 const processLtcsB313 = resolvePreviewB313MaterialFromRow({
   material: processLtcs.material, materialSource: processLtcs.source,
   materialCode: processLtcs.materialCode,
   materialCodeNeedsReview: true,
-  materialCodeCorroborationCandidate: processLtcs.materialCodeCorroborationCandidate,
-  materialCodeCorroborationSource: processLtcs.materialCodeCorroborationSource,
+  materialCodeCorroborationCandidate: classEvidence.materialCodeCorroborationCandidate,
+  materialCodeCorroborationSource: classEvidence.materialCodeCorroborationSource,
   materialCodeCorroborationNeedsReview: false,
   pipingClassNeedsReview: false,
 }, {});
