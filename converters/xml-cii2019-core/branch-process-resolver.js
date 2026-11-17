@@ -522,6 +522,16 @@ export function resolveBranchProcessData({
     xmlBranch,
     config,
   });
+  // An exact Step 8 class material can corroborate a broad Line List family
+  // for B31.3 without changing the governing Line List material/code.
+  const configuredMaterialEvidence = resolveConfiguredMaterialCode({
+    pipingClass: resolvedPipingClass, config,
+  });
+  const configuredGrade = text(configuredMaterialEvidence?.materialName);
+  const configuredGradeNeedsReview = !!configuredGrade && (
+    configuredMaterialEvidence?.method !== 'exact'
+    || Number(configuredMaterialEvidence?.confidence) < 90
+  );
   const corrosion = resolveCorrosionFromPipingClass({
     lineRow: resolverLineRow,
     boreMm,
@@ -560,6 +570,11 @@ export function resolveBranchProcessData({
       ? classRowMaterial(material.matchedRow)
       : '',
     materialCodeEvidenceSource: material.source,
+    materialCodeCorroborationCandidate: configuredGrade,
+    materialCodeCorroborationSource: configuredGrade ? 'piping-class-material-code-config' : '',
+    materialCodeCorroborationMethod: configuredMaterialEvidence?.method || '',
+    materialCodeCorroborationConfidence: configuredMaterialEvidence?.confidence ?? null,
+    materialCodeCorroborationNeedsReview: configuredGradeNeedsReview,
     materialCodeNeedsReview: material.needsReview === true || !!material.conflict || !material.materialCode,
     materialCodeConflict: material.conflict || null,
     corrosionAllowanceMm: corrosion.corrosionAllowanceMm,
