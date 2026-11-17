@@ -7,6 +7,7 @@ import {
 import {
   previewB313BasisKey,
   resolvePreviewB313MaterialFromRow,
+  b313SourceConfirmsA106Seamless,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261116-b313-pull-v065';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
@@ -192,14 +193,13 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const materialId = text(materialIdentity.material?.materialId);
   const storedBasis = storedBasisForRow(config, row, materialId, t1);
   const explicitRoute = text(storedBasis.manufacturingRoute);
-  // ASTM A106 is a seamless-pipe specification, but a generic CS family
-  // default to A106 is NOT evidence of the physical pipe product.
-  const confirmedA106Pipe = materialId === 'CS-A106-B'
-    && materialIdentity.b313IdentityNeedsReview !== true
-    && materialIdentity.b313FallbackApplied !== true
-    && materialIdentity.requestMode === 'EXACT_PREVIEW_MATERIAL'
-    && !(materialSource === 'piping-class-fallback'
-      && row?.materialCodeCorroborationSource !== 'piping-class-master-exact-DN');
+  const routeReference = text(storedBasis.manufacturingRouteSourceReference);
+  const routeEvidenceReviewed = storedBasis.manufacturingRouteEvidenceReviewed === true;
+  const confirmedA106Pipe = b313SourceConfirmsA106Seamless(row, materialIdentity);
+  // Route entries are candidates until a real pipe-spec/MTR source is
+  // independently reviewed. Factor table options do not prove construction.
+  const reviewedExplicitRoute = explicitRoute && ((routeReference && routeEvidenceReviewed) || confirmedA106Pipe)
+    ? explicitRoute : '';
 
   if (!t1 || text(row?.t1Source).toLowerCase() === 'default') {
     const defaultRoute = confirmedA106Pipe ? 'SEAMLESS' : '';
@@ -222,10 +222,8 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       previewHydroPressure: text(row?.hydroPressure),
       route: explicitRoute || defaultRoute,
       routeSource: explicitRoute
-        ? 'controlled Preview basis'
-        : defaultRoute
-          ? 'confirmed ASTM A106 product specification'
-          : 'unresolved',
+        ? reviewedExplicitRoute ? 'reviewed physical route evidence' : 'ROUTE SOURCE/REVIEW REQUIRED'
+        : defaultRoute ? 'confirmed ASTM A106 product specification' : 'unresolved',
       factorBasis: null,
       fallback: null,
       tableContext: { materialId, temperatureC: undefined },
@@ -235,20 +233,16 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const factorBasis = resolvePreviewB313FactorBasis({
     materialIdentity,
     designTemperatureC: t1,
-    manufacturingRoute: explicitRoute || (confirmedA106Pipe ? 'SEAMLESS' : ''),
+    manufacturingRoute: reviewedExplicitRoute || (confirmedA106Pipe ? 'SEAMLESS' : ''),
     manualBasis: storedBasis,
   });
   const availability = factorAvailabilityFrom(factorBasis);
-  const defaultRoute = routeFromAvailability(availability)
-    || (confirmedA106Pipe ? 'SEAMLESS' : '');
+  const defaultRoute = confirmedA106Pipe ? 'SEAMLESS' : '';
   const route = explicitRoute || defaultRoute;
   const routeSource = explicitRoute
-    ? 'controlled Preview basis'
-    : confirmedA106Pipe && route === 'SEAMLESS'
-      ? 'confirmed ASTM A106 product specification'
-      : route
-        ? 'active factor master'
-        : 'unresolved';
+    ? reviewedExplicitRoute ? 'reviewed physical route evidence' : 'ROUTE SOURCE/REVIEW REQUIRED'
+    : defaultRoute ? 'confirmed ASTM A106 product specification' : 'unresolved';
+  const routeNeedsReview = !!explicitRoute && !reviewedExplicitRoute;
 
   const strictReady = factorBasis?.ok && factorBasis.mode === 'ACTIVE_MASTER_STRICT';
   const storedFallbackReady = factorBasis?.ok && factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK';
@@ -263,6 +257,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const fallback = strictReady ? null : fallbackFromStoredOrSeed(storedBasis, seed);
   const status = materialIdentityNeedsReview && !materialIdentityReviewed
     ? { code: 'GRADE_REVIEW_REQUIRED', label: 'GRADE REVIEW REQUIRED' }
+    : routeNeedsReview ? { code: 'B313_ROUTE_EVIDENCE_REQUIRED', label: 'ROUTE EVIDENCE REQUIRED' }
     : strictReady
       ? { code: 'AUTO_READY', label: 'AUTO READY ✓' }
     : storedFallbackReady
@@ -282,8 +277,9 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     factorBasisCode: factorBasis?.code || '',
     statusCode: status.code,
     statusLabel: status.label,
-    factorSummary: strictReady
-      ? strictFactorSummary(factorBasis)
+    factorSummary: routeNeedsReview
+      ? 'Confirm the physical pipe manufacturing route against a controlled pipe spec/MTR and explicitly review the source; code-table route options are not construction evidence.'
+      : strictReady ? strictFactorSummary(factorBasis)
       : storedFallbackReady && fallback?.ok
         ? fallbackFactorSummary(fallback, true)
         : fallback?.ok
@@ -291,6 +287,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
           : unavailableFactorSummary(availability),
     route,
     routeSource,
+    routeNeedsReview,
     factorBasis,
     fallback,
     storedBasis,
