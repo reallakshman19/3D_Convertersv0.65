@@ -10,6 +10,11 @@ const SUBTABS = Object.freeze([
     load: () => import('./b313-material-factors-tab.js?v=engineering-2').then((module) => module.renderB313MaterialFactorsTab),
   },
   {
+    id: 'external-reference-review',
+    label: 'External Reference Review',
+    load: () => import('./external-engineering-reference-tab.js?v=20261117-extref-1').then((module) => module.renderExternalEngineeringReferenceTab),
+  },
+  {
     id: 'empirical-weight-tuning',
     label: 'Empirical Weight Tuning',
     load: () => import('./empirical-weight-tuning-tab.js?v=engineering-2').then((module) => module.renderEmpiricalWeightTuningTab),

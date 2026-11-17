@@ -38,7 +38,8 @@
     "verify:aiv-workbook-reconciliation": "node scripts/verify-aiv-workbook-reconciliation.mjs",
     "verify:aiv-independent-benchmarks": "node scripts/verify-aiv-independent-benchmarks.mjs",
     "verify:aiv-independent-promotion-review": "node scripts/verify-aiv-independent-promotion-review.mjs",
-    "build:github-pages-docs": "node scripts/build-github-pages-docs.mjs"
+    "build:github-pages-docs": "node scripts/build-github-pages-docs.mjs",
+    "verify:external-reference": "node --test tests/external-engineering-reference.test.mjs"
   },
   "dependencies": {
     "pyodide": "^0.27.2",

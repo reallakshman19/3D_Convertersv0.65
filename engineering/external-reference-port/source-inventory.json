@@ -1,0 +1,572 @@
+{
+  "schema": "external-engineering-source-inventory/v1",
+  "status": "SOURCE_INDEX_ONLY_NO_UPSTREAM_CONTENT_BUNDLED",
+  "scope": "Metadata inventory at user-supplied immutable Git revisions, not a licence grant or design approval.",
+  "licenseReview": "Neither pinned repository tree shows a top-level LICENSE; ascertain copying rights and any proprietary standards-data restrictions before any source-code/data mirroring.",
+  "sources": [
+    {
+      "name": "epcc",
+      "repository": "iman-taheri59/epcc-platform",
+      "pinnedCommit": "afa8b5989733c293bd91752de095376b64b60d98",
+      "subdirectory": "standards-packs",
+      "entries": [
+        {
+          "path": "standards-packs/awp.pack.json",
+          "gitBlobSha1": "a7fa7bffb797699e2e29be093bb4ea5f764186ac",
+          "bytes": 39052,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/ips-iran.pack.json",
+          "gitBlobSha1": "b5df90cb95ce7a0954853b50303918f78269df28",
+          "bytes": 43983,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/iso.pack.json",
+          "gitBlobSha1": "31ed0856193817111e007cea05775799984134b4",
+          "bytes": 34242,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/actuators.ref.json",
+          "gitBlobSha1": "a84d720b90be25c66d20987e89dc6c8831dd9d7a",
+          "bytes": 9963,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/allowable-stress.ref.json",
+          "gitBlobSha1": "a6b20119b517738459f3a605e88dbf051afc96cd",
+          "bytes": 1139272,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/b313-materials.ref.json",
+          "gitBlobSha1": "3d2d1201e87b54a62b2a3d50f6dccef4b85b4de6",
+          "bytes": 51446,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/component-templates.ref.json",
+          "gitBlobSha1": "123d903b87a1a87edeee3f41deb8e6cfd31fe522",
+          "bytes": 18581,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/end-types.ref.json",
+          "gitBlobSha1": "3abbb0907b4399cd52c9179f032ab1137dd0ccec",
+          "bytes": 6483,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/fitting-dimensions.ref.json",
+          "gitBlobSha1": "75494a54666a1a1d82fa049dd475f4278261fb65",
+          "bytes": 27994,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/flange-bolting.ref.json",
+          "gitBlobSha1": "1e9ae5bff369bfc85be72fd0e2b4db2672f012df",
+          "bytes": 105531,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/flange-pt-ratings.ref.json",
+          "gitBlobSha1": "d58341e839b17b21d218607b1291a17749489b24",
+          "bytes": 258963,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/flange-ratings.ref.json",
+          "gitBlobSha1": "fa85de158a6da09e9d4b1e3cf59af26b44ee2db2",
+          "bytes": 251912,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/fluid-service.ref.json",
+          "gitBlobSha1": "09b7abeaeef76c3041a362464477b914c655795b",
+          "bytes": 14681,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/forged-fitting-elbow-dimensions.ref.json",
+          "gitBlobSha1": "60ed5fc394773186266d972366d8fc0cece73c33",
+          "bytes": 20709,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/materials.ref.json",
+          "gitBlobSha1": "aa1a2769f7920b55b62df0def570e55f436dfbe4",
+          "bytes": 465838,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/pipe-schedules.ref.json",
+          "gitBlobSha1": "26071eb458bd512be9a46637c816e63ae52c37d9",
+          "bytes": 8143,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/pipe-sizes.ref.json",
+          "gitBlobSha1": "a72e8157f4cf8fb0fd8c688e7d6f45a5072533e5",
+          "bytes": 3539,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/actuators.schema.json",
+          "gitBlobSha1": "5b4e06614a0e304acb4774cd93fa9ee0de898f7b",
+          "bytes": 4331,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/allowable-stress.schema.json",
+          "gitBlobSha1": "c94d2a3f04f3f59f343e6a7be8bf3b79398cd9e5",
+          "bytes": 2433,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/component-templates.schema.json",
+          "gitBlobSha1": "ebf45f34a04c266d77cdba4f4558cb0bf11a7925",
+          "bytes": 4129,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/end-types.schema.json",
+          "gitBlobSha1": "4704a7655ed83cd49f95d526fdc9f38b4053982e",
+          "bytes": 1300,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/fitting-dimensions.schema.json",
+          "gitBlobSha1": "dc97aa384a8bd9cdaaf4a3ec736b66c21d4d55da",
+          "bytes": 4458,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/flange-bolting.schema.json",
+          "gitBlobSha1": "6117a310055571d6a9935ae059290172cf1f1353",
+          "bytes": 4379,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/flange-pt-ratings.schema.json",
+          "gitBlobSha1": "d27e433bc4c951a0c0ae36129e8da119d747574a",
+          "bytes": 7151,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/fluid-service.schema.json",
+          "gitBlobSha1": "6e012bda0e83d6daf0b442877ab4649435c0c118",
+          "bytes": 5938,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/forged-fitting-elbow-dimensions.schema.json",
+          "gitBlobSha1": "d2c0dba668d1ea27dc0ba63fdfef4110740c38ee",
+          "bytes": 6297,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/materials.schema.json",
+          "gitBlobSha1": "3f1af7d6edd81e95a807fc2b121229db8677a605",
+          "bytes": 7131,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/pipe-schedules.schema.json",
+          "gitBlobSha1": "b2112c8c3fd67c27c1b2fe2cadc792082b7971ee",
+          "bytes": 935,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/pipe-sizes.schema.json",
+          "gitBlobSha1": "b45e194395965e41a2efc103d3345796c33763f5",
+          "bytes": 1061,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/units.schema.json",
+          "gitBlobSha1": "bd761c04cb1910040f333b7375ba55332b10bd31",
+          "bytes": 5181,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/valve-construction.schema.json",
+          "gitBlobSha1": "3655939d4bd6473d3be4260313ea0a546a30e6f5",
+          "bytes": 6811,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/valve-face-to-face.schema.json",
+          "gitBlobSha1": "280afb95bda619b3e3c4490990a1bc5bf117dc29",
+          "bytes": 5298,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/valve-pt-ratings.schema.json",
+          "gitBlobSha1": "73ee4a30659e631245b850f081fd9062ca6337c2",
+          "bytes": 7600,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/schema/valve-testing.schema.json",
+          "gitBlobSha1": "0e5608121658f128318f03abd99a3a343cd18f24",
+          "bytes": 5390,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/units.ref.json",
+          "gitBlobSha1": "626dcccae88607d7808fea2127ec832945835f1d",
+          "bytes": 10868,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/valve-construction.ref.json",
+          "gitBlobSha1": "28ced7539b47f90523c7b5b23739f093c6dc5360",
+          "bytes": 52193,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/valve-face-to-face.ref.json",
+          "gitBlobSha1": "912370e70fb2b2d6f22178549f6da0362d500477",
+          "bytes": 652402,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/valve-pt-ratings.ref.json",
+          "gitBlobSha1": "2d055a05350b0a6711bf2bd1511fbe104503d169",
+          "bytes": 552563,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/reference/valve-testing.ref.json",
+          "gitBlobSha1": "4080bc02a5de86acbba5b06c45c305237619f3f4",
+          "bytes": 36974,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/schema/standards-pack.schema.json",
+          "gitBlobSha1": "6fdbe8255ced863e05c5b53f6e79a60c986be3d7",
+          "bytes": 16150,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/tests/test_fitting_dimensions.py",
+          "gitBlobSha1": "649fc57c4521a74bc6e0e479de8281d745f28511",
+          "bytes": 6869,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/tests/test_flange_ratings_cross_check.py",
+          "gitBlobSha1": "0d06b63eb6094fa140503ac8fabe23e2e3b485dc",
+          "bytes": 2512,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "standards-packs/validate_packs.py",
+          "gitBlobSha1": "7eb10cdeed4f93380da91fa58864501f98ea13f5",
+          "bytes": 152061,
+          "scope": "upstream-unmirrored"
+        }
+      ]
+    },
+    {
+      "name": "matseng",
+      "repository": "jvnshirr-collab/matseng",
+      "pinnedCommit": "2d649445356779d7c4c024edf6421844d51b638a",
+      "subdirectory": "core",
+      "entries": [
+        {
+          "path": "core/__init__.py",
+          "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "bytes": 0,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/advanced_fatigue.py",
+          "gitBlobSha1": "f314ac21b40c68d3e40cc5f816dad72fe9dbef19",
+          "bytes": 7448,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/asme_viii.py",
+          "gitBlobSha1": "f6a53d15ceb3136137db1a39e591575aba43654f",
+          "bytes": 16621,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/bayesian_inspection.py",
+          "gitBlobSha1": "b5951b981725cd440ee4722bde38dd2835efb309",
+          "bytes": 24542,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/corrosion.py",
+          "gitBlobSha1": "02d5f768cb1baeadca21f8c8aa99ef990cab73cd",
+          "bytes": 6209,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/corrosion_rate.py",
+          "gitBlobSha1": "74ce930707efb05dff5dd3bdf8304f93125a7097",
+          "bytes": 5056,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/creep.py",
+          "gitBlobSha1": "a5baaf589974dd39e55f3280ace15316f3b4fce9",
+          "bytes": 17341,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/creep.py.bak",
+          "gitBlobSha1": "503e10977bf002bd4e646fc96c5e9f983b5523a0",
+          "bytes": 12219,
+          "scope": "excluded-backup"
+        },
+        {
+          "path": "core/database.py",
+          "gitBlobSha1": "b93e6cb3c184ddcfc5b8c0e0735cb248ee5a83df",
+          "bytes": 1127,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/exceptions.py",
+          "gitBlobSha1": "ad42ceccb94063ddb0276bc89de72c17ea4d4bf6",
+          "bytes": 1698,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/failure_analysis.py",
+          "gitBlobSha1": "ff0aaa06c69a355b87bdcb3ef6d1855fb9dcbe08",
+          "bytes": 12629,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/fatigue.py",
+          "gitBlobSha1": "13422812c7eb0df51c19d4dd65a6d17077e84bb2",
+          "bytes": 38079,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/fatigue.py.bak",
+          "gitBlobSha1": "fca21fa7400bb658a926dd09bef4f66856e0b0f7",
+          "bytes": 21565,
+          "scope": "excluded-backup"
+        },
+        {
+          "path": "core/fea_bridge.py",
+          "gitBlobSha1": "aba0bd21f3bfc6925f6ce9a106139ba5c99057d5",
+          "bytes": 23125,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/fitness_for_service.py",
+          "gitBlobSha1": "7fe79f5c2424fdcc9114f21ade1ff2682787f9ed",
+          "bytes": 5151,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/flange_design.py",
+          "gitBlobSha1": "5208746db49419a7c2f40c75d08580c083c6b238",
+          "bytes": 12593,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/fracture.py",
+          "gitBlobSha1": "82ef7ca898213ffbde26b34f45e6aca863179b65",
+          "bytes": 4901,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/heat_treatment.py",
+          "gitBlobSha1": "f6b6a7777d5ba7cbb3a5ce56e4cdf5682d586cc4",
+          "bytes": 5177,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/inspection.py",
+          "gitBlobSha1": "bd564ba41ac1cf5d910d6187d5a604612b476148",
+          "bytes": 7870,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/logging.py",
+          "gitBlobSha1": "d0abc7b04d74ca61823298d6d8c274042c93c424",
+          "bytes": 2134,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/material_selection_advanced.py",
+          "gitBlobSha1": "ea55a3e771f10e91d16cb40be097d705add074c0",
+          "bytes": 125157,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/material_selection_advanced.py.bak",
+          "gitBlobSha1": "fb4c988a2b1a0de22ac3af66879439136a260061",
+          "bytes": 81798,
+          "scope": "excluded-backup"
+        },
+        {
+          "path": "core/models.py",
+          "gitBlobSha1": "e43d32948ead360f3447b042a6cb2f3e84baae79",
+          "bytes": 5902,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/mtc.py",
+          "gitBlobSha1": "5daad0b995cf6203731af11ab6116de677f4d257",
+          "bytes": 4769,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/phase_diagram.py",
+          "gitBlobSha1": "6fac6a39c9e70db45c892d1e6bb712955a2f0d35",
+          "bytes": 4440,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/phase_diagrams.py",
+          "gitBlobSha1": "22129e65cae7ec5cb80f61a4d1de1c028ed08cc4",
+          "bytes": 69696,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/phase_diagrams.py.bak",
+          "gitBlobSha1": "f475756280533c59bcf9282fa6167e1ef188916e",
+          "bytes": 37317,
+          "scope": "excluded-backup"
+        },
+        {
+          "path": "core/piping.py",
+          "gitBlobSha1": "f4713d6b0ab77c866ecef7afab1cbf5a9ea85dcf",
+          "bytes": 5288,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/probabilistic.py",
+          "gitBlobSha1": "8c988b645a511979f7954736b239d5d8918754a6",
+          "bytes": 8354,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/process_equipment.py",
+          "gitBlobSha1": "4f4c896ff93c59f85f9c1a63331b68b18d4b7230",
+          "bytes": 28597,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/properties.py",
+          "gitBlobSha1": "c7cce8af9404a45971f476a81867c47894fb2076",
+          "bytes": 5251,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/rag_standards.py",
+          "gitBlobSha1": "b217d6c86b1e4237a8a588f77ed9ad0ea9887d1d",
+          "bytes": 321545,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/rag_standards.py.bak",
+          "gitBlobSha1": "58e39b507d9cc14ceea896827d0175ca34572962",
+          "bytes": 127091,
+          "scope": "excluded-backup"
+        },
+        {
+          "path": "core/report_generator.py",
+          "gitBlobSha1": "2037dd6481eaa1d1715ecb28ee821bf2f6eb4681",
+          "bytes": 28629,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/repository.py",
+          "gitBlobSha1": "2cd27adbb7badc7fd2445939c1ae98fdc743fb27",
+          "bytes": 5147,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/research/__init__.py",
+          "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "bytes": 0,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/research/active_learning_alloy.py",
+          "gitBlobSha1": "735ff033f93dd45deecacd98c82a4492928608a8",
+          "bytes": 10561,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/research/pinn_creep.py",
+          "gitBlobSha1": "d199f65496ee132bf99f6d3e74f8959116e121a3",
+          "bytes": 8054,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/selector.py",
+          "gitBlobSha1": "af4e4594b2ce87dc269938789e01a2bd1e853f90",
+          "bytes": 4771,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/sour_service.py",
+          "gitBlobSha1": "3549dc23c63d48897b983656337ec8881a0ecbad",
+          "bytes": 5318,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/temp_dependent.py",
+          "gitBlobSha1": "421fba2c17ffdacd637919f352b98171766c7ea4",
+          "bytes": 8457,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/ttt_cct.py",
+          "gitBlobSha1": "e2073c2b28087b1713e0ba6a6ffac3b9443afd76",
+          "bytes": 56900,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/uncertainty.py",
+          "gitBlobSha1": "71bb1b55ca34f6f364b17881cad02035ecdeb185",
+          "bytes": 11559,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/units.py",
+          "gitBlobSha1": "b5fca3a0550b59200ce3c5c5f00dcc7f26100d7f",
+          "bytes": 6319,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/vessel_supports.py",
+          "gitBlobSha1": "8bef780a3c684abf7dc7e64ad61c56073fa9e26b",
+          "bytes": 14191,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/weld_procedures.py",
+          "gitBlobSha1": "f3aedbbcf208288f04ab71024848fbe9dc015011",
+          "bytes": 6615,
+          "scope": "upstream-unmirrored"
+        },
+        {
+          "path": "core/welding.py",
+          "gitBlobSha1": "ef6d2f5ae2a159a8e1785dbcef1994b07436ac7a",
+          "bytes": 4864,
+          "scope": "upstream-unmirrored"
+        }
+      ]
+    }
+  ],
+  "implementation": {
+    "referenceAdapter": "converters/external-engineering/reference-review.js",
+    "browserReview": "tabs/external-engineering-reference-tab.js",
+    "regression": "tests/external-engineering-reference.test.mjs",
+    "engineeringMasterPublication": "DISALLOWED",
+    "directStep4Mutation": "DISALLOWED",
+    "matsengPythonExecution": "NOT_IMPLEMENTED"
+  }
+}

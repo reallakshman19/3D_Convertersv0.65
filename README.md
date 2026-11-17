@@ -20,3 +20,8 @@ python -m http.server 8080
 ```
 
 Then open `http://localhost:8080/`.
+
+## External reference interoperability
+
+Engineering Calculations → External Reference Review supports opt-in, read-only inspection of locally supplied EPCC standards-pack JSON and a MatSEng-style piping calculation comparison. No upstream code, proprietary standard tables or unqualified B31.3 factors are bundled. See [read me.txt](read%20me.txt) for exact upstream commit IDs, scope, limitations and usage.
+
