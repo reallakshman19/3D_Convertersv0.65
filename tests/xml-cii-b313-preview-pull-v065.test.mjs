@@ -66,6 +66,23 @@ assert.equal(b313PullProposal(config, src, 0, [node]).code, 'B313_PULL_CS_FALLBA
 proposal.materialFallbackReviewed = true;
 assert.equal(b313PullProposal(config, src, 0, [node]).ok, true);
 
+const explicitMaterialCodeConflict = resolvePreviewB313MaterialFromRow({
+  material: 'ASTM A106-B', materialCode: '177',
+  materialCodeConflict: { overrideCode: '177', resolvedCode: '106' }, t1: '120',
+}, config);
+assert.equal(explicitMaterialCodeConflict.ok, false);
+assert.equal(explicitMaterialCodeConflict.code, 'B313_PREVIEW_MATERIAL_CODE_CONFLICT');
+const familyGradeProposal = config.b313WallUpdate.proposalsByBranch['0'];
+familyGradeProposal.materialIdentityNeedsReview = true;
+familyGradeProposal.materialIdentityReviewed = false;
+assert.equal(b313PullProposal(config, src, 0, [node]).code, 'B313_PULL_MATERIAL_GRADE_REVIEW_REQUIRED');
+familyGradeProposal.materialIdentityReviewed = true;
+assert.equal(b313PullProposal(config, src, 0, [node]).ok, true);
+assert.notEqual(b313PreviewInputSignature(src, config),
+  b313PreviewInputSignature({ ...src, materialCodeMatchedMaterial: 'ASTM A333-6' }, config));
+assert.notEqual(b313PreviewInputSignature(src, config),
+  b313PreviewInputSignature({ ...src, materialCodeNeedsReview: true }, config));
+
 const missing = resolvePreviewB313MaterialFromRow({ material: '', t1: '120' }, config);
 assert.equal(missing.ok, true);
 assert.equal(missing.material.materialId, 'CS-A106-B');
