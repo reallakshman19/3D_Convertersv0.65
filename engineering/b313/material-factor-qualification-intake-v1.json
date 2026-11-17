@@ -107,7 +107,8 @@
         "Authorized factor table source with version, units and temperature applicability",
         "Independent project acceptance"
       ],
-      "qualifiesForPull": false
+      "qualifiesForPull": false,
+      "projectCodeEditionConfirmed": false
     },
     {
       "id": "B313-Q-02",
@@ -188,7 +189,8 @@
         "Authorized factor table source with version, units and temperature applicability",
         "Independent project acceptance"
       ],
-      "qualifiesForPull": false
+      "qualifiesForPull": false,
+      "projectCodeEditionConfirmed": false
     },
     {
       "id": "B313-Q-03",
@@ -287,7 +289,8 @@
         "Authorized factor table source with version, units and temperature applicability",
         "Independent project acceptance"
       ],
-      "qualifiesForPull": false
+      "qualifiesForPull": false,
+      "projectCodeEditionConfirmed": false
     },
     {
       "id": "B313-Q-04",
@@ -362,7 +365,8 @@
         "Authorized factor table source with version, units and temperature applicability",
         "Independent project acceptance"
       ],
-      "qualifiesForPull": false
+      "qualifiesForPull": false,
+      "projectCodeEditionConfirmed": false
     }
   ],
   "publication": {
@@ -375,5 +379,7 @@
       "Do not copy T1 from another branch or T2/T3",
       "Do not treat ASTM A790/A928 class as a single qualified manufacturing route"
     ]
-  }
+  },
+  "projectCodeEditionConfirmed": false,
+  "codeEditionDecisionRequired": "Confirm actual Owner XML project governing B31.3 edition before publishing 2024 factor rows; unrelated project reports from a different edition do not qualify this model"
 }
