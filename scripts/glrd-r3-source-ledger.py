@@ -15,6 +15,7 @@ def child_text(e,key):
 def source_receipts(receipt,rows,xml_sha,workbook):
     """Check exact worksheet, cells, design-pressure header/units, and numerical source bytes."""
     from openpyxl import load_workbook
+    from openpyxl.utils.cell import coordinate_from_string
     if receipt.get('schema')!='glrd-psi02-line-receipt/v1' or receipt.get('sourceXmlSha256')!=xml_sha:
         raise ValueError('RECEIPT_XML_OR_SCHEMA_WRONG')
     if receipt.get('workbookSha256')!=digest(workbook):
@@ -35,6 +36,19 @@ def source_receipts(receipt,rows,xml_sha,workbook):
             cells=[rec.get(k) for k in keys]
             if any(not isinstance(c,str) or not re.fullmatch(r'[A-Z]{1,3}[1-9]\d*',c) for c in cells) or len(set(cells))!=len(cells):
                 raise ValueError('MISSING_OR_DUPLICATE_SOURCE_CELL')
+            # An exact line-key cell does NOT authorize taking P1/T1 from a
+            # different physical workbook row or from unrelated header columns.
+            line_col,line_row=coordinate_from_string(rec['lineCell'])
+            p_col,p_row=coordinate_from_string(rec['p1Cell'])
+            t_col,t_row=coordinate_from_string(rec['t1Cell'])
+            ph_col,ph_row=coordinate_from_string(rec['p1HeaderCell'])
+            th_col,th_row=coordinate_from_string(rec['t1HeaderCell'])
+            if line_row != p_row or line_row != t_row:
+                raise ValueError('CROSS_ROW_PROCESS_DATA_SUBSTITUTION')
+            if ph_col != p_col or th_col != t_col or ph_row >= p_row or th_row >= t_row:
+                raise ValueError('HEADER_NOT_BOUND_TO_SOURCE_VALUE_COLUMN')
+            if p_col == t_col or p_col == line_col or t_col == line_col:
+                raise ValueError('SOURCE_LINE_PRESSURE_TEMPERATURE_COLUMN_COLLISION')
             def cell(key):
                 raw=ws[rec[key]].value
                 return str(raw if raw is not None else '').strip()
@@ -60,7 +74,15 @@ def source_receipts(receipt,rows,xml_sha,workbook):
             try:agree=abs(float(rec.get('p1'))-p1)<1e-8 and abs(float(rec.get('t1C'))-t1)<1e-8
             except (TypeError,ValueError):agree=False
             if not agree:raise ValueError('SOURCE_RECEIPT_DIFFERS_FROM_WORKBOOK')
-            result[i]={'p1':p1,'p1Unit':next(iter(found)),'t1C':t1,'worksheet':name,
+            # Gauge-vs-absolute pressure is part of the source authority.
+            # It must not be guessed from the numerical P1 magnitude.
+            gauge=bool(re.search(r'\\(G\\)|\\bGAUGE\\b|\\bPSIG\\b|\\bBARG\\b',p_header))
+            absolute=bool(re.search(r'\\(A\\)|\\bABS(?:OLUTE)?\\b|\\bPSIA\\b',p_header))
+            if gauge == absolute:
+                raise ValueError('P1_GAUGE_ABSOLUTE_SOURCE_UNRESOLVED')
+            if rec.get('pressureBasis') != ('GAUGE' if gauge else 'ABSOLUTE'):
+                raise ValueError('P1_PRESSURE_BASIS_RECEIPT_MISMATCH')
+            result[i]={'p1':p1,'p1Unit':next(iter(found)),'pressureBasis':rec['pressureBasis'],'t1C':t1,'worksheet':name,
                        'lineCell':rec['lineCell'],'p1Cell':rec['p1Cell'],'t1Cell':rec['t1Cell']}
         return result
     finally:wb.close()
@@ -89,7 +111,7 @@ def produce(manifest_file,matrix_file,source_dir,out_dir,line_receipt=None,line_
         if not line_key:raise ValueError('SOURCE_LINE_KEY_MISSING')
         rows.append({'sourceOrdinal':i,'branchName':name,'lineKey':line_key,
           'sourceXmlSha256':source_xml_sha,'ownerAuditFactorGroup':expected.get('auditFactorGroup'),
-          'p1':None,'p1Unit':None,'t1C':None,'selectedWorksheet':None,'lineListSourceCell':None,
+          'p1':None,'p1Unit':None,'p1PressureBasis':None,'t1C':None,'selectedWorksheet':None,'lineListSourceCell':None,
           'processEvidenceStatus':'HOLD_LINE_LIST_RECEIPT_NOT_PROVIDED',
           'b313AuthorityStatus':'HOLD_PRODUCT_ROUTE_AND_S_E_W_Y_UNQUALIFIED',
           'acceptedPull':False,'finalWallMm':None,'nativeCiiVerified':False})
@@ -98,7 +120,7 @@ def produce(manifest_file,matrix_file,source_dir,out_dir,line_receipt=None,line_
         if not line_master:raise ValueError('LINE_MASTER_PATH_REQUIRED')
         receipts=source_receipts(json.loads(Path(line_receipt).read_text()),rows,source_xml_sha,line_master)
     for i,e in receipts.items():
-        rows[i].update(p1=e['p1'],p1Unit=e['p1Unit'],t1C=e['t1C'],selectedWorksheet=e['worksheet'],
+        rows[i].update(p1=e['p1'],p1Unit=e['p1Unit'],p1PressureBasis=e['pressureBasis'],t1C=e['t1C'],selectedWorksheet=e['worksheet'],
           lineListSourceCell=e['lineCell'],
           processEvidenceStatus='EXACT_WORKBOOK_CELLS_MATCH_NOT_ENGINEERING_APPROVAL')
     summary={'schema':'glrd-psi02-source-to-cii-physical-ledger/v1',
