@@ -554,7 +554,13 @@ export function resolveBranchProcessData({
     materialSource: material.source,
     materialCodeConfidence: material.confidence ?? null,
     materialCodeMatchMethod: material.matchMethod || null,
-    materialCodeNeedsReview: material.needsReview ?? !material.materialCode,
+    // Preserve the exact specification from the resolved Step 8 or material-map
+    // row. A material code/family by itself is not an exact B31.3 grade.
+    materialCodeMatchedMaterial: material.materialCode
+      ? classRowMaterial(material.matchedRow)
+      : '',
+    materialCodeEvidenceSource: material.source,
+    materialCodeNeedsReview: material.needsReview === true || !!material.conflict || !material.materialCode,
     materialCodeConflict: material.conflict || null,
     corrosionAllowanceMm: corrosion.corrosionAllowanceMm,
     corrosionSource: corrosion.source,
