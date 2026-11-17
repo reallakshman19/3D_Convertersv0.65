@@ -34,7 +34,9 @@ for (const factor of ['S','E','W','Y']) {
     if (!Number.isFinite(val) || (factor !== 'Y' && val <= 0) || (factor === 'Y' && val < 0)
         || (['E','W'].includes(factor) && val > 1)) qualificationErrors.push(`${prefix}: invalid factor value`);
     if (row.temperatureApplicability === 'CONSTANT_RANGE') {
-      if (factor === 'S' || !Number.isFinite(Number(row.validFromC))
+      if (factor === 'S' || row.validFromC == null || row.validToC == null
+          || row.validFromC === '' || row.validToC === ''
+          || !Number.isFinite(Number(row.validFromC))
           || !Number.isFinite(Number(row.validToC)) || Number(row.validFromC) > Number(row.validToC)) {
         qualificationErrors.push(`${prefix}: invalid qualified temperature range`);
       }
