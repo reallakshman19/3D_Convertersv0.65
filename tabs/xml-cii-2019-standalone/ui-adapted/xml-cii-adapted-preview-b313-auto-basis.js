@@ -41,6 +41,9 @@ function storedBasisForRow(config, row, materialId, t1) {
   if (!bases || typeof bases !== 'object' || Array.isArray(bases)) return {};
   const key = previewB313BasisKey(row, config);
   if (key && bases[key] && typeof bases[key] === 'object') return bases[key];
+  // A family-default identity review is scoped to the Preview occurrence.
+  // Never resurrect an old shared material/T1 approval from another line.
+  if (key.includes('|GRADE_SCOPE:')) return {};
   return Object.values(bases).find((basis) => (
     basis
     && typeof basis === 'object'
@@ -155,7 +158,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
   const storedBasis = storedBasisForRow(config, row, materialId, t1);
   const explicitRoute = text(storedBasis.manufacturingRoute);
 
-  if (!t1) {
+  if (!t1 || text(row?.t1Source).toLowerCase() === 'default') {
     const defaultRoute = materialId === 'CS-A106-B' ? 'SEAMLESS' : '';
     return {
       schema: B313_PREVIEW_AUTO_BASIS_SCHEMA,
@@ -165,9 +168,11 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
       t1,
       materialId,
       identityCode: materialIdentity.code,
-      statusCode: 'B313_PREVIEW_T1_REQUIRED',
-      statusLabel: 'T1 REQUIRED',
-      factorSummary: 'S/E/W/Y not evaluated until Preview T1 is resolved',
+      statusCode: !t1 ? 'B313_PREVIEW_T1_REQUIRED' : 'B313_PREVIEW_T1_SOURCE_UNVERIFIED',
+      statusLabel: !t1 ? 'T1 REQUIRED' : 'T1 SOURCE REVIEW',
+      factorSummary: !t1
+        ? 'S/E/W/Y not evaluated until Preview T1 is resolved. Enter design T1 in existing 4 Preview, then Rebuild. No fallback temperature is assumed.'
+        : 'T1 came from a configuration default, not verified design evidence. Confirm T1 in 4 Preview and rebuild.',
       route: explicitRoute || defaultRoute,
       routeSource: explicitRoute
         ? 'controlled Preview basis'
@@ -200,14 +205,19 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
 
   const strictReady = factorBasis?.ok && factorBasis.mode === 'ACTIVE_MASTER_STRICT';
   const storedFallbackReady = factorBasis?.ok && factorBasis.mode === 'MANUAL_EXPLICIT_FALLBACK';
+  const materialIdentityNeedsReview = materialIdentity.b313IdentityNeedsReview === true;
+  const materialIdentityReviewed = storedBasis.identityReviewed === true
+    || (materialIdentity.b313FallbackApplied === true && storedBasis.csFallbackReviewed === true);
   const seed = strictReady ? null : suggestPreviewB313FallbackBasis({
     materialIdentity,
     designTemperatureC: t1,
     manufacturingRoute: route,
   });
   const fallback = strictReady ? null : fallbackFromStoredOrSeed(storedBasis, seed);
-  const status = strictReady
-    ? { code: 'AUTO_READY', label: 'AUTO READY ✓' }
+  const status = materialIdentityNeedsReview && !materialIdentityReviewed
+    ? { code: 'GRADE_REVIEW_REQUIRED', label: 'GRADE REVIEW REQUIRED' }
+    : strictReady
+      ? { code: 'AUTO_READY', label: 'AUTO READY ✓' }
     : storedFallbackReady
       ? { code: 'CONTROLLED_FALLBACK_READY', label: 'CONTROLLED FALLBACK READY' }
       : fallback?.ok
@@ -237,6 +247,8 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     factorBasis,
     fallback,
     storedBasis,
+    materialIdentityNeedsReview,
+    materialIdentityReviewed,
     materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
     tableContext: {
       materialId,
@@ -265,7 +277,20 @@ function statusColor(model) {
 
 function sourceInfo(model, factor) {
   const source = model.fallback?.factorSources?.[factor] || model.factorBasis?.factorSources?.[factor] || null;
-  if (!source) return `${factor}: no candidate source record is available.`;
+  if (!source) {
+    const availability = factorAvailabilityFrom(model.factorBasis)?.factors?.[factor];
+    if (!availability) return `${factor}: no candidate or qualified source record is available.`;
+    return [
+      `${factor}: ${availability.status || 'UNAVAILABLE'}`,
+      availability.candidateStatuses?.length ? `candidate statuses: ${availability.candidateStatuses.join(', ')} (at T1)` : '',
+      availability.nearbySourceStatuses?.length ? `nearby data status: ${availability.nearbySourceStatuses.join(', ')}` : '',
+      availability.nearbyTemperaturesC?.length ? `neighbor temperatures: ${availability.nearbyTemperaturesC.join(', ')} °C` : '',
+      availability.qualifiedSourceTemperaturesC?.length ? `qualified resolution points: ${availability.qualifiedSourceTemperaturesC.join(', ')} °C` : '',
+      availability.availableTemperaturesC?.length ? `all source temperatures: ${availability.availableTemperaturesC.join(', ')} °C` : '',
+      availability.availableManufacturingRoutes?.length ? `routes: ${availability.availableManufacturingRoutes.join(', ')}` : '',
+      'No qualified factor has been selected at the effective Preview temperature.',
+    ].filter(Boolean).join(' · ');
+  }
   const parts = [
     `${factor} source`,
     finite(source.temperatureC) !== null ? `T=${source.temperatureC} °C` : '',
@@ -304,13 +329,16 @@ function panelHtml(models, config = {}) {
     const route = model.route || '—';
     const routeSource = model.routeSource || 'unresolved';
     const iconDisabled = model.tableContext?.materialId ? '' : 'disabled';
+    const identityHint = model.materialIdentityNeedsReview && !model.materialIdentityReviewed
+      ? '<div style="font-size:9px;color:#fbbf24;">Family-default grade is only a candidate; verify the exact material specification.</div>'
+      : '';
     const seedHint = model.fallback?.ok && model.statusCode !== 'CONTROLLED_FALLBACK_READY'
       ? `<div style="font-size:9px;color:#fbbf24;margin-top:2px;">Seed ${esc(model.fallback.seedTemperatureC)} °C · ${esc(model.fallback.selectionDirection || '')} · no interpolation</div>`
       : '';
     const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1}</div></td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${seedHint}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${identityHint}${seedHint}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div></td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'S', 'allowableStress', { width: '82px' })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${stressUnitCell(model)}</td>
@@ -323,6 +351,7 @@ function panelHtml(models, config = {}) {
         <input type="text" data-b313-auto-source-reference placeholder="Qualified source reference (required)" value="${esc(model.storedBasis?.sourceReference || '')}" style="margin-top:4px;width:98%;">
         <label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-design-approved ${model.storedBasis?.designApproved === true ? 'checked' : ''}> Qualified manual basis reviewed</label>
         ${model.materialFallbackApplied ? `<label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-cs-reviewed ${model.storedBasis?.csFallbackReviewed === true ? 'checked' : ''}> Confirm CS fallback applies</label>` : ''}
+        ${model.materialIdentityNeedsReview && !model.materialFallbackApplied ? `<label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-identity-reviewed ${model.storedBasis?.identityReviewed === true ? 'checked' : ''}> Exact material grade verified against controlled source</label>` : ''}
       </td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;text-align:center;vertical-align:middle;white-space:nowrap;"><button type="button" data-b313-auto-refresh ${refreshDisabled} aria-label="Accept current fallback and recalculate" title="Accept current fallback values and recalculate B31.3 wall" style="width:24px;height:24px;padding:0;border:1px solid #64748b;border-radius:4px;background:#111827;color:#fbbf24;cursor:pointer;font-size:16px;line-height:22px;">↻</button> <button type="button" data-b313-auto-open-material ${iconDisabled} aria-label="Open B31.3 Material Factors table" title="Open B31.3 Material Factors table" style="width:24px;height:24px;padding:0;border:1px solid #64748b;border-radius:4px;background:#111827;color:#e2e8f0;cursor:pointer;font-size:14px;line-height:22px;">▦</button></td>
     </tr>`;
@@ -417,6 +446,7 @@ function bindRefresh(panel, host, config, models, options) {
       sourceReference: text(rowEl?.querySelector?.('[data-b313-auto-source-reference]')?.value),
       designApproved: rowEl?.querySelector?.('[data-b313-auto-design-approved]')?.checked === true,
       csFallbackReviewed: rowEl?.querySelector?.('[data-b313-auto-cs-reviewed]')?.checked === true,
+      identityReviewed: rowEl?.querySelector?.('[data-b313-auto-identity-reviewed]')?.checked === true,
       pressureUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="pressureUnit"]')?.value || 'AUTO'),
       dimensionStandard: text(rowEl?.querySelector?.('[data-b313-auto-field="dimensionStandard"]')?.value || 'AUTO'),
     };

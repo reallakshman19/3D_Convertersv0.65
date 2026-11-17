@@ -37,6 +37,54 @@ explicit ⤓ Pull confirmation (never Fill Down)
 accepted same-OD node group → Rebuild Preview → enriched XML parity verification
 ```
 
+## 2026-11 B31.3 robustness correction
+
+No new Step 4 columns: effective Preview remains the sole input and the
+existing ⤳ Pull action remains distinct from Fill. Step 8 exact Piping
+Class/material-code evidence is passed to the B31.3 resolver *only as
+corroboration*, never as a silent Line List material overwrite. Generic
+`DSS`, `LTCS` or `CS` may name a family candidate; the inferred grade
+is not an engineering-qualified material specification without reviewed
+evidence. Conflicting primary material and exact class grade HOLD.
+
+For **LTCS at 82 °C**, strict S may be interpolated only between
+qualified, same-source, same-edition material stress records enclosing 82 °C;
+qualified E/W/Y must independently cover 82 °C and the manufacturing route.
+Screening neighbors at 80/120 °C do not qualify. The info popup shows source
+temperatures and qualification status.
+
+For **unknown material with blank T1**, the CS fallback cannot create
+design temperature. The existing T1 field in 4 Preview must be edited using
+project design evidence, then Preview rebuilt. Blank, below absolute zero,
+configuration-default-only, and unresolved T1 cause row-specific HOLD; a
+default-only P1 also HOLDs. Valid unrelated rows can still calculate.
+
+For **Pull**, a previous proposal is invalidated by material evidence,
+Preview inputs, pipe node identity or a changed active S/E/W/Y master. No
+Pull is allowed for unapproved inferred grade, unresolved route, or
+incomplete factor qualification. User-entered manual S/E/W/Y remains an
+explicit, non-master fallback with independent source/review requirements.
+
+## Size-specific material authority
+
+The existing Step 8 **Piping Class / Material Code** default is not an
+exact pipe product specification across all DN sizes. For B31.3 factor
+corroboration, the selected effective **Piping Class + DN** master row is
+required. A matching row's exact grade is evidence; a class-wide material
+fallback without a matching DN is **review required**. If the generic
+Material Code designation disagrees with the exact-size Piping Class
+material, the row is HOLD (`B313_MATERIAL_CODE_VS_CLASS_DN_CONFLICT`).
+
+This is essential for class 11472 (A333 Grade 6 through DN600; A671
+CC65 Class 22 at DN750–1200) and class 13831 (A790 S31803 through
+DN200; composite A790/A928 at DN250–600). An `A790/A928` product must
+not silently be treated as seamless A790. All factor qualification is
+scoped to the physical pipe occurrence and confirmed route.
+
+See `engineering/b313/material-factor-qualification-intake-v1.json`.
+The intake is a review-only register, **not** an automatic factor
+source and not an authorization for Pull.
+
 ## Material-column custody
 
 The effective Phase 4 `Material` cell is the primary material identity input. That cell already follows the Preview material-authority order: process/line-list material evidence first, then governed piping-class/material-code fallback when process material is absent.
@@ -88,7 +136,7 @@ qualificationMode = strict
 
 Therefore only `VERIFIED` / `PROJECT_APPROVED` active factor rows can become the automatic factor basis. `BENCHMARK_ONLY` data is never enabled by this adapter.
 
-If strict active factors are incomplete at the exact Preview T1, the existing per-material/T1 manual basis may be used only when all of the following are explicit:
+If strict active factors cannot be resolved at Preview T1 using qualified exact records, qualified S interpolation or explicit factor-specific temperature applicability, the existing per-material/T1 manual basis may be used only when all of the following are explicit:
 
 - allowable stress `S` and unit;
 - `E`;

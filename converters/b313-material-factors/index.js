@@ -21,7 +21,7 @@ export function resolveB313MaterialIdentity(input={}){
  return{ok:true,code:'B313_MATERIAL_RESOLVED',material:{...matches[0]},resolution:requestedFamily&&!requestedId&&!requestedName?'FAMILY':'EXACT'};
 }
 function acceptedStatuses(mode,explicit){if(Array.isArray(explicit)&&explicit.length)return new Set(explicit);if(mode==='benchmark')return new Set(['VERIFIED','PROJECT_APPROVED','BENCHMARK_ONLY']);if(mode==='screening')return new Set(['VERIFIED','PROJECT_APPROVED','BENCHMARK_ONLY','SCREENING']);return new Set(['VERIFIED','PROJECT_APPROVED']);}
-function tempC(input){const raw=input.designTemperature??input.temperature??input.temperatureC,n=Number(raw);if(!Number.isFinite(n))return null;const u=norm(input.temperatureUnit||(input.temperatureC!==undefined?'C':'C'));if(u==='C'||u==='CELSIUS')return n;if(u==='F'||u==='FAHRENHEIT')return(n-32)*5/9;return null;}
+function tempC(input){const raw=input.designTemperature??input.temperature??input.temperatureC;if(String(raw??'').trim()==='')return null;const n=Number(raw);if(!Number.isFinite(n))return null;const u=norm(input.temperatureUnit||(input.temperatureC!==undefined?'C':'C'));if(u==='C'||u==='CELSIUS')return n;if(u==='F'||u==='FAHRENHEIT')return(n-32)*5/9;return null;}
 function exact(records,id,t,statuses,extra={}){
  let matches=(records||[]).filter(r=>r.materialId===id&&Math.abs(Number(r.temperatureC)-t)<=1e-9&&statuses.has(r.status));
  for(const [key,value] of Object.entries(extra)){
@@ -31,15 +31,105 @@ function exact(records,id,t,statuses,extra={}){
  return matches[0];
 }
 function stressMPa(record){if(!record)return null;const v=Number(record.value),u=norm(record.unit||'MPA');if(!(v>0))return null;return u==='KSI'?v*KSI_TO_MPA:u==='MPA'?v:null;}
+
+/**
+ * Qualified temperature-resolution rule for one already identified material.
+ * A source row is usable only if its qualification and product/route identity
+ * match. Exact rows win. Only S may be linearly interpolated by default under
+ * B31.3 Table A-1/A-1C rules; W/Y require an EXPLICIT code-reviewed
+ * LINEAR_APPROVED policy on both source records. E and all other constant
+ * intervals require a qualified range record. Never extrapolate.
+ *
+ * This pure helper accepts synthetic records so the code rule can be
+ * independently tested without adding fictitious approved records to master.
+ */
+export function resolveB313QualifiedTemperatureFactor({
+  factor, records = [], materialId, temperatureC, manufacturingRoute = '',
+  productForm = 'PIPE', allowedStatuses = ['VERIFIED','PROJECT_APPROVED'],
+  edition = '2024',
+} = {}) {
+  const f = norm(factor), t = Number(temperatureC), id = String(materialId || '');
+  if (!['S','E','W','Y'].includes(f) || String(temperatureC ?? '').trim() === '' || !Number.isFinite(t) || !id) return null;
+  const statuses = new Set(allowedStatuses);
+  const route = norm(manufacturingRoute);
+  const candidates = records.filter(row => row.materialId === id
+    && statuses.has(row.status)
+    // Status alone never qualifies a factor. Retain a traceable code source;
+    // project-approved rows also need an explicit approval reference.
+    && String(row.sourceAuthority || '').trim()
+    && String(row.sourceReference || '').trim()
+    && !/SCREENING|BENCHMARK|CANDIDATE/i.test(String(row.sourceAuthority))
+    && (row.status !== 'PROJECT_APPROVED' || String(row.approvalReference || '').trim())
+    && (row.edition == null || String(row.edition) === String(edition))
+    && (!row.productForm || norm(row.productForm) === norm(productForm)));
+  const routeRows = candidates.filter(row => !row.manufacturingRoute || (route && norm(row.manufacturingRoute) === route));
+  // When there are explicit route-specific records, do not silently use one
+  // for a missing/unknown route. Generic records remain valid if supplied.
+  function preferRoute(rows) {
+    const specific = route ? rows.filter(row => row.manufacturingRoute && norm(row.manufacturingRoute) === route) : [];
+    return specific.length ? specific : rows.filter(row => !row.manufacturingRoute);
+  }
+  function unique(rows) {
+    if (rows.length !== 1) return null; // duplicate or conflicting authority: HOLD
+    const row = rows[0];
+    const value = f === 'S' ? stressMPa(row) : Number(row.value);
+    return Number.isFinite(value) && (f === 'Y' ? value >= 0 : value > 0) ? row : null;
+  }
+  const exactMatches = preferRoute(routeRows.filter(row => Number(row.temperatureC) === t));
+  const eq = unique(exactMatches);
+  if (eq) return { record: eq, resolution: 'EXACT_QUALIFIED', sourceTemperaturesC: [t] };
+  if (exactMatches.length) return null; // invalid/ambiguous exact rows block interpolation
+  const intervals = preferRoute(routeRows.filter(row =>
+    row.temperatureApplicability === 'CONSTANT_RANGE'
+    && row.validFromC !== '' && row.validFromC != null
+    && row.validToC !== '' && row.validToC != null
+    && Number.isFinite(Number(row.validFromC)) && Number.isFinite(Number(row.validToC))
+    && Number(row.validFromC) <= t && t <= Number(row.validToC)));
+  const within = unique(intervals);
+  if (within && f !== 'S') return {
+    record: { ...within, temperatureC: t, resolution: 'QUALIFIED_CONSTANT_RANGE',
+      sourceTemperaturesC: [Number(within.validFromC), Number(within.validToC)] },
+    resolution: 'QUALIFIED_CONSTANT_RANGE',
+    sourceTemperaturesC: [Number(within.validFromC), Number(within.validToC)],
+  };
+  if (intervals.length) return null;
+  if (!['S','W','Y'].includes(f)) return null;
+  const temps = [...new Set(routeRows.map(row => Number(row.temperatureC)).filter(Number.isFinite))].sort((a,b)=>a-b);
+  const lowerT = temps.filter(n => n < t).at(-1), upperT = temps.find(n => n > t);
+  if (lowerT === undefined || upperT === undefined) return null; // no extrapolation
+  const low = unique(preferRoute(routeRows.filter(row => Number(row.temperatureC) === lowerT)));
+  const high = unique(preferRoute(routeRows.filter(row => Number(row.temperatureC) === upperT)));
+  if (!low || !high || !low.sourceAuthority || low.sourceAuthority !== high.sourceAuthority) return null;
+  if (low.status !== high.status || String(low.approvalReference || '') !== String(high.approvalReference || '')) return null;
+  if (String(low.edition || edition) !== String(high.edition || edition)) return null;
+  if (norm(low.productForm || productForm) !== norm(high.productForm || productForm)) return null;
+  if (norm(low.manufacturingRoute || '') !== norm(high.manufacturingRoute || '')) return null;
+  if (f !== 'S' && (low.interpolationPolicy !== 'LINEAR_APPROVED' || high.interpolationPolicy !== 'LINEAR_APPROVED')) return null;
+  const lowValue = f === 'S' ? stressMPa(low) : Number(low.value);
+  const highValue = f === 'S' ? stressMPa(high) : Number(high.value);
+  if (!Number.isFinite(lowValue) || !Number.isFinite(highValue)
+      || (f !== 'Y' && (lowValue <= 0 || highValue <= 0))
+      || (f === 'Y' && (lowValue < 0 || highValue < 0))) return null;
+  const value = lowValue + (highValue - lowValue) * (t - lowerT) / (upperT - lowerT);
+  const record = { ...low, temperatureC: t, value, ...(f === 'S' ? {unit:'MPa'} : {}),
+    resolution: 'LINEAR_QUALIFIED', sourceTemperaturesC: [lowerT,upperT],
+    sourceRecords: [low.sourceReference || low.recordId || '', high.sourceReference || high.recordId || ''] };
+  return { record, resolution: 'LINEAR_QUALIFIED', sourceTemperaturesC: [lowerT,upperT] };
+}
+
 export function resolveB313DesignFactors(input={}){
  const identity=resolveB313MaterialIdentity(input);if(!identity.ok)return identity;const t=tempC(input);if(t==null)return fail('INVALID_DESIGN_TEMPERATURE','A finite design temperature in C or F is required.');
  const mode=String(input.qualificationMode||'strict').toLowerCase(),statuses=acceptedStatuses(mode,input.acceptedStatuses),id=identity.material.materialId,route=input.manufacturingRoute||input.material?.manufacturingRoute||(id==='CS-A106-B'?'SEAMLESS':null),f=B313_MATERIAL_FACTOR_MASTER.factors;
- const sr=exact(f.S.records,id,t,statuses),er=exact(f.E.records,id,t,statuses,{manufacturingRoute:route}),wr=exact(f.W.records,id,t,statuses,{manufacturingRoute:route}),yr=exact(f.Y.records,id,t,statuses),o=input.factorOverrides||input.factors||{};
+ const strict=mode==='strict' && !Array.isArray(input.acceptedStatuses);
+ const resolve=(factor)=>strict
+   ? resolveB313QualifiedTemperatureFactor({factor,records:f[factor].records,materialId:id,temperatureC:t,manufacturingRoute:route,productForm:identity.material.productForm||'PIPE',edition:B313_MATERIAL_FACTOR_MASTER.edition})?.record
+   : exact(f[factor].records,id,t,statuses,factor==='E'||factor==='W'?{manufacturingRoute:route}:{});
+ const sr=resolve('S'),er=resolve('E'),wr=resolve('W'),yr=resolve('Y'),o=input.factorOverrides||input.factors||{};
  const S=o.allowableStressMPa??o.S??stressMPa(sr),E=o.qualityFactorE??o.E??er?.value,W=o.weldStrengthReductionW??o.W??wr?.value,Y=o.coefficientY??o.Y??yr?.value,missing=[];
  if(!(Number(S)>0))missing.push('S');if(!(Number(E)>0))missing.push('E');if(!(Number(W)>0))missing.push('W');if(!(Number(Y)>=0))missing.push('Y');
  const sources={S:o.allowableStressMPa!==undefined||o.S!==undefined?{authority:'CALLER_OVERRIDE'}:sr?{...sr}:null,E:o.qualityFactorE!==undefined||o.E!==undefined?{authority:'CALLER_OVERRIDE'}:er?{...er}:null,W:o.weldStrengthReductionW!==undefined||o.W!==undefined?{authority:'CALLER_OVERRIDE'}:wr?{...wr}:null,Y:o.coefficientY!==undefined||o.Y!==undefined?{authority:'CALLER_OVERRIDE'}:yr?{...yr}:null};
  if(missing.length)return fail('B313_FACTOR_DATA_INCOMPLETE','Material identity resolved, but one or more design factors are unavailable at this temperature/qualification level.',{material:identity.material,temperatureC:t,missing,qualificationMode:mode});
- return{ok:true,code:'B313_FACTORS_RESOLVED',material:identity.material,temperatureC:t,qualificationMode:mode,factors:{allowableStressMPa:Number(S),qualityFactorE:Number(E),weldStrengthReductionW:Number(W),coefficientY:Number(Y)},factorSources:sources,designAuthority:Object.values(sources).every(s=>s?.status==='VERIFIED'||s?.status==='PROJECT_APPROVED'||s?.authority==='CALLER_OVERRIDE')};
+ return{ok:true,code:'B313_FACTORS_RESOLVED',material:identity.material,temperatureC:t,qualificationMode:mode,factors:{allowableStressMPa:Number(S),qualityFactorE:Number(E),weldStrengthReductionW:Number(W),coefficientY:Number(Y)},factorSources:sources,designAuthority:Object.values(sources).every(s=>s?.status==='VERIFIED'||s?.status==='PROJECT_APPROVED')};
 }
 export function getB313MaterialFactorCoverage(){const f=B313_MATERIAL_FACTOR_MASTER.factors;return(B313_MATERIAL_FACTOR_MASTER.materials||[]).map(m=>({materialId:m.materialId,family:m.family,hasS:f.S.records.some(r=>r.materialId===m.materialId),hasE:f.E.records.some(r=>r.materialId===m.materialId),hasW:f.W.records.some(r=>r.materialId===m.materialId),hasY:f.Y.records.some(r=>r.materialId===m.materialId)}));}
 export function calculateB313MaterialDesign(input={}){

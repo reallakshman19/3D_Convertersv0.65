@@ -4,6 +4,7 @@ import {
   normalizeB313MaterialFamily,
   resolveB313DesignFactors,
   resolveB313MaterialIdentity,
+  resolveB313QualifiedTemperatureFactor,
 } from '../b313-material-factors/index.js';
 import { selectPipeWallForCalculation } from '../pipe-wall-master/index.js';
 
@@ -68,22 +69,35 @@ function resolveMaterialToken(value, { allowProjectFamilyDefault = true } = {}) 
   const token = text(value);
   if (!token) return failure('B313_PREVIEW_MATERIAL_REQUIRED', 'Preview material is required.');
 
+  // Generic family tokens are also listed as catalog aliases (e.g. DSS).
+  // They must NOT be resolved as exact material grades before Step 8 can
+  // corroborate them. A designation containing a real grade, such as SS316,
+  // still takes the exact-identity path below.
+  const normalized = normalizedToken(token);
+  const genericFamily = /^(?:CS|CARBON STEEL)(?: SOUR)?$/.test(normalized) ? 'CS'
+    : /^(?:LTCS|LT CS|LOW TEMPERATURE CARBON STEEL)(?: SOUR)?$/.test(normalized) ? 'LTCS'
+    : /^(?:SS|STAINLESS|STAINLESS STEEL)$/.test(normalized) ? 'SS'
+    : /^(?:DSS|DUPLEX|DUPLEX SS|DUPLEX STAINLESS STEEL)$/.test(normalized) ? 'DSS'
+    : /^(?:SDSS|SUPER DUPLEX|SUPER DUPLEX SS|SUPER DUPLEX STAINLESS STEEL)$/.test(normalized) ? 'SDSS'
+    : null;
   let lastExactFailure = null;
-  for (const variant of materialTokenVariants(token)) {
-    const exact = resolveB313MaterialIdentity({ material: { spec: variant } });
-    if (exact.ok) {
-      return {
-        ...exact,
-        schema: B313_PREVIEW_MATERIAL_FACTOR_SCHEMA,
-        requestMode: 'EXACT_PREVIEW_MATERIAL',
-        requestedMaterial: token,
-        matchedMaterialVariant: variant,
-      };
+  if (!genericFamily) {
+    for (const variant of materialTokenVariants(token)) {
+      const exact = resolveB313MaterialIdentity({ material: { spec: variant } });
+      if (exact.ok) {
+        return {
+          ...exact,
+          schema: B313_PREVIEW_MATERIAL_FACTOR_SCHEMA,
+          requestMode: 'EXACT_PREVIEW_MATERIAL',
+          requestedMaterial: token,
+          matchedMaterialVariant: variant,
+        };
+      }
+      lastExactFailure = exact;
     }
-    lastExactFailure = exact;
   }
 
-  const family = inferredFamily(token);
+  const family = genericFamily || inferredFamily(token);
   if (!family) {
     return failure('B313_PREVIEW_MATERIAL_NOT_MAPPED', 'Preview material does not map to a B31.3 project material identity.', {
       requestedMaterial: token,
@@ -153,6 +167,24 @@ export function resolvePreviewB313MaterialIdentity({
     });
   }
 
+  // A family-default identity is a candidate, not an exact specification.
+  // A reviewed exact designation from Step 8 may disambiguate the SAME
+  // family; never override a conflicting exact primary specification.
+  if (primary.ok && corroborating?.ok && primary.material.materialId !== corroborating.material.materialId
+      && primary.requestMode === 'PROJECT_FAMILY_DEFAULT'
+      && corroborating.requestMode === 'EXACT_PREVIEW_MATERIAL'
+      && primary.material.family === corroborating.material.family) {
+    return {
+      ...corroborating,
+      resolutionSource: 'PREVIEW_MATERIAL_CODE_CORROBORATION',
+      materialSource: text(materialSource),
+      unresolvedPreviewMaterial: text(material),
+      corroboratingMaterial: corroboratingText,
+      corroboratingSource: text(corroboratingSource),
+      corroborationStatus: 'FAMILY_DISAMBIGUATED',
+      b313IdentityNeedsReview: false,
+    };
+  }
   if (primary.ok && corroborating?.ok && primary.material.materialId !== corroborating.material.materialId) {
     return failure('B313_PREVIEW_MATERIAL_CONFLICT', 'Preview Material and reviewed material-code evidence resolve to different B31.3 material identities.', {
       previewMaterial: text(material),
@@ -172,6 +204,9 @@ export function resolvePreviewB313MaterialIdentity({
       corroboratingMaterial: corroboratingText,
       corroboratingSource: text(corroboratingSource),
       corroborationStatus: corroborating?.ok ? 'MATCHED' : (corroboratingText ? 'NOT_USED_REVIEW_REQUIRED' : 'NONE'),
+      // An uncorroborated family default is not a verified exact grade.
+      b313IdentityNeedsReview: primary.requestMode === 'PROJECT_FAMILY_DEFAULT'
+        && corroborating?.requestMode !== 'EXACT_PREVIEW_MATERIAL',
     };
   }
 
@@ -238,9 +273,22 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
   }
   const strictRows = applicableRows.filter((row) => STRICT_FACTOR_STATUSES.has(text(row.status).toUpperCase()));
   const rejectedRows = applicableRows.filter((row) => !STRICT_FACTOR_STATUSES.has(text(row.status).toUpperCase()));
-  let status = 'STRICT_AVAILABLE';
-  if (!strictRows.length) {
-    if (!exactTemperatureRows.length) status = 'NO_EXACT_TEMPERATURE_RECORD';
+  const qualifiedResolution = resolveB313QualifiedTemperatureFactor({
+    factor, records, materialId, temperatureC: designTemperatureC,
+    manufacturingRoute: requestedRoute, edition: B313_MATERIAL_FACTOR_MASTER.edition,
+  });
+  const eligible = !!qualifiedResolution;
+  const sourceTemperaturesC = uniqueSortedNumbers(qualifiedResolution?.sourceTemperaturesC || []);
+  const nearbyTemps = uniqueSortedNumbers(materialRows.map((row)=>row.temperatureC));
+  const lower = nearbyTemps.filter((t)=>t<designTemperatureC).at(-1);
+  const upper = nearbyTemps.find((t)=>t>designTemperatureC);
+  const surroundingRows = materialRows.filter((row) => Number(row.temperatureC)===lower || Number(row.temperatureC)===upper);
+  let status = qualifiedResolution?.resolution === 'LINEAR_QUALIFIED'
+    ? 'QUALIFIED_INTERPOLATION_AVAILABLE'
+    : qualifiedResolution?.resolution === 'QUALIFIED_CONSTANT_RANGE'
+      ? 'QUALIFIED_RANGE_AVAILABLE' : 'STRICT_AVAILABLE';
+  if (!eligible) {
+    if (!exactTemperatureRows.length) status = 'NO_QUALIFIED_TEMPERATURE_BASIS';
     else if (routeSensitive && !requestedRoute && !applicableRows.length) status = 'MANUFACTURING_ROUTE_REQUIRED';
     else if (routeSensitive && requestedRoute && !applicableRows.length) status = 'MANUFACTURING_ROUTE_NO_MATCH';
     else if (rejectedRows.length) status = 'QUALIFICATION_STATUS_REJECTED';
@@ -249,7 +297,11 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
   return {
     factor,
     status,
-    strictAvailable: strictRows.length > 0,
+    strictAvailable: eligible,
+    qualifiedResolution: qualifiedResolution?.resolution || null,
+    qualifiedSourceTemperaturesC: sourceTemperaturesC,
+    nearbyTemperaturesC: [lower, upper].filter(Number.isFinite),
+    nearbySourceStatuses: uniqueText(surroundingRows.map(row=>row.status)),
     materialRecordCount: materialRows.length,
     exactTemperatureRecordCount: exactTemperatureRows.length,
     applicableRecordCount: applicableRows.length,
@@ -257,13 +309,14 @@ function factorAvailability(factor, materialId, designTemperatureC, manufacturin
     requestedManufacturingRoute: requestedRoute,
     availableManufacturingRoutes: uniqueText(exactTemperatureRows.map((row) => row.manufacturingRoute)),
     candidateStatuses: uniqueText(exactTemperatureRows.map((row) => row.status)),
+    nearbySourceAuthorities: uniqueText(surroundingRows.map(row=>row.sourceAuthority || row.basisId)),
     rejectedStatuses: uniqueText(rejectedRows.map((row) => row.status)),
     candidateAuthorities: uniqueText(exactTemperatureRows.map((row) => row.sourceAuthority || row.basisId)),
   };
 }
 
 export function explainPreviewB313FactorAvailability({ materialId, designTemperatureC, manufacturingRoute = '' } = {}) {
-  const temperature = Number(designTemperatureC);
+  const temperature = text(designTemperatureC)==='' ? NaN : Number(designTemperatureC);
   if (!text(materialId) || !Number.isFinite(temperature)) return null;
   const factors = Object.fromEntries(['S', 'E', 'W', 'Y'].map((factor) => [
     factor,

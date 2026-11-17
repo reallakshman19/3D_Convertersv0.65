@@ -65,6 +65,58 @@ function classRowMaterial(row) {
   return readAny(row, ['materialName', 'Material_Name', 'Material Name', 'Material', 'material', 'MATERIAL', 'Mat', 'MAT', 'MOC']);
 }
 
+/**
+ * A reviewed, exact Step 8 Piping Class mapping may corroborate a broad
+ * process material for B31.3. This does not assign or alter the governing
+ * Line List Material or Material Code.
+ */
+export function resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass, config = {}, pipingClassRow = null, sizeMm = null, pipingClassNeedsReview = false,
+} = {}) {
+  const matched = resolveConfiguredMaterialCode({ pipingClass, config });
+  const fallbackCandidate = text(matched?.materialName);
+  const size = Number(sizeMm);
+  const classRowSize = Number(pipingClassRow?.convertedBore);
+  const classRowKey = text(pipingClassRow?.['Piping Class'] || pipingClassRow?.pipingClass);
+  // A Piping Class may switch pipe product/specification at a different DN.
+  // A class-wide material-code mapping is never sufficient for grade approval.
+  const exactSizedRow = !!pipingClassRow && Number.isFinite(size) && size > 0
+    && Number.isFinite(classRowSize) && Math.abs(size - classRowSize) < 1e-6
+    && normalKey(classRowKey) === normalKey(pipingClass);
+  const sizedCandidate = exactSizedRow ? classRowMaterial(pipingClassRow) : '';
+  const candidate = sizedCandidate || fallbackCandidate;
+  // Composite product standards (e.g. A790/A928) need exact product and
+  // manufacturing route confirmation; they are not an A790-only identity.
+  const compositeSpecification = /\bA\d{3,4}\s*\/\s*A\d{3,4}\b/i.test(candidate);
+  const reviewed = exactSizedRow && !!sizedCandidate
+    && !compositeSpecification && pipingClassNeedsReview !== true;
+  return {
+    materialCodeCorroborationCandidate: candidate,
+    materialCodeCorroborationSource: sizedCandidate
+      ? 'piping-class-master-exact-DN'
+      : (candidate ? 'piping-class-config-unscoped' : ''),
+    materialCodeCorroborationMethod: sizedCandidate ? 'size-exact' : (matched?.method || ''),
+    materialCodeCorroborationConfidence: sizedCandidate ? (reviewed ? 100 : 0) : (matched?.confidence ?? null),
+    materialCodeCorroborationNeedsReview: !reviewed && (!!candidate || !!pipingClassRow),
+    materialCodeCorroborationSizeMm: exactSizedRow ? size : null,
+    materialCodeCorroborationCompositeSpecification: compositeSpecification,
+  };
+}
+
+export function resolveXmlCiiB313MaterialCodeClassConflict({ materialCodeMatchedMaterial, classEvidence } = {}) {
+  const mapped = text(materialCodeMatchedMaterial);
+  const exactSize = classEvidence?.materialCodeCorroborationSource === 'piping-class-master-exact-DN';
+  const selected = text(classEvidence?.materialCodeCorroborationCandidate);
+  if (!mapped || !selected || !exactSize || normalKey(mapped) === normalKey(selected)) return null;
+  return {
+    code: 'B313_MATERIAL_CODE_VS_CLASS_DN_CONFLICT',
+    mappedMaterial: mapped,
+    exactClassMaterial: selected,
+    sizeMm: classEvidence.materialCodeCorroborationSizeMm,
+    message: 'Material Code designation disagrees with exact Piping Class/DN product; confirm the effective material before B31.3.',
+  };
+}
+
 function directMaterialCode(row) {
   return cleanMaterialCode(readAny(row, [
     'materialCode', 'Material Code', 'MATERIAL_CODE', 'MAT_CODE',
@@ -522,6 +574,18 @@ export function resolveBranchProcessData({
     xmlBranch,
     config,
   });
+  // An exact Step 8 class material can corroborate a broad Line List family
+  // for B31.3 without changing the governing Line List material/code.
+  const configuredMaterialEvidence = resolveXmlCiiB313ClassMaterialEvidence({
+    pipingClass: resolvedPipingClass, config, pipingClassRow,
+    sizeMm: boreMm, pipingClassNeedsReview: classMatch.classMatch?.needsReview || classMatch.needsReview,
+  });
+  const mappedMaterialDesignation = material.materialCode ? classRowMaterial(material.matchedRow) : '';
+  const classGradeConflict = resolveXmlCiiB313MaterialCodeClassConflict({
+    materialCodeMatchedMaterial: mappedMaterialDesignation,
+    classEvidence: configuredMaterialEvidence,
+  });
+  const effectiveMaterialConflict = material.conflict || classGradeConflict;
   const corrosion = resolveCorrosionFromPipingClass({
     lineRow: resolverLineRow,
     boreMm,
@@ -554,8 +618,13 @@ export function resolveBranchProcessData({
     materialSource: material.source,
     materialCodeConfidence: material.confidence ?? null,
     materialCodeMatchMethod: material.matchMethod || null,
-    materialCodeNeedsReview: material.needsReview ?? !material.materialCode,
-    materialCodeConflict: material.conflict || null,
+    // Preserve the exact specification from the resolved Step 8 or material-map
+    // row. A material code/family by itself is not an exact B31.3 grade.
+    materialCodeMatchedMaterial: mappedMaterialDesignation,
+    materialCodeEvidenceSource: material.source,
+    ...configuredMaterialEvidence,
+    materialCodeNeedsReview: material.needsReview === true || !!effectiveMaterialConflict || !material.materialCode,
+    materialCodeConflict: effectiveMaterialConflict || null,
     corrosionAllowanceMm: corrosion.corrosionAllowanceMm,
     corrosionSource: corrosion.source,
     wallThicknessMm: wall.valueMm,

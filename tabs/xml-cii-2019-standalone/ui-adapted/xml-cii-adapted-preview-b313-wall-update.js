@@ -57,12 +57,28 @@ function temperatureText(row) {
 }
 
 export function resolvePreviewB313MaterialFromRow(row, config = {}) {
+  if (row?.materialCodeConflict) {
+    return { ok: false, code: 'B313_PREVIEW_MATERIAL_CODE_CONFLICT',
+      message: 'Step 4 Material and Material Code evidence conflict; resolve the existing Preview authority before B31.3 calculation.',
+      details: { materialCodeConflict: row.materialCodeConflict } };
+  }
+  // When the Line List publishes only a family, accept exact, reviewed Step
+  // 8 class evidence as corroboration, not as a mutation of governing material.
+  const primaryCodeEvidence = text(row?.materialCodeMatchedMaterial);
+  const classEvidenceAllowed = !primaryCodeEvidence
+    && !!text(row?.materialCodeCorroborationCandidate)
+    && row?.materialCodeCorroborationNeedsReview !== true
+    && row?.pipingClassNeedsReview !== true
+    && !row?.pipingClassConflict;
   const resolved = resolvePreviewB313MaterialIdentity({
     material: materialText(row),
     materialSource: row?.materialSource || '',
-    corroboratingMaterial: row?.materialCodeMatchedMaterial || '',
-    corroboratingSource: row?.materialCodeSource || row?.materialCodeResolutionMethod || '',
-    corroboratingNeedsReview: row?.materialCodeNeedsReview === true,
+    corroboratingMaterial: primaryCodeEvidence
+      || (classEvidenceAllowed ? row?.materialCodeCorroborationCandidate : ''),
+    corroboratingSource: primaryCodeEvidence
+      ? (row?.materialCodeSource || row?.materialCodeResolutionMethod || '')
+      : (classEvidenceAllowed ? row?.materialCodeCorroborationSource : ''),
+    corroboratingNeedsReview: primaryCodeEvidence ? row?.materialCodeNeedsReview === true : !classEvidenceAllowed,
   });
   if (resolved.ok) return resolved;
   const fallback = config?.b313WallUpdate?.materialFallback || { enabled: true, family: 'CS' };
@@ -88,13 +104,29 @@ function legacyPreviewB313BasisKey(row) {
 export function previewB313BasisKey(row, config = {}) {
   const temperature = normalizedToken(temperatureText(row));
   const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
-  if (materialIdentity.ok) return `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
+  if (materialIdentity.ok) {
+    const base = `MATID:${materialIdentity.material.materialId}|T1=${temperature || '?'}`;
+    if (materialIdentity.b313IdentityNeedsReview !== true) return base;
+    // Manual grade approval cannot be shared merely because multiple lines
+    // happen to resolve to the same project-family candidate and T1.
+    const scope = [
+      row?.branchOccurrenceIndex ?? '', row?.branchName ?? '',
+      row?.lineKey ?? '', row?.pipingClass ?? '',
+      row?.materialCode ?? '', row?.materialCodeMatchedMaterial ?? '',
+    ].map(normalizedToken);
+    return scope.some(Boolean)
+      ? `${base}|GRADE_SCOPE:${scope.map(encodeURIComponent).join('~')}`
+      : base;
+  }
   const legacy = legacyPreviewB313BasisKey(row);
   return legacy ? `RAW:${legacy}` : '';
 }
 
 function basisForRow(cfg, row, key = previewB313BasisKey(row)) {
   if (key && cfg.bases[key]) return { key, basis: cfg.bases[key], source: 'canonical-material-id-key' };
+  // Do not import a legacy group-wide approval into an occurrence-scoped
+  // family-default review: it may belong to another physical line.
+  if (key.includes('|GRADE_SCOPE:')) return { key, basis: {}, source: 'unreviewed-family-occurrence' };
   const legacy = legacyPreviewB313BasisKey(row);
   if (legacy && cfg.bases[legacy]) return { key, basis: cfg.bases[legacy], source: 'legacy-material-text-key' };
   return { key, basis: {}, source: 'none' };
@@ -481,6 +513,26 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       return;
     }
 
+    // A numeric configuration default is not a reviewed design temperature.
+    // Corrections are made in the existing 4 Preview T1/P1 cells, followed by
+    // Rebuild; never borrow T2/T3, a neighboring branch, or the CS fallback.
+    const t1Raw = temperatureText(row);
+    const t1 = t1Raw === '' ? NaN : Number(t1Raw);
+    const t1Source = normalizedToken(row?.t1Source);
+    if (!Number.isFinite(t1) || t1 <= -273.15 || t1Source === 'DEFAULT' || t1Source === 'NONE') {
+      results.push(failureRow(row,
+        !Number.isFinite(t1) || t1 <= -273.15 ? 'B313_PREVIEW_T1_REQUIRED' : 'B313_PREVIEW_T1_SOURCE_UNVERIFIED',
+        'T1 must be a real design temperature from the effective 4 Preview. Edit/confirm T1 in that table and Rebuild Preview; do not use default or neighboring temperatures.',
+        { t1: t1Raw, t1Source: row?.t1Source || 'unresolved', nextAction: 'EDIT_STEP4_T1_AND_REBUILD' }));
+      return;
+    }
+    if (normalizedToken(row?.p1Source) === 'DEFAULT') {
+      results.push(failureRow(row,'B313_PREVIEW_P1_SOURCE_UNVERIFIED',
+        'P1 is only a configuration default. Confirm design pressure and units in 4 Preview, then Rebuild.',
+        { p1: row?.p1, p1Source: row?.p1Source, nextAction: 'EDIT_STEP4_P1_AND_REBUILD' }));
+      return;
+    }
+
     const key = previewB313BasisKey(row, { b313WallUpdate: basisConfig });
     const stored = basisForRow(basisConfig, row, key);
     const basis = stored.basis || {};
@@ -590,6 +642,9 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       || (basis.designApproved === true && text(basis.sourceReference)
           && !/^USER_ACCEPTED_PREVIEW_FALLBACK|^B313_ACTIVE_MASTER_CANDIDATE_SEED/.test(text(basis.sourceReference)));
     const csReviewed = materialIdentity.b313FallbackApplied !== true || basis.csFallbackReviewed === true;
+    const identityNeedsReview = materialIdentity.b313IdentityNeedsReview === true;
+    const identityReviewed = !identityNeedsReview || basis.identityReviewed === true
+      || (materialIdentity.b313FallbackApplied === true && basis.csFallbackReviewed === true);
     basisConfig.proposalsByBranch[proposalKey] = {
       schema: 'xml-cii-b313-proposal/v1',
       inputSignature: b313PreviewInputSignature(row, config),
@@ -599,6 +654,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       factorBasisMode: factorBasis.mode,
       materialFallbackApplied: materialIdentity.b313FallbackApplied === true,
       materialFallbackReviewed: csReviewed,
+      materialIdentityNeedsReview: identityNeedsReview,
+      materialIdentityReviewed: identityReviewed,
       manualFactorsReviewed: manualReviewed,
       result, evidence,
     };

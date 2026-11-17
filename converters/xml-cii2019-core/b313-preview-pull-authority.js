@@ -1,3 +1,24 @@
+import { B313_MATERIAL_FACTOR_MASTER } from '../b313-material-factors/index.js';
+
+/**
+ * Detect changed active factor tables across deploys: cached Preview/Pull
+ * records must not survive a code/source-master revision. This checksum is
+ * a change detector, not a security signature or engineering approval.
+ */
+function factorMasterRevision() {
+  const master = B313_MATERIAL_FACTOR_MASTER;
+  const raw = JSON.stringify({ standard: master.standard, edition: master.edition,
+    materials: master.materials,
+    factors: Object.fromEntries(['S','E','W','Y'].map(k => [k, master.factors?.[k]?.records || []])) });
+  let h1 = 0x811c9dc5, h2 = 0x9747b28c;
+  for (let i = 0; i < raw.length; i++) {
+    h1 = Math.imul(h1 ^ raw.charCodeAt(i), 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ raw.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  return `${master.standard || 'B313'}:${master.edition || '?'}:${h1.toString(16)}:${h2.toString(16)}`;
+}
+export const B313_ACTIVE_FACTOR_MASTER_REVISION = factorMasterRevision();
+
 /**
  * Step 4 B31.3 Pull custody. A calculation is a proposal; only an explicit
  * branch/occurrence-scoped Pull becomes effective Preview wall authority.
@@ -11,6 +32,7 @@ const isApplicableWallNode = (node) => txt(node?.outsideDiameterMm) !== ''
 export function b313PreviewInputSignature(row = {}, config = {}) {
   const basis = config?.b313WallUpdate || {};
   return JSON.stringify({
+    factorMasterRevision: B313_ACTIVE_FACTOR_MASTER_REVISION,
     branchName: txt(row.branchName),
     lineKey: txt(row.lineKey),
     sizeMm: txt(row.sizeMm),
@@ -18,6 +40,20 @@ export function b313PreviewInputSignature(row = {}, config = {}) {
     material: txt(row.material),
     materialCode: txt(row.materialCode),
     materialCodeMatchedMaterial: txt(row.materialCodeMatchedMaterial),
+    materialCodeNeedsReview: row.materialCodeNeedsReview === true,
+    materialCodeSource: txt(row.materialCodeSource),
+    materialCodeResolutionMethod: txt(row.materialCodeResolutionMethod),
+    materialCodeConfidence: txt(row.materialCodeConfidence),
+    materialCodeConflict: row.materialCodeConflict || null,
+    materialCodeCorroborationCandidate: txt(row.materialCodeCorroborationCandidate),
+    materialCodeCorroborationSource: txt(row.materialCodeCorroborationSource),
+    materialCodeCorroborationMethod: txt(row.materialCodeCorroborationMethod),
+    materialCodeCorroborationConfidence: txt(row.materialCodeCorroborationConfidence),
+    materialCodeCorroborationSizeMm: txt(row.materialCodeCorroborationSizeMm),
+    materialCodeCorroborationCompositeSpecification: row.materialCodeCorroborationCompositeSpecification === true,
+    materialCodeCorroborationNeedsReview: row.materialCodeCorroborationNeedsReview === true,
+    pipingClassNeedsReview: row.pipingClassNeedsReview === true,
+    pipingClassConflict: row.pipingClassConflict || null,
     p1: txt(row.p1),
     p1Source: txt(row.p1Source),
     p1Unit: txt(row.p1Unit),
@@ -91,6 +127,9 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
   if (proposal.materialFallbackApplied && proposal.materialFallbackReviewed !== true) {
     return { ok: false, code: 'B313_PULL_CS_FALLBACK_REVIEW_REQUIRED' };
   }
+  if (proposal.materialIdentityNeedsReview === true && proposal.materialIdentityReviewed !== true) {
+    return { ok: false, code: 'B313_PULL_MATERIAL_GRADE_REVIEW_REQUIRED' };
+  }
   if (proposal.factorBasisMode !== 'ACTIVE_MASTER_STRICT' && proposal.manualFactorsReviewed !== true) {
     return { ok: false, code: 'B313_PULL_MANUAL_FACTORS_REVIEW_REQUIRED' };
   }
@@ -104,6 +143,8 @@ export function b313PullProposal(config = {}, branchRow = {}, branchOccurrenceIn
       nominalWallMm: proposal.nominalWallMm,
       selectedSchedule: proposal.selectedSchedule,
       factorBasisMode: proposal.factorBasisMode,
+      materialIdentityNeedsReview: proposal.materialIdentityNeedsReview === true,
+      materialIdentityReviewed: proposal.materialIdentityReviewed === true,
       materialFallbackApplied: proposal.materialFallbackApplied === true,
       calculation: proposal.result,
       status: 'USER_ACCEPTED_PENDING_OUTPUT_VERIFICATION',

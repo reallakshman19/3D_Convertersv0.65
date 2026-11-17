@@ -9,7 +9,7 @@ for (const status of [
   'QUALIFICATION_STATUS_REJECTED',
   'MANUFACTURING_ROUTE_REQUIRED',
   'MANUFACTURING_ROUTE_NO_MATCH',
-  'NO_EXACT_TEMPERATURE_RECORD',
+  'NO_QUALIFIED_TEMPERATURE_BASIS',
 ]) assert(composer.includes(status), status);
 assert(composer.includes('strictAcceptedStatuses'));
 assert(composer.includes('candidateStatuses'));
@@ -22,7 +22,7 @@ assert(!composer.includes("qualificationMode: 'screening'"), 'Preview must not o
 assert(audit.includes('factorBlockerText'));
 assert(audit.includes('candidate status'));
 assert(audit.includes('manufacturing route required'));
-assert(audit.includes('no exact T1 record'));
+assert(audit.includes('no qualified T1 basis'));
 assert(audit.includes('Line-list and Piping Class data may resolve the governed material identity'));
 assert(audit.includes('They do not invent numeric S/E/W/Y'));
 assert(audit.includes('BENCHMARK_ONLY / SCREENING factors'));

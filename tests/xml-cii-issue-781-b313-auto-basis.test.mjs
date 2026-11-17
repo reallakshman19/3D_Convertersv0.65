@@ -5,6 +5,7 @@ import {
   buildPreviewB313AutoBasisRows,
   derivePreviewB313AutoBasisRow,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
+import { previewB313BasisKey } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const a106Row = {
   material: 'ASTM A106-B',
@@ -33,6 +34,38 @@ assert.equal(a106BlankT1.route, 'SEAMLESS');
 assert.equal(a106BlankT1.routeSource, 'A106 carbon-steel default');
 assert.equal(a106BlankT1.tableContext.temperatureC, undefined);
 assert.match(a106BlankT1.factorSummary, /not evaluated until Preview T1 is resolved/);
+
+const uncorroboratedDss = derivePreviewB313AutoBasisRow({ material: 'DSS', t1: '120' }, {});
+assert.equal(uncorroboratedDss.statusCode, 'GRADE_REVIEW_REQUIRED');
+assert.equal(uncorroboratedDss.materialIdentityNeedsReview, true);
+const corroboratedDss = derivePreviewB313AutoBasisRow({
+  material: 'DSS', materialCodeMatchedMaterial: 'ASTM A790 UNS S31803',
+  materialCodeNeedsReview: false, materialCodeSource: 'piping-class-fallback',
+  t1: '120',
+}, {});
+assert.equal(corroboratedDss.materialIdentityNeedsReview, false);
+assert.notEqual(corroboratedDss.statusCode, 'GRADE_REVIEW_REQUIRED');
+const wildcardDss = derivePreviewB313AutoBasisRow({
+  material: 'DSS', materialCodeMatchedMaterial: 'ASTM A790 UNS S31803',
+  materialCodeNeedsReview: true, t1: '120',
+}, {});
+assert.equal(wildcardDss.materialIdentityNeedsReview, true);
+
+
+const dssLineA = { material: 'DSS', t1: '120', branchOccurrenceIndex: 0, branchName: 'DSS-01', lineKey: 'L-A' };
+const dssLineB = { material: 'DSS', t1: '120', branchOccurrenceIndex: 1, branchName: 'DSS-02', lineKey: 'L-B' };
+const keyA = previewB313BasisKey(dssLineA, {});
+const keyB = previewB313BasisKey(dssLineB, {});
+assert.notEqual(keyA, keyB, 'Unconfirmed family-grade approval must not share a material/T1 key');
+assert.match(keyA, /GRADE_SCOPE/);
+const scopedReview = { b313WallUpdate: { bases: { [keyA]: { identityReviewed: true } } } };
+assert.equal(derivePreviewB313AutoBasisRow(dssLineA, scopedReview).materialIdentityReviewed, true);
+assert.equal(derivePreviewB313AutoBasisRow(dssLineB, scopedReview).materialIdentityReviewed, false);
+const legacySharedReview = { b313WallUpdate: { bases: {
+  'MATID:DSS-A790-S31803|T1=120': { identityReviewed: true }
+} } };
+assert.equal(derivePreviewB313AutoBasisRow(dssLineA, legacySharedReview).materialIdentityReviewed, false,
+  'Legacy shared material/T1 approval must not authorize a different physical line');
 
 const explicitRoute = derivePreviewB313AutoBasisRow(a106Row, {
   b313WallUpdate: {
@@ -81,6 +114,9 @@ assert.match(runtimeSource, /data-b313-auto-source-reference/);
 assert.match(runtimeSource, /data-b313-auto-design-approved/);
 assert.match(runtimeSource, /data-b313-mill-basis/);
 assert.match(runtimeSource, /data-b313-cs-fallback/);
+assert.match(runtimeSource, /data-b313-auto-identity-reviewed/);
+assert.match(runtimeSource, /GRADE REVIEW REQUIRED/);
+assert.match(runtimeSource, /candidate statuses:/);
 assert.match(runtimeSource, /no interpolation/i);
 assert.match(diagnosticsSource, /installPreviewB313AutoBasisPanel/);
 

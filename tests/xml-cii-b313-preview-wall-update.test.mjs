@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
@@ -6,6 +7,15 @@ import {
   resolvePreviewB313FactorBasis,
   resolvePreviewB313MaterialIdentity,
 } from '../converters/xml-cii2019-core/b313-preview-wall-update.js';
+import {
+  resolveMaterialCodeFromLineMaterial,
+  resolveXmlCiiB313ClassMaterialEvidence,
+  resolveXmlCiiB313MaterialCodeClassConflict,
+} from '../converters/xml-cii2019-core/branch-process-resolver.js';
+import {
+  resolvePreviewB313MaterialFromRow,
+  buildPreviewB313WallUpdateReport,
+} from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const base = {
   dn: 250,
@@ -140,5 +150,180 @@ assert.equal(blankY.code, 'B313_PREVIEW_COEFFICIENT_Y_REQUIRED');
 const explicitZeroY = calculateAndSelectPreviewB313Wall({ ...base, coefficientY: 0 });
 assert.equal(explicitZeroY.ok, true, JSON.stringify(explicitZeroY, null, 2));
 assert.equal(explicitZeroY.calculation.inputs.coefficientY, 0);
+
+
+// An exact Step 8 material mapping must reach B31.3 without being inferred
+// afresh from a generic material family.
+const step8Ltcs = resolveMaterialCodeFromLineMaterial({
+  lineRow: {}, materialMap: [], pipingClassRow: null,
+  pipingClass: '11472', overrides: {},
+  config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+assert.equal(step8Ltcs.materialCode, '177');
+assert.equal(step8Ltcs.matchedRow.materialName, 'ASTM A333-6');
+assert.equal(step8Ltcs.needsReview, false);
+// Process Line List 'LTCS' remains the governing material. The exact class
+// specification is attached as corroborating evidence only; it does NOT set a
+// previously unresolved Material Code.
+const processLtcs = resolveMaterialCodeFromLineMaterial({
+  lineRow: { Material: 'LTCS' }, materialMap: [], pipingClassRow: null,
+  pipingClass: '11472', overrides: {},
+  config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+assert.equal(processLtcs.material, 'LTCS');
+assert.equal(processLtcs.materialCode, '');
+const class11472 = JSON.parse(fs.readFileSync(new URL('../docs/Masters/SpecwisePipingClass/11472.json', import.meta.url), 'utf8'));
+const class13831 = JSON.parse(fs.readFileSync(new URL('../docs/Masters/SpecwisePipingClass/13831.json', import.meta.url), 'utf8'));
+const pickSize = (cls, dn) => cls.rows.find((row) => Number(row.convertedBore) === dn);
+const classEvidence = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass: '11472', config: { useDefaultPipingClassMaterialCodeMap: true },
+  pipingClassRow: pickSize(class11472, 150), sizeMm: 150,
+});
+assert.equal(classEvidence.materialCodeCorroborationCandidate, 'ASTM A333-6');
+assert.equal(classEvidence.materialCodeCorroborationNeedsReview, false);
+assert.equal(classEvidence.materialCodeCorroborationMethod, 'size-exact');
+assert.equal(classEvidence.materialCodeCorroborationSizeMm,150);
+// The class switches product from ASTM A333 to ASTM A671 at DN750;
+// class-wide A333 factor approval would be a severe source-identity error.
+const class11472Dn750 = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'11472', config: {useDefaultPipingClassMaterialCodeMap:true},
+  pipingClassRow:pickSize(class11472,750),sizeMm:750,
+});
+assert.equal(class11472Dn750.materialCodeCorroborationCandidate,'ASTM A671-CC65 cl 22');
+assert.equal(class11472Dn750.materialCodeCorroborationNeedsReview,false,
+  'Exact DN establishes an identity candidate but not factor qualification');
+const wrongFamilyMaterial = resolveXmlCiiB313MaterialCodeClassConflict({
+  materialCodeMatchedMaterial:'ASTM A333-6',classEvidence:class11472Dn750,
+});
+assert.equal(wrongFamilyMaterial.code,'B313_MATERIAL_CODE_VS_CLASS_DN_CONFLICT');
+assert.equal(wrongFamilyMaterial.sizeMm,750);
+assert.equal(resolveXmlCiiB313MaterialCodeClassConflict({
+  materialCodeMatchedMaterial:'ASTM A671-CC65 cl 22',classEvidence:class11472Dn750,
+}),null);
+const rowConflict=resolvePreviewB313MaterialFromRow({
+  material:'LTCS',materialCodeMatchedMaterial:'ASTM A333-6',
+  materialCodeConflict:wrongFamilyMaterial,t1:'82',
+}, {});
+assert.equal(rowConflict.ok,false);
+assert.equal(rowConflict.code,'B313_PREVIEW_MATERIAL_CODE_CONFLICT');
+const class11472Unscoped = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'11472',config:{useDefaultPipingClassMaterialCodeMap:true},
+});
+assert.equal(class11472Unscoped.materialCodeCorroborationNeedsReview,true,
+  'A class-wide mapping is never a qualified exact pipe product');
+const dssDn200 = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'13831',pipingClassRow:pickSize(class13831,200),sizeMm:200,
+});
+assert.equal(dssDn200.materialCodeCorroborationCandidate,'ASTM A790 UNS S31803');
+assert.equal(dssDn200.materialCodeCorroborationNeedsReview,false);
+const dssDn250 = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'13831',pipingClassRow:pickSize(class13831,250),sizeMm:250,
+});
+assert.match(dssDn250.materialCodeCorroborationCandidate,/A790\/A928/i);
+assert.equal(dssDn250.materialCodeCorroborationNeedsReview,true,
+  'A790/A928 alternative manufacturing specs require review');
+const mismatchedDn = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass:'13831',pipingClassRow:pickSize(class13831,200),sizeMm:250,
+});
+assert.equal(mismatchedDn.materialCodeCorroborationNeedsReview,true,
+  'Wrong-size class row cannot qualify material designation');
+const weakClassEvidence = resolveXmlCiiB313ClassMaterialEvidence({
+  pipingClass: '31148', config: { useDefaultPipingClassMaterialCodeMap: true },
+});
+if (weakClassEvidence.materialCodeCorroborationCandidate) {
+  assert.equal(weakClassEvidence.materialCodeCorroborationNeedsReview, true);
+}
+const invalidDnClass = resolvePreviewB313MaterialFromRow({
+  material:'LTCS',
+  materialCodeCorroborationCandidate:class11472Unscoped.materialCodeCorroborationCandidate,
+  materialCodeCorroborationNeedsReview:class11472Unscoped.materialCodeCorroborationNeedsReview,
+}, {});
+assert.equal(invalidDnClass.b313IdentityNeedsReview,true);
+const processLtcsB313 = resolvePreviewB313MaterialFromRow({
+  material: processLtcs.material, materialSource: processLtcs.source,
+  materialCode: processLtcs.materialCode,
+  materialCodeNeedsReview: true,
+  materialCodeCorroborationCandidate: classEvidence.materialCodeCorroborationCandidate,
+  materialCodeCorroborationSource: classEvidence.materialCodeCorroborationSource,
+  materialCodeCorroborationNeedsReview: false,
+  pipingClassNeedsReview: false,
+}, {});
+assert.equal(processLtcsB313.ok, true, JSON.stringify(processLtcsB313));
+assert.equal(processLtcsB313.material.materialId, 'LTCS-A333-6');
+assert.equal(processLtcsB313.b313IdentityNeedsReview, false);
+const unresolvedClassConflict = resolvePreviewB313MaterialFromRow({
+  material: 'LTCS', materialCodeCorroborationCandidate: 'ASTM A333-6',
+  materialCodeCorroborationNeedsReview: false,
+  pipingClassConflict: 'FORMAT1_FORMAT2_DIFFER',
+}, {});
+assert.equal(unresolvedClassConflict.ok, true);
+assert.equal(unresolvedClassConflict.b313IdentityNeedsReview, true,
+  'A conflicting selected Piping Class cannot establish exact material grade');
+const unreviewedWildcard = resolvePreviewB313MaterialFromRow({
+  material: 'LTCS', materialCodeCorroborationCandidate: 'ASTM A333-6',
+  materialCodeCorroborationNeedsReview: true,
+}, {});
+assert.equal(unreviewedWildcard.b313IdentityNeedsReview, true);
+
+const ltcsIdentity = resolvePreviewB313MaterialIdentity({
+  material: 'LTCS',
+  corroboratingMaterial: step8Ltcs.matchedRow.materialName,
+  corroboratingSource: 'piping-class-fallback',
+  corroboratingNeedsReview: step8Ltcs.needsReview,
+});
+assert.equal(ltcsIdentity.ok, true, JSON.stringify(ltcsIdentity));
+assert.equal(ltcsIdentity.material.materialId, 'LTCS-A333-6');
+assert.equal(ltcsIdentity.b313IdentityNeedsReview, false);
+
+const genericDss = resolvePreviewB313MaterialIdentity({ material: 'DSS' });
+assert.equal(genericDss.ok, true);
+assert.equal(genericDss.material.materialId, 'DSS-A790-S31803');
+assert.equal(genericDss.b313IdentityNeedsReview, true, 'Family defaults are candidates, not proven exact grades');
+const corroboratedDss = resolvePreviewB313MaterialIdentity({
+  material: 'DSS', corroboratingMaterial: 'ASTM A790 UNS S31803',
+  corroboratingSource: 'reviewed-step8-exact', corroboratingNeedsReview: false,
+});
+assert.equal(corroboratedDss.ok, true, JSON.stringify(corroboratedDss));
+assert.equal(corroboratedDss.b313IdentityNeedsReview, false);
+const unreviewedDss = resolvePreviewB313MaterialIdentity({
+  material: 'DSS', corroboratingMaterial: 'ASTM A790 UNS S31803',
+  corroboratingNeedsReview: true,
+});
+assert.equal(unreviewedDss.b313IdentityNeedsReview, true);
+const crossFamilyConflict = resolvePreviewB313MaterialIdentity({
+  material: 'DSS', corroboratingMaterial: 'ASTM A312-TP316',
+  corroboratingSource: 'reviewed-step8-exact', corroboratingNeedsReview: false,
+});
+assert.equal(crossFamilyConflict.ok, false);
+assert.equal(crossFamilyConflict.code, 'B313_PREVIEW_MATERIAL_CONFLICT');
+const exactGradeConflict = resolvePreviewB313MaterialIdentity({
+  material: 'ASTM A312-TP304', corroboratingMaterial: 'ASTM A312-TP316',
+  corroboratingSource: 'reviewed-step8-exact', corroboratingNeedsReview: false,
+});
+assert.equal(exactGradeConflict.ok, false);
+assert.equal(exactGradeConflict.code, 'B313_PREVIEW_MATERIAL_CONFLICT');
+
+// No Line List design T1 may be fabricated by material CS fallback, a
+// configuration default, or a neighboring temperature record. These are
+// row-level holds, not batch-wide exceptions.
+const tempRow = { branchName:'BR-1', lineKey:'L-1', material:'LTCS',
+  t1:'', t1Source:'none', p1:'10', p1Source:'linelist', corrosion:'1.5' };
+function reported(row) {
+  const r=buildPreviewB313WallUpdateReport({rows:[row],config:{b313WallUpdate:{bases:{},proposalsByBranch:{}}}});
+  assert.equal(r.summary.calculatedRows,0);
+  assert.equal(r.summary.skippedRows,1);
+  return r.rows[0];
+}
+const missingT1=reported(tempRow);
+assert.equal(missingT1.code,'B313_PREVIEW_T1_REQUIRED');
+assert.equal(missingT1.details.nextAction,'EDIT_STEP4_T1_AND_REBUILD');
+const defaultT1=reported({...tempRow,t1:'120',t1Source:'default'});
+assert.equal(defaultT1.code,'B313_PREVIEW_T1_SOURCE_UNVERIFIED');
+assert.equal(reported({...tempRow,t1:'-100000',t1Source:'linelist'}).code,'B313_PREVIEW_T1_REQUIRED');
+const defaultP1=reported({...tempRow,t1:'82',t1Source:'linelist',p1Source:'default'});
+assert.equal(defaultP1.code,'B313_PREVIEW_P1_SOURCE_UNVERIFIED');
+const actual82=reported({...tempRow,t1:'82',t1Source:'linelist'});
+assert.equal(actual82.code,'B313_PREVIEW_FACTOR_BASIS_UNAVAILABLE',
+  'Qualified factors still required at actual T1; no screening or neighboring data promoted');
 
 console.log('XML/CII Preview B31.3 material-factor and wall API composition checks passed.');

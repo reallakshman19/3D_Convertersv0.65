@@ -8,6 +8,50 @@ const source = path.join(ROOT, 'docs', 'Masters', 'b313-material-factor-master.j
 const target = path.join(ROOT, 'converters', 'b313-material-factors', 'default-b313-material-factor-data.js');
 const data = JSON.parse(fs.readFileSync(source, 'utf8'));
 
+// This generator is the release boundary: importing/saving a browser draft
+// never qualifies a code factor. Only reviewed project source rows with
+// traceable evidence may enter the active generated master.
+const qualificationErrors = [];
+for (const factor of ['S','E','W','Y']) {
+  for (const [i, row] of (data.factors?.[factor]?.records || []).entries()) {
+    const prefix = `factors.${factor}.records[${i}]`;
+    if (!['VERIFIED','PROJECT_APPROVED'].includes(row.status)) continue;
+    if (!String(row.sourceAuthority||'').trim()
+        || /SCREENING|BENCHMARK|CANDIDATE/i.test(String(row.sourceAuthority))) {
+      qualificationErrors.push(`${prefix}: qualified sourceAuthority is missing or screening-only`);
+    }
+    if (!String(row.sourceReference||'').trim()) {
+      qualificationErrors.push(`${prefix}: exact code/table sourceReference required`);
+    }
+    if (row.status === 'PROJECT_APPROVED' && !String(row.approvalReference||'').trim()) {
+      qualificationErrors.push(`${prefix}: controlled project approvalReference required`);
+    }
+    if (row.edition != null && String(row.edition) !== String(data.edition)) {
+      qualificationErrors.push(`${prefix}: record edition differs from master edition`);
+    }
+    const temp = Number(row.temperatureC), val = Number(row.value);
+    if (row.temperatureC === '' || !Number.isFinite(temp)) qualificationErrors.push(`${prefix}: finite temperatureC required`);
+    if (!Number.isFinite(val) || (factor !== 'Y' && val <= 0) || (factor === 'Y' && val < 0)
+        || (['E','W'].includes(factor) && val > 1)) qualificationErrors.push(`${prefix}: invalid factor value`);
+    if (row.temperatureApplicability === 'CONSTANT_RANGE') {
+      if (factor === 'S' || row.validFromC == null || row.validToC == null
+          || row.validFromC === '' || row.validToC === ''
+          || !Number.isFinite(Number(row.validFromC))
+          || !Number.isFinite(Number(row.validToC)) || Number(row.validFromC) > Number(row.validToC)) {
+        qualificationErrors.push(`${prefix}: invalid qualified temperature range`);
+      }
+    }
+    if (row.interpolationPolicy != null
+        && !(row.interpolationPolicy === 'LINEAR_APPROVED' && ['W','Y'].includes(factor))) {
+      qualificationErrors.push(`${prefix}: unsupported temperature interpolation policy`);
+    }
+  }
+}
+if (qualificationErrors.length) {
+  console.error('B31.3 qualified factor master rejected:\n' + qualificationErrors.join('\n'));
+  process.exit(1);
+}
+
 const runtimeHelpers = `
 function expandScreeningBasis(source) {
   const master = JSON.parse(JSON.stringify(source));

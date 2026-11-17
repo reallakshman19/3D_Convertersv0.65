@@ -43,7 +43,20 @@ function validateMaster(master){
       if(['E','W'].includes(factor)&&(!(value>0)||value>1))errors.push({path:`${path}.value`,message:`${factor} must satisfy 0 < ${factor} ≤ 1`});
       if(factor==='Y'&&value<0)errors.push({path:`${path}.value`,message:'Y must be non-negative'});
       if(!STATUSES.has(String(row.status||'').toUpperCase()))errors.push({path:`${path}.status`,message:'Unknown status'});
-      if(['VERIFIED','PROJECT_APPROVED'].includes(String(row.status||'').toUpperCase())&&!row.sourceAuthority)errors.push({path:`${path}.sourceAuthority`,message:'Approved rows require sourceAuthority'});
+      if(['VERIFIED','PROJECT_APPROVED'].includes(String(row.status||'').toUpperCase())){
+        if(!row.sourceAuthority || /SCREENING|BENCHMARK|CANDIDATE/i.test(String(row.sourceAuthority)))
+          errors.push({path:`${path}.sourceAuthority`,message:'Qualified rows require a non-screening source authority'});
+        if(!String(row.sourceReference||'').trim())
+          errors.push({path:`${path}.sourceReference`,message:'Exact B31.3 code/table source reference is required'});
+        if(row.status==='PROJECT_APPROVED'&&!String(row.approvalReference||'').trim())
+          errors.push({path:`${path}.approvalReference`,message:'Project approval reference required'});
+        if(row.edition && String(row.edition)!==String(master.edition))
+          errors.push({path:`${path}.edition`,message:'Factor code edition differs from master'});
+        if(row.temperatureApplicability==='CONSTANT_RANGE' && (
+          factor==='S' || !Number.isFinite(Number(row.validFromC)) ||
+          !Number.isFinite(Number(row.validToC)) || Number(row.validFromC)>Number(row.validToC)))
+          errors.push({path:`${path}.temperatureApplicability`,message:'Invalid constant-range authority'});
+      }
       const key=[row.materialId,row.productForm||'',row.manufacturingRoute||'',Number(row.temperatureC)].join('|');
       if(seen.has(key))warnings.push({path,message:'Potential duplicate authority key'});else seen.add(key);
     }
@@ -111,7 +124,7 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
   function factorHtml(){const rows=filteredFactorRows();return`
     <div class="engineering-master-banner warn">Edits are candidate data only. Saving a draft does not change the active B31.3 resolver or design-authority status.</div>
     <div class="engineering-master-toolbar"><button class="engineering-master-btn" data-action="add-factor">Add ${factor} row</button><span class="engineering-master-muted">${rows.length} visible records</span></div>
-    <div class="engineering-master-table-wrap"><table class="engineering-master-table"><thead><tr><th>Material</th><th>Family</th><th>Temp °C</th><th>${factor}</th>${factor==='S'?'<th>Unit</th>':''}<th>Product</th>${['E','W'].includes(factor)?'<th>Route</th>':''}<th>Status</th><th>Source authority</th><th></th></tr></thead><tbody>${rows.map(({row,index,material})=>`<tr>
+    <div class="engineering-master-table-wrap"><table class="engineering-master-table"><thead><tr><th>Material</th><th>Family</th><th>Temp °C</th><th>${factor}</th>${factor==='S'?'<th>Unit</th>':''}<th>Product</th>${['E','W'].includes(factor)?'<th>Route</th>':''}<th>Status</th><th>Source authority</th><th>Exact source/table</th><th>Approval ref</th><th></th></tr></thead><tbody>${rows.map(({row,index,material})=>`<tr>
       <td><select class="engineering-master-select" data-factor-index="${index}" data-key="materialId">${(draft.materials||[]).map(m=>`<option value="${esc(m.materialId)}" ${m.materialId===row.materialId?'selected':''}>${esc(m.materialId)}</option>`).join('')}</select></td>
       <td>${esc(material?.family||'')}</td><td><input class="engineering-master-input" type="number" step="any" data-factor-index="${index}" data-key="temperatureC" value="${esc(row.temperatureC)}"></td>
       <td><input class="engineering-master-input" type="number" step="any" data-factor-index="${index}" data-key="value" value="${esc(row.value)}"></td>
@@ -120,6 +133,8 @@ export function renderB313MaterialFactorsTab(container,{context=null,emit}={}){
       ${['E','W'].includes(factor)?`<td><input class="engineering-master-input" data-factor-index="${index}" data-key="manufacturingRoute" value="${esc(row.manufacturingRoute||'')}"></td>`:''}
       <td><select class="engineering-master-select" data-factor-index="${index}" data-key="status">${[...STATUSES].map(s=>`<option ${s===row.status?'selected':''}>${s}</option>`).join('')}</select></td>
       <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceAuthority" value="${esc(row.sourceAuthority||'')}"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="sourceReference" value="${esc(row.sourceReference||'')}" placeholder="B31.3 table / revision"></td>
+      <td><input class="engineering-master-input" data-factor-index="${index}" data-key="approvalReference" value="${esc(row.approvalReference||'')}" placeholder="Project approval ID"></td>
       <td><button class="engineering-master-btn" data-action="delete-factor" data-index="${index}">Retire/Delete</button></td></tr>`).join('')}</tbody></table></div>`;}
 
   function previewHtml(){const result=preview();return`<div class="engineering-master-preview"><div class="engineering-master-card"><h3>Candidate calculation preview</h3>

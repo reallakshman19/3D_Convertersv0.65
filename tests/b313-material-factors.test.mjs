@@ -6,6 +6,7 @@ import {
   normalizeB313MaterialFamily,
   resolveB313MaterialIdentity,
   resolveB313DesignFactors,
+  resolveB313QualifiedTemperatureFactor,
   getB313MaterialFactorCoverage,
   calculateB313MaterialDesign,
 } from '../converters/b313-material-factors/index.js';
@@ -148,4 +149,58 @@ test('A106 full pipeline resolves factors, B31.3 wall and commercial schedule', 
   assert.equal(r.pipeWall.selected.nominalWallMm, b.expected.selectedWallMm);
   assert.equal(r.pipeWall.selected.schedule, b.expected.schedule);
   assert.deepEqual(r.pipeWall.selected.equivalentSchedules, b.expected.equivalentSchedules);
+});
+
+test('qualified S bracket interpolation at LTCS 82C is exact, source-bound and unit safe', () => {
+  const source = 'QUALIFIED-APPENDIX-A1-LTCS-2024';
+  const rows = [
+    { materialId:'LTCS-A333-6', productForm:'PIPE', temperatureC:80, value:20, unit:'ksi', status:'PROJECT_APPROVED', edition:'2024', sourceAuthority:source, sourceReference:'A1/80', approvalReference:'PROJECT-APPROVAL-LTCS-01' },
+    { materialId:'LTCS-A333-6', productForm:'PIPE', temperatureC:120, value:19, unit:'ksi', status:'PROJECT_APPROVED', edition:'2024', sourceAuthority:source, sourceReference:'A1/120', approvalReference:'PROJECT-APPROVAL-LTCS-01' },
+  ];
+  const q = {factor:'S',records:rows,materialId:'LTCS-A333-6',temperatureC:82,edition:'2024'};
+  const result = resolveB313QualifiedTemperatureFactor(q);
+  assert.equal(result.resolution,'LINEAR_QUALIFIED');
+  assert.deepEqual(result.sourceTemperaturesC,[80,120]);
+  assert(Math.abs(result.record.value-(20-.05)*KSI_TO_MPA)<1e-9);
+  assert.equal(result.record.unit,'MPa');
+  assert.equal(result.record.status,'PROJECT_APPROVED');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,temperatureC:80}).resolution,'EXACT_QUALIFIED');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,temperatureC:121}),null,'No extrapolation');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,temperatureC:79}),null,'No extrapolation');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,records:rows.map(r=>({...r,status:'SCREENING'}))}),null);
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,records:[rows[0],{...rows[1],sourceAuthority:'OTHER-SOURCE'}]}),null);
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,records:[...rows,{...rows[0]}]}),null,'Ambiguous same-temperature records HOLD');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,records:rows.map(r=>({...r,sourceReference:''}))}),null,'No source reference, no qualified result');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,records:rows.map(r=>({...r,approvalReference:''}))}),null,'PROJECT_APPROVED needs approval evidence');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...q,records:rows.map(r=>({...r,sourceAuthority:'USER_SUPPLIED_ENGINEERING_SCREENING_BASIS'}))}),null,
+    'Renaming screening data to APPROVED must not silently qualify it');
+});
+test('E needs qualified exact/explicit range and correct weld route; W/Y interpolation needs approval', () => {
+  const common={materialId:'LTCS-A333-6',productForm:'PIPE',status:'VERIFIED',edition:'2024',sourceAuthority:'QUALIFIED-2024',sourceReference:'CONTROLLED-2024-FACTORS'};
+  const range={...common,temperatureC:80,validFromC:20,validToC:150,temperatureApplicability:'CONSTANT_RANGE',value:1};
+  const e={factor:'E',records:[{...range,manufacturingRoute:'SEAMLESS'}],materialId:common.materialId,temperatureC:82,edition:'2024'};
+  assert.equal(resolveB313QualifiedTemperatureFactor({...e,manufacturingRoute:'SEAMLESS'}).resolution,'QUALIFIED_CONSTANT_RANGE');
+  assert.equal(resolveB313QualifiedTemperatureFactor(e),null,'Route unresolved must HOLD');
+  assert.equal(resolveB313QualifiedTemperatureFactor({...e,manufacturingRoute:'EFW_DOUBLE_BUTT'}),null);
+  assert.equal(resolveB313QualifiedTemperatureFactor({...e,manufacturingRoute:'SEAMLESS',temperatureC:151}),null);
+  assert.equal(resolveB313QualifiedTemperatureFactor({...e,manufacturingRoute:'SEAMLESS',records:[{...range,manufacturingRoute:'SEAMLESS',status:'SCREENING'}]}),null);
+  for (const factor of ['W','Y']) {
+    const rows=[{...common,temperatureC:80,value:factor==='W'?1:.4},
+      {...common,temperatureC:120,value:factor==='W'?.9:.45}];
+    const q={factor,records:rows,materialId:common.materialId,temperatureC:82,edition:'2024'};
+    assert.equal(resolveB313QualifiedTemperatureFactor(q),null,'No unapproved interpolation of W/Y');
+    const approved=rows.map(r=>({...r,interpolationPolicy:'LINEAR_APPROVED'}));
+    const result=resolveB313QualifiedTemperatureFactor({...q,records:approved});
+    assert.equal(result.resolution,'LINEAR_QUALIFIED');
+    assert.equal(result.record.status,'VERIFIED');
+  }
+});
+test('strict resolver rejects blank T1 and caller overrides do not count as qualified source authority', () => {
+  const blank=resolveB313DesignFactors({material:{materialId:'CS-A106-B'},designTemperature:''});
+  assert.equal(blank.ok,false);
+  assert.equal(blank.code,'INVALID_DESIGN_TEMPERATURE');
+  const user=resolveB313DesignFactors({material:{materialId:'LTCS-A333-6'},designTemperature:82,
+    factorOverrides:{S:125,E:1,W:1,Y:.4}});
+  assert.equal(user.ok,true);
+  assert.equal(user.designAuthority,false,'Numeric caller overrides are not qualified master data');
 });

@@ -156,7 +156,7 @@ function factorBlockerText(details = {}) {
     if (item.status === 'QUALIFICATION_STATUS_REJECTED') detail = `candidate status ${statuses || 'unqualified'} excluded; strict accepts ${strictStatuses}`;
     else if (item.status === 'MANUFACTURING_ROUTE_REQUIRED') detail = `manufacturing route required${routes ? `; available ${routes}` : ''}`;
     else if (item.status === 'MANUFACTURING_ROUTE_NO_MATCH') detail = `route ${item.requestedManufacturingRoute || '?'} not matched${routes ? `; available ${routes}` : ''}`;
-    else if (item.status === 'NO_EXACT_TEMPERATURE_RECORD') detail = `no exact T1 record${temperatures ? `; available T °C: ${temperatures}` : ''}`;
+    else if (item.status === 'NO_QUALIFIED_TEMPERATURE_BASIS') detail = `no qualified T1 basis; nearby source data may be screening only${temperatures ? `; available T °C: ${temperatures}` : ''}`;
     rows.push(`${factor}: ${detail}`);
   }
   return rows.join(' · ');
