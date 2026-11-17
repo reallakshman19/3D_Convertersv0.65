@@ -34,7 +34,7 @@ export function buildDtxrWallReview({
     }
     item.rowIndices.push(ri);
     const occurrence = txt(row?.branchOccurrenceIndex);
-    item.acceptanceKeys.push(/^\\d+$/.test(occurrence) ? String(Number(occurrence)) : String(ri));
+    item.acceptanceKeys.push(/^\d+$/.test(occurrence) ? String(Number(occurrence)) : String(ri));
     item.branchNames.push(txt(row?.branchName) || ('Preview row ' + (ri + 1)));
   }
   const items = [...grouped.values()].map(item => {
