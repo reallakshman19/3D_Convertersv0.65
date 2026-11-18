@@ -83,6 +83,38 @@ try {
     'Unified B31.3 audit after source build and calculation');
   const audit = unifiedSlot.querySelector('[data-mc-b313-report]');
   assert(audit.textContent.includes('Evaluated 41'), 'Audit did not use 41 physical Preview rows');
+  const csvButton=audit.querySelector('[data-b313-evidence-download="csv"]');
+  const jsonButton=audit.querySelector('[data-b313-evidence-download="json"]');
+  assert(csvButton&&jsonButton, 'Source-to-wall CSV/JSON evidence controls unavailable');
+  assert(csvButton.textContent.includes('41 rows'),
+    'Full live Preview occurrence population is not exported');
+  const evidenceBlobs=[],evidenceNames=[];
+  const nativeObjectUrl=URL.createObjectURL;
+  const nativeRevokeUrl=URL.revokeObjectURL;
+  const nativeAnchorClick=HTMLAnchorElement.prototype.click;
+  try {
+    URL.createObjectURL=blob=>{evidenceBlobs.push(blob);return 'blob:test/4preview-source-proof';};
+    URL.revokeObjectURL=()=>{};
+    HTMLAnchorElement.prototype.click=function(){evidenceNames.push(this.download);};
+    csvButton.click();
+    jsonButton.click();
+  } finally {
+    URL.createObjectURL=nativeObjectUrl;
+    URL.revokeObjectURL=nativeRevokeUrl;
+    HTMLAnchorElement.prototype.click=nativeAnchorClick;
+  }
+  assert(evidenceBlobs.length===2,'Both evidence downloads must produce browser Blob data');
+  assert(evidenceNames[0]==='GLRD-4Preview-B313-Source-to-Wall.csv');
+  assert(evidenceNames[1]==='GLRD-4Preview-B313-Source-to-Wall.json');
+  const proofJson=JSON.parse(await evidenceBlobs[1].text());
+  assert(proofJson.schema==='b313-preview-source-to-wall-ledger/v1');
+  assert(proofJson.rows.length===41,'Exporter omitted physical Preview rows');
+  assert(proofJson.rows.every((r,i)=>r.ordinal===i+1),'Physical ordinal order changed');
+  assert(proofJson.rows.every(r=>!r.pullEligible),'Screening cannot set Pull eligibility');
+  const proofCsv=await evidenceBlobs[0].text();
+  assert(proofCsv.split('\\r\\n').filter(Boolean).length===42,
+    'Exporter CSV does not have 41 source-ordered physical rows plus header');
+
   assert(host.querySelectorAll('[data-mc-b313-report]').length === 1,
     'Competing top-level and unified B31.3 audit panels were rendered');
   assert(audit.textContent.includes('Held 41'),
@@ -273,7 +305,8 @@ try {
       'Accepted Step 4 wall did not propagate to native enriched XML');
   }
 
-  done({ ok: true, conditionalSeamlessDefaultVerified: true,
+  done({ ok: true, perBranchSourceWallLedgerExportVerified: true,
+    conditionalSeamlessDefaultVerified: true,
     conditionalE: 1, conditionalAlternativeRouteSwitchVerified: true,
     conditionalMasterOdReferenceVerified: true,
     syntheticPullAccepted: true, sameOdNodesUpdated: pipeLedger.length,
