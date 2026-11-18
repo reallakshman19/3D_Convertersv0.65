@@ -514,12 +514,12 @@ export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, pre
   if (explicit) return { unit: explicit, source: 'design-basis' };
   if (fromPreview) return { unit: fromPreview, source: row?.p1UnitSource || 'preview' };
   if (fromHeader.unit) return fromHeader;
-  if (previewOnly) return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
-  if (normalizedToken(row?.p1Source).includes('XML')) {
-    const unit = normalizePressureUnit(sourceXml?.pressureUnit);
-    if (unit) return { unit, source: 'source-xml-units' };
-  }
-  return { unit: '', source: 'unresolved' };
+  // Wall calculation has ONE user-visible input authority: the effective
+  // 4 Preview P1 unit (or its explicitly selected B31.3 basis). An XML
+  // document's declared unit never supplies a design-pressure unit here.
+  // sourceXml is kept as a deprecated positional argument solely for
+  // compatibility with existing third-party callers.
+  return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
 }
 
 export function inferPreviewDimensionStandard(row, basis = {}, materialIdentity = null) {
@@ -831,7 +831,7 @@ export function buildPreviewB313ScreeningReference({
   if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
     holdReasons.push('Positive source P1 is missing or default-only');
   const pressureBasis = inferPreviewPressureUnit(row,config,
-    {pressureUnit:'',byBranch:new Map()},manualBasis,true);
+    null,manualBasis,true);
   if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
   const corrosion=nonNegative(row?.corrosion);
   if (corrosion===null) holdReasons.push('Corrosion allowance missing');
@@ -846,10 +846,9 @@ export function buildPreviewB313ScreeningReference({
   const classDn=positive(row?.pipingClassPipeDnMm);
   const referenceOd=dimension.standard
     ? masterOutsideDiameterMm(effectiveDn,dimension.standard):null;
-  // A conditional SCREENING-only calculation can use the pipe-wall dimension
-  // master if the physical XML node ledger carries no OD, but only where
-  // the effective 4 Preview confirms an exact-DN class pipe product.
-  // NEVER use the nominal OD to authorize Pull or assert XML parity.
+  // A conditional SCREENING-only calculation can use the dimension
+  // master if the effective 4 Preview has no unique row/node OD and its
+  // class product confirms the same nominal DN. This does not authorize Pull.
   const exactDnClassReference=Boolean(effectiveDn && classDn
     && Math.abs(effectiveDn-classDn)<1e-6
     && positive(row?.pipingClassPipeWallMm)
@@ -943,7 +942,7 @@ export function buildPreviewB313ScreeningReference({
   };
 }
 
-export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
+export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   const lineListCoverage = buildPreviewB313LineListCoverage(branchRows, config);
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
@@ -957,7 +956,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
   // Source XML and master matching are upstream responsibilities of Build Preview.
   const previewNodeRows = Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
     ? host.__xmlCiiPreviewResult.nodeBoreWallRows : [];
-  const sourceXml = { pressureUnit: '', byBranch: new Map() };
+  // No XML read/parse/pressure or temperature fallback. All rows are the
+  // effective 4 Preview snapshot captured by Build Preview.
   const basisConfig = ensureBasisConfig(config || {});
   const results = [];
   let updated = 0;
@@ -1047,7 +1047,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, 'B313_PREVIEW_CORROSION_REQUIRED', 'Preview corrosion allowance is unavailable.', { materialIdentity, factorBasis }));
       return;
     }
-    const pressureBasis = inferPreviewPressureUnit(row, config, sourceXml, basis, true);
+    const pressureBasis = inferPreviewPressureUnit(row, config, null, basis, true);
     if (!pressureBasis.unit) {
       results.push(failureRow(row, 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED', 'Pressure unit could not be resolved. Set P unit explicitly in the B31.3 design basis.', { materialIdentity, factorBasis }));
       return;
@@ -1074,7 +1074,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
             : { ok: true, outsideDiameterMm: selectedOd, source: 'step4-preview-node-ledger',
                 referenceOdMm: referenceOd, parityDeltaMm: Math.abs(selectedOd - referenceOd), toleranceMm };
     if (!odBasis.ok) {
-      results.push(failureRow(row, odBasis.code, 'A reliable row outside diameter could not be established from source XML against the DN master reference.', { ...odBasis, materialIdentity, factorBasis }));
+      results.push(failureRow(row, odBasis.code, 'A unique 4 Preview row outside diameter could not be confirmed against the DN master reference.', { ...odBasis, materialIdentity, factorBasis }));
       return;
     }
 
