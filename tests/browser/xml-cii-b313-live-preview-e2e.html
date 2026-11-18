@@ -197,7 +197,7 @@ try {
     rows:[{branchName:conditionalRow.branchName,lineKey:'P4110001',
       status:'NOT_UPDATED',code:'REFERENCE_ONLY',screeningReference:odless}],
   });
-  assert(fallbackAudit.includes('source XML OD unavailable'),
+  assert(fallbackAudit.includes('4 Preview node OD unavailable'),
     'Audit does not disclose the assumed screening dimensional OD');
   assert(fallbackAudit.includes('5.2354 mm'),
     'Master OD fallback did not render conditional calculated wall');
