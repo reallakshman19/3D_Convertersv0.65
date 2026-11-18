@@ -111,7 +111,7 @@ test('no source OD: exact-DN class/dimension master supplies read-only screening
   rows:[{branchName:row().branchName,lineKey:'P4110001',
     status:'NOT_UPDATED',screeningReference:ref,code:'TEST_SCREENING_ONLY'}],
  });
- assert.match(html,/exact-DN dimensional master \(screening assumption; source XML OD unavailable\)/);
+ assert.match(html,/exact-DN dimensional master \(screening assumption; 4 Preview node OD unavailable\)/);
  assert.match(html,/5\.2354 mm/);
  assert.match(html,/Eligible proposals 0/);
 });
