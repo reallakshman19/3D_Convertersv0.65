@@ -5,6 +5,7 @@ import {lookupB313ScreeningFactors} from '../converters/b313-material-factors/sc
 import {resolveB313DesignFactors} from '../converters/b313-material-factors/index.js';
 import {
   buildPreviewB313ScreeningReference,buildPreviewB313WallUpdateReport,
+  resolveB313EffectivePreviewPressureUnit,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import {renderPreviewB313WallAuditHtml} from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
 
@@ -141,6 +142,32 @@ test('4 Preview only: displayed P1/T1/material and selected basis determine B31.
  assert.deepEqual(b,a,'Changing XML pressure, temperature and units must not affect 4 Preview wall calculation');
  assert.equal(left.summary.updatedRows,0);
  assert.equal(right.summary.updatedRows,0);
+});
+
+test('4 Preview pressure-unit authority excludes raw Line List relookup at calculation time',()=>{
+ const blank={...row(),p1Unit:'',p1UnitSource:''};
+ const cfg=config();
+ cfg.linelist={masterRows:[
+   {'Line number':'P4110001','Pressure Max kPa(g)':13001}],
+   fieldMap:{}};
+ const unresolved=buildPreviewB313ScreeningReference({
+   row:blank,config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(unresolved.pressureUnit,'');
+ assert(unresolved.holdReasons.includes('P1 pressure unit unresolved'));
+ assert.equal(unresolved.scenarios.length,0,'Unresolved Preview P1 unit must block numerical wall');
+ assert.equal(resolveB313EffectivePreviewPressureUnit(blank,{}).unit,'');
+ const explicit=resolveB313EffectivePreviewPressureUnit(blank,{pressureUnit:'KPA'});
+ assert.equal(explicit.unit,'KPA');
+ assert.equal(explicit.source,'4-preview-b313-basis');
+ const chosen=buildPreviewB313ScreeningReference({
+   row:{...blank,p1Unit:'KPA',p1UnitSource:'reviewed-preview-cell'},
+   config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(chosen.pressureUnit,'KPA');
+ assert.equal(chosen.conditionalScenario.calculationOk,true);
+ const conflict=resolveB313EffectivePreviewPressureUnit({
+   ...blank,p1Unit:'KPA'}, {pressureUnit:'BARG'});
+ assert.equal(conflict.unit,'');
+ assert.equal(conflict.source,'P1_UNIT_AUTHORITIES_CONFLICT');
 });
 
 test('missing P1 unit with class master OD: show verified factor and OD, but no calculation',()=>{
