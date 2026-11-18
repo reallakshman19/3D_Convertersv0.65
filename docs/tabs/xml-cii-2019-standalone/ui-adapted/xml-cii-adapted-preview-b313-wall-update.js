@@ -472,6 +472,21 @@ export function resolvePreviewP1LineListHeaderUnit(row = {}, config = {}) {
   const raw = selected?.row;
   if (!raw || typeof raw !== 'object') return { unit: '', source: 'NO_SELECTED_LINE_LIST_ROW' };
   const matches = [];
+  // Imported Excel may put DESIGN CONDITIONS, Pressure Max and kPa(g)
+  // on different rows in a single source column. Only the stored
+  // same-column normalized source receipt can provide this unit.
+  const headerBandSource=text(raw._sourceP1HeaderSource);
+  if (headerBandSource.startsWith('line-list-header-band:')) {
+    const fields=Array.isArray(raw._sourceP1HeaderTexts)
+      ?raw._sourceP1HeaderTexts.map(normalizedToken):[];
+    const validDesign=fields.some(x=>/\bPRESSURE\s+(MAX|MAXIMUM)\b|\bDESIGN\s+PRESSURE\b/.test(x))
+      && !fields.some(x=>/AT\s+WORKING\s+CONDITIONS|OPERATING\s+CONDITIONS/.test(x));
+    const bandUnit=normalizePressureUnit(raw._sourceP1Unit);
+    if (validDesign && bandUnit && sameNumeric(raw._sourceP1OriginalValue,row.p1)
+        && sameNumeric(raw.p1,row.p1))
+      matches.push({unit:bandUnit,source:headerBandSource});
+    else return {unit:'',source:'LINE_LIST_P1_HEADER_BAND_STALE_OR_INCOMPLETE'};
+  }
   for (const [key, value] of Object.entries(raw)) {
     const header = normalizedToken(key);
     if (!( /\bP1\b/.test(header) || (/\bPRESSURE\b/.test(header) && /\b(?:DESIGN|MAX|MAXIMUM)\b/.test(header)) )
