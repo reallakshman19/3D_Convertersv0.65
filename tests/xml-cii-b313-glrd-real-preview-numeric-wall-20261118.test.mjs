@@ -51,20 +51,24 @@ test('four owner-saved real-shaped complete rows display numerical B31.3 what-if
     const display=buildPreviewB313CalculatedWallDisplay({
       row,config:cfg,previewNodeRows:[],rowIndex:i,
     });
-    assert.equal(display.ok,true,'Row '+(i+1)+' '+JSON.stringify(display));
-    assert.equal(display.code,'HYPOTHETICAL_KPA_UNIT_UNVERIFIED');
-    assert.equal(display.hypotheticalKpa,true);
-    assert.equal(display.pressureUnit,'KPA');
-    assert.equal(display.pressureUnitAssumed,true);
-    assert.equal(display.sourcePressureUnitUnverified,true);
-    assert.equal(display.eligibleForPull,false);
-    assert.equal(display.stressLookupMethod,x.stress);
-    assert.equal(display.factors.E,1,'conditional Seamless E=1 only');
-    assert.equal(display.factors.W,1);
-    assert.equal(display.factors.Y,0.4);
-    assert.equal(display.outsideDiameterSource,'pipe-wall-master-exact-DN-SCREENING-ONLY');
-    close(display.outsideDiameterMm,x.OD,0.001);
-    close(display.requiredNominalThicknessMm,x.expected);
+    assert.equal(display.ok,false,'No unverified pressure unit can become an approved governing result');
+    assert.equal(display.requiredNominalThicknessMm,null);
+    assert.match(display.reason,/P1 pressure unit unresolved/);
+    const hypo=display.hypotheticalScenario;
+    assert.equal(hypo?.ok,true,'Row '+(i+1)+' '+JSON.stringify(display));
+    assert.equal(hypo.code,'HYPOTHETICAL_KPA_UNIT_UNVERIFIED');
+    assert.equal(hypo.hypotheticalKpa,true);
+    assert.equal(hypo.pressureUnit,'KPA');
+    assert.equal(hypo.pressureUnitAssumed,true);
+    assert.equal(hypo.sourcePressureUnitUnverified,true);
+    assert.equal(hypo.eligibleForPull,false);
+    assert.equal(hypo.stressLookupMethod,x.stress);
+    assert.equal(hypo.factors.E,1,'conditional Seamless E=1 only');
+    assert.equal(hypo.factors.W,1);
+    assert.equal(hypo.factors.Y,0.4);
+    assert.equal(hypo.outsideDiameterSource,'pipe-wall-master-exact-DN-SCREENING-ONLY');
+    close(hypo.outsideDiameterMm,x.OD,0.001);
+    close(hypo.requiredNominalThicknessMm,x.expected);
     assert.equal(JSON.stringify(row),before,'Preview row altered');
   }
   assert.equal(JSON.stringify(cfg),saved,'reference code wrote config, overrides or Pull');
@@ -127,7 +131,9 @@ test('strict Class Pull still requires real source-row identity; display fallbac
     'governed screening reference must still reject missing source unit');
   assert.equal(ref.scenarios.length,0);
   const display=buildPreviewB313CalculatedWallDisplay({row,config:cfg,rowIndex:1});
-  assert.equal(display.classPass,false,'missing source-row index remains a governed class HOLD');
+  assert.equal(display.ok,false);
+  assert.equal(display.hypotheticalScenario?.classPass,false,
+    'missing class source-row index remains a governed class HOLD even with a numerical hypothetical');
   assert.equal(display.eligibleForPull,false);
   assert(!Object.keys(cfg.b313WallUpdate.acceptedWallByBranch).length);
   assert(!Object.keys(cfg.b313WallUpdate.proposalsByBranch).length);
