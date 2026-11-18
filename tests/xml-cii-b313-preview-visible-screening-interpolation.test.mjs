@@ -72,7 +72,7 @@ test('new B31.3 required-wall column computes every fully populated saved GLRD 4
  for(const sample of models){
    const preview=physicalRow(sample);
    const cfg={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{},
-     millTolerance:{basis:'percent',value:12.5}}};
+     commonPressureUnitFallback:'KPA',millTolerance:{basis:'percent',value:12.5}}};
    const previous=JSON.stringify(cfg);
    const required=buildPreviewB313CalculatedWallDisplay({
      row:preview,config:cfg,previewNodeRows:[],rowIndex:sample.rowNumber-1});
