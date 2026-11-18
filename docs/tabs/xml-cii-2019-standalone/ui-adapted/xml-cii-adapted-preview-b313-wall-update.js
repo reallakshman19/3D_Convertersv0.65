@@ -960,6 +960,81 @@ export function buildPreviewB313ScreeningReference({
   };
 }
 
+/**
+ * Display-only 4 Preview wall calculation for the new read-only table column.
+ *
+ * The coefficient master is evaluated numerically at the PREVIEW T1 even
+ * when its active 2024 approval record is absent. The source of the result,
+ * interpolation brackets, all assumptions, and calculated t/minimum nominal
+ * are preserved and shown to the user. Nothing from this function is eligible
+ * for Pull or writes an engineering/approved factor basis.
+ *
+ * When the Preview P unit is unknown, show an explicitly labeled what-if
+ * using 1 Preview pressure unit = 1 kPa. This never modifies the actual P
+ * unit or publishes a governed wall; changing the existing P-unit selector
+ * recalculates the same column in the correct selected unit.
+ */
+export function buildPreviewB313CalculatedWallDisplay({
+  row = {},config = {},previewNodeRows = [],rowIndex = 0,reference = null,
+} = {}) {
+  const initial=reference || buildPreviewB313ScreeningReference({
+    row,config,previewNodeRows,rowIndex,
+  });
+  let chosen=initial;
+  let pressureUnitAssumed=false;
+  if (initial?.ok && !initial?.conditionalScenario?.calculationOk
+      && !initial?.pressureUnit
+      && Array.isArray(initial.holdReasons)
+      && initial.holdReasons.includes('P1 pressure unit unresolved')) {
+    const trial=buildPreviewB313ScreeningReference({
+      row:{...row,p1Unit:'KPA',p1UnitSource:'CONDITIONAL_DISPLAY_KPA_ASSUMPTION'},
+      config,previewNodeRows,rowIndex,
+    });
+    if(trial?.conditionalScenario?.calculationOk) {
+      chosen=trial;
+      pressureUnitAssumed=true;
+    }
+  }
+  const scenario=chosen?.conditionalScenario;
+  const errors=Array.isArray(chosen?.holdReasons)?chosen.holdReasons:[];
+  if(!chosen?.ok || !scenario?.calculationOk
+      || !Number.isFinite(Number(scenario.requiredNominalThicknessMm))) {
+    return {
+      ok:false,code:chosen?.code||'PREVIEW_CALC_INPUTS_INCOMPLETE',
+      rowIndex,requiredNominalThicknessMm:null,pressureDesignThicknessMm:null,
+      reason:errors[0]||chosen?.code||'Missing 4 Preview calculation inputs',
+      pressureUnitAssumed:false,eligibleForPull:false,
+    };
+  }
+  return {
+    ok:true,code:'CALCULATED_REFERENCE_WALL',
+    rowIndex,requiredNominalThicknessMm:scenario.requiredNominalThicknessMm,
+    pressureDesignThicknessMm:scenario.pressureDesignThicknessMm,
+    classNominalWallMm:scenario.classNominalWallMm,
+    classSchedule:scenario.classSchedule,
+    classPass:scenario.classPass,
+    pressureUnit:chosen.pressureUnit,
+    pressureUnitAssumed,
+    pressure:chosen.pressure,
+    materialId:chosen.materialId,
+    temperatureC:chosen.temperatureC,
+    factors:{S_MPa:chosen.S.MPa,E:chosen.conditionalE,W:chosen.W,Y:chosen.Y},
+    factorBasisId:chosen.basisId,
+    factorSourceReference:chosen.sourceReference,
+    factorCodeEditionBasis:chosen.editionBasis,
+    stressLookupMethod:chosen.S.method,
+    interpolationBracket:chosen.S.bracket,
+    manufacturingRoute:chosen.conditionalManufacturing,
+    routeAssumed:chosen.conditionalRouteAssumed,
+    outsideDiameterMm:chosen.outsideDiameterMm,
+    outsideDiameterSource:chosen.outsideDiameterSource,
+    corrosionAllowanceMm:chosen.corrosionAllowanceMm,
+    millTolerance:chosen.negativeMillTolerance,
+    engineeringQualification:'NOT_ESTABLISHED_BY_THIS_REFERENCE_CALCULATION',
+    eligibleForPull:false,
+  };
+}
+
 export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   const lineListCoverage = buildPreviewB313LineListCoverage(branchRows, config);
@@ -1204,10 +1279,14 @@ export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
       const screeningReference=buildPreviewB313ScreeningReference({
         row:branchRows[rowIndex],config,previewNodeRows,rowIndex,
       });
+      const calculatedWallDisplay=buildPreviewB313CalculatedWallDisplay({
+        row:branchRows[rowIndex],config,previewNodeRows,rowIndex,
+        reference:screeningReference,
+      });
       return result.status === 'CALCULATED' || result.status === 'UPDATED'
-        ? {...result,screeningReference}
+        ? {...result,screeningReference,calculatedWallDisplay}
         : {
-          ...result,screeningReference,
+          ...result,screeningReference,calculatedWallDisplay,
           details: {
             ...(result.details || {}),
             independentInputIssues: collectPreviewB313IndependentIssues(branchRows[rowIndex], config),
