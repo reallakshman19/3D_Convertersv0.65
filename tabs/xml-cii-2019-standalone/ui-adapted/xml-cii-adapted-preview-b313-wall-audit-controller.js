@@ -164,39 +164,56 @@ function factorBlockerText(details = {}) {
 
 
 /** Screening result is visual evidence only; never a Pull or strict factor. */
+
 function screeningFactorHtml(reference) {
   if (!reference?.ok) return '';
   const S=reference.S||{}, bracket=Array.isArray(S.bracket)?S.bracket:[];
   const bracketText=bracket.map(x=>esc(x.temperatureC)+'°C:'+compact(x.Sksi,5)+' ksi').join(' → ');
-  const routeText=reference.E===null
-    ? 'E varies by unverified route: '+reference.routeOptions.map(x=>esc(x.route)+'='+compact(x.value)).join(' / ')
-    : 'E '+compact(reference.E)+' (route '+esc(reference.selectedRoute)+')';
+  const routes=Array.isArray(reference.routeOptions)?reference.routeOptions:[];
+  const routeOptions=routes.map(route=>`<option value="${esc(route.route)}" data-b313-e="${compact(route.value)}"${route.route===reference.conditionalManufacturing?' selected':''}>${esc(route.route.replaceAll('_',' '))}</option>`).join('');
+  const routeSelect=routes.length
+    ? `<label>Conditional manufacturing <select data-b313-conditional-manufacturing aria-label="Conditional manufacturing (screening only)" style="padding:3px;border:1px solid #d97706;border-radius:4px;">${routeOptions}</select></label>`
+    : 'Conditional manufacturing unavailable';
+  const eValue=reference.conditionalE===null?'unresolved':compact(reference.conditionalE);
   return `<div data-b313-screening-reference style="margin-top:7px;padding:6px;border:1px solid #f59e0b;border-radius:5px;color:#7c2d12;background:#fffbeb;">
     <strong>SCREENING MASTER LOOKUP — NOT PULL ELIGIBLE</strong>
     <div>Source: ${esc(reference.basisId)} · ${esc(reference.basisStatus)} · T1 ${esc(reference.temperatureC)}°C</div>
     <div>S ${fixed(S.MPa,3)} MPa (${compact(S.ksi,5)} ksi) · ${esc(S.method)} ${bracketText ? '('+bracketText+')':''}</div>
-    <div>${routeText} · W ${compact(reference.W)} · Y ${compact(reference.Y)}</div>
+    <div>${routeSelect} · E = <strong data-b313-conditional-e-value>${esc(eValue)}</strong> · W ${compact(reference.W)} · Y ${compact(reference.Y)}</div>
+    <div style="font-size:10px;">${reference.conditionalRouteAssumed?'Default Seamless: screening assumption, NOT verified pipe manufacture.':'Declared route: screening only.'} Selector does not authorize Pull.</div>
   </div>`;
 }
 
 function screeningWallHtml(reference) {
   if (!reference?.ok) return '';
   const scenarios=Array.isArray(reference.scenarios)?reference.scenarios:[];
-  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;">
-    <strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}
-    </div>`;
+  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;"><strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}</div>`;
   return `<div data-b313-screening-wall style="margin-top:7px;padding:6px;border:1px solid #f59e0b;border-radius:5px;background:#fffbeb;color:#7c2d12;">
     <strong>CONDITIONAL REFERENCE ONLY — not design approved</strong>
     <div>P1 ${compact(reference.pressure)} ${esc(reference.pressureUnit)} · OD ${fixed(reference.outsideDiameterMm,3)} mm · CA ${compact(reference.corrosionAllowanceMm)} mm</div>
-    ${scenarios.map(s=>`<div style="border-top:1px solid #fde68a;padding-top:4px;margin-top:4px;">
-      Route ${esc(s.manufacturingRoute)}${s.routeAssumed?' (what-if; not verified)':''} · E ${compact(s.E)}:
+    ${scenarios.map(s=>`<div data-b313-screening-scenario="${esc(s.manufacturingRoute)}" style="border-top:1px solid #fde68a;padding-top:4px;margin-top:4px;${s.manufacturingRoute===reference.conditionalManufacturing?'':'display:none;'}">
+      Conditional manufacturing: ${esc(s.manufacturingRoute.replaceAll('_',' '))}${s.routeAssumed?' (what-if; not verified)':''} · E = ${compact(s.E)}:
       ${s.calculationOk
-        ? `pressure wall ${fixed(s.pressureDesignThicknessMm,4)} mm → required nominal ${fixed(s.requiredNominalThicknessMm,4)} mm
-          · class ${fixed(s.classNominalWallMm,4)} mm / ${esc(s.classSchedule||'?')}
-          · ${s.classPass?'class reference PASS':'class reference HOLD '+esc(s.classCode||'UNAVAILABLE')}`
+        ? `pressure wall ${fixed(s.pressureDesignThicknessMm,4)} mm → required nominal ${fixed(s.requiredNominalThicknessMm,4)} mm · class ${fixed(s.classNominalWallMm,4)} mm / ${esc(s.classSchedule||'?')} · ${s.classPass?'class reference PASS':'class reference HOLD '+esc(s.classCode||'UNAVAILABLE')}`
         : `no result (${esc(s.code)})`}
     </div>`).join('')}
   </div>`;
+}
+
+function bindConditionalManufacturing(host) {
+  for (const select of host?.querySelectorAll?.('[data-b313-conditional-manufacturing]') || []) {
+    if (select.dataset.b313ConditionalBound==='true') continue;
+    select.dataset.b313ConditionalBound='true';
+    select.addEventListener('change', () => {
+      const tr=select.closest('tr');
+      if (!tr) return;
+      const option=Array.from(select.options).find(o=>o.value===select.value);
+      const eEl=tr.querySelector('[data-b313-conditional-e-value]');
+      if (eEl) eEl.textContent=option?.dataset?.b313E??'unresolved';
+      for (const scenario of tr.querySelectorAll('[data-b313-screening-scenario]'))
+        scenario.style.display=scenario.dataset.b313ScreeningScenario===select.value?'':'none';
+    });
+  }
 }
 
 function failedRowHtml(row) {
@@ -354,17 +371,20 @@ function renderReport(host, report) {
   if (sharedSlot) {
     sharedSlot.innerHTML = renderPreviewB313WallAuditHtml(report);
     bindSourceNavigation(host);
+    bindConditionalManufacturing(host);
     return;
   }
   const editor = host?.querySelector?.('[data-mc-b313-basis-editor]');
   if (editor) {
     editor.insertAdjacentHTML('afterend', renderPreviewB313WallAuditHtml(report));
     bindSourceNavigation(host);
+    bindConditionalManufacturing(host);
     return;
   }
   const actionBar = host?.querySelector?.('[data-mc-preview-build]')?.parentElement;
   actionBar?.parentElement?.insertAdjacentHTML?.('afterend', renderPreviewB313WallAuditHtml(report));
   bindSourceNavigation(host);
+    bindConditionalManufacturing(host);
 }
 
 function bindAuditButton(host, config, xmlText, options, getSnapshotRows, getLiveRows) {
