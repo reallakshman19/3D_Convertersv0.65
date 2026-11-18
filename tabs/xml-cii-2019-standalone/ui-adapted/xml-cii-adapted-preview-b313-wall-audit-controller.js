@@ -190,7 +190,7 @@ function screeningWallHtml(reference) {
   if (!reference?.ok) return '';
   const scenarios=Array.isArray(reference.scenarios)?reference.scenarios:[];
   const odProvenance=reference.outsideDiameterReferenceOnly
-    ? `<div data-b313-screening-od-source style="font-size:10px;font-weight:700;color:#92400e;">OD ${fixed(reference.outsideDiameterMm,3)} mm from exact-DN dimensional master (screening assumption; source XML OD unavailable)</div>`
+    ? `<div data-b313-screening-od-source style="font-size:10px;font-weight:700;color:#92400e;">OD ${fixed(reference.outsideDiameterMm,3)} mm from exact-DN dimensional master (screening assumption; 4 Preview node OD unavailable)</div>`
     :reference.outsideDiameterSourceMatched
       ? `<div data-b313-screening-od-source style="font-size:10px;">OD ${fixed(reference.outsideDiameterMm,3)} mm from actual Preview node ledger</div>`
       :'';
