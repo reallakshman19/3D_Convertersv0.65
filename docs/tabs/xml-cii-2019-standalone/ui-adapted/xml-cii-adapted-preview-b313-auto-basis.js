@@ -10,12 +10,12 @@ import {
   buildPreviewB313CalculatedWallDisplay,
   resolvePreviewB313MaterialFromRow,
   b313SourceConfirmsA106Seamless,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-b313-common-punit-1';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-glrd-numeric-2';
 
 import {
   buildPreviewB313AutomaticWallColumnReport,
   renderPreviewB313CalculatedWallCells,
-} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-b313-common-punit-1';
+} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-glrd-numeric-2';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
