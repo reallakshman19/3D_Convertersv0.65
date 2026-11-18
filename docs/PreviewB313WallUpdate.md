@@ -244,6 +244,71 @@ Merging this Preview adoption does not complete B31.3 design-authority qualifica
 
 When the effective Preview material is blank or genuinely unmapped, the B31.3 basis panel may offer the configured **CS** family fallback. It does not rewrite the Preview Material cell, does not override known non-CS identities (for example stainless), and requires explicit user confirmation before Pull. The CS family is not itself an allowable-stress record: a controlled exact material identity and qualified S/E/W/Y or independently reviewed manual basis are required for engineering acceptance. The default may be disabled in project settings.
 
+## 2026-11-18 — Source-to-wall receipt / Line List recovery (PR #12)
+
+The existing **4 Preview → Calculate B31.3 pressure-design wall** now
+records the selected Line List matching result for *each physical branch
+occurrence*, using the exact source matcher already used for Preview
+population. Every row is independently classified as:
+
+- `MATCHED_PROCESS_INPUTS_PRESENT`: one unique exact or P-only numeric
+  alias match, with source P1/T1 and unit provenance visible;
+- `P1_UNIT_SOURCE_UNRESOLVED`: P1 and T1 exist, but the selected
+  same-line source has no verifiable unit-bearing design-pressure header;
+- `NO_SELECTED_MASTER_LINE`: no matching row in the actually loaded master;
+- `AMBIGUOUS_SELECTED_MASTER`: multiple exact or alias source candidates;
+- `PREVIEW_MASTER_OUT_OF_SYNC` or `PREVIEW_REBUILD_REQUIRED`: the
+  current Preview and selected master no longer describe the same source;
+- `PREVIEW_SOURCE_P1_CONFLICT` or `PREVIEW_SOURCE_T1_CONFLICT`:
+  a unique source row exists but its source-design value no longer agrees
+  with the Preview field;
+- `EXPLICIT_OVERRIDE_NO_LINE_LIST_MATCH`: independently entered P1/T1
+  require engineering review; not a source Line List match.
+
+The bare numeric workbook sequence `4110001` may match a unique
+**P4110001** pipe line, but must never match **B4110001** or another
+unrelated service-family line. Both the Preview resolver and the Pull-time
+source-pressure receipt now use this same P-only alias rule.
+
+The audit now has **Download source → wall CSV** and **Download JSON
+evidence**. These contain one row per physical Preview occurrence, with
+branch/line identity, selected source row/status, matched P1/T1 and source
+units, S lookup method and interpolation brackets, conditional E/W/Y,
+OD/provenance, CA, screening pressure wall, required nominal/class wall,
+actual strict/qualified status, Pull eligibility, and explicit HOLD reasons.
+CSV labels are formula-injection-safe. It changes no source values,
+approved factors, physical walls, or config.
+
+**Source availability boundary:** the owner-saved PSI-02 Preview had
+16 loaded master rows, 7 populated physical rows and 23 missing P1/T1,
+on 18 distinct keys. The historically pinned BM2 `LL_BM2.xlsx`
+`Linelist` sheet contained only two unscoped numeric sequence matches
+against the target PSI-02 branch keys (not two verified design matches).
+The separately accessible `ImportedRawLineListLL.xlsx` does not contain
+the 18 missing PSI-02 line keys either. It would be incorrect to choose
+either as a complete PSI-02 master on the user's behalf. Re-import the
+actual governed PSI-02 master and worksheet if available, verify its
+source mapping, then **Rebuild Preview**. If no authoritative source row
+exists, record that line-specific engineering input or reviewed override;
+never extrapolate another line's 120°C or 13001 pressure.
+
+The existing master P unit control can be set to the documented unit.
+A pressure unit is automatically accepted only from the same selected
+source Line List row with a unit-bearing design P1 header and equal
+numeric cell. Neither the 13001 magnitude nor a hydro/test pressure
+header identifies that unit.
+
+Reproduction:
+```sh
+node --test tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs
+node --test tests/xml-cii-b313-preview-screening-reference.test.mjs
+node scripts/run-xml-cii-b313-live-preview-e2e.mjs
+```
+
+The browser test verifies real downloadable CSV/JSON data from the
+current Preview row population; it is *software proof*, not a signed
+30/30 PSI-02 engineering input receipt or native emitted CII acceptance.
+
 ## 2026-11-18 screenshot RCA: screening dimensional OD and missing design-unit evidence
 
 Owner's deployed **4 Preview** screenshot after R3 merge: 30 GLRD physical
