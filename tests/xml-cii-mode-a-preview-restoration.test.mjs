@@ -27,7 +27,7 @@ test('consolidated Mode A Preview restores DTXR and governed B31.3 actions sourc
   assert.match(source, /buildPreviewB313WallUpdateReport/u);
   assert.match(source, /applyModeAConsolidatedB313Wall/u);
   assert.match(source, /current\.sourceText \|\| entry\.state\.sourceText \|\| ''/u);
-  assert.match(source, /blocked\/skipped/u);
+  assert.match(source, /held\/skipped/u);
 });
 
 test('individual Mode A Preview remains manual and retains native review actions', () => {
@@ -40,7 +40,7 @@ test('individual Mode A Preview remains manual and retains native review actions
   assert.match(source, /data-mode-a-source-phase/u);
   assert.doesNotMatch(source, /build\.click\(\)/u);
   assert.doesNotMatch(source, /MutationObserver/u);
-  assert.match(renderer, /Update Wall thickness based on DTXR/u);
+  assert.match(renderer, /Review DTXR wall candidates/u);
   assert.match(rendererV7, /Fetch Rating as per DTXR/u);
   assert.match(b313, /Update wall thickness as per B31\.3 Sec II/u);
 });
