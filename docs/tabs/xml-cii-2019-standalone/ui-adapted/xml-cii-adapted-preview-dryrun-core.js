@@ -504,6 +504,18 @@ function previewP1Unit(lineRow, p1) {
   const p = numbers(p1);
   if (p === null) return { unit: '', source: 'unresolved' };
   const found = [];
+  // Source XLSX multi-row W5/W6/W8 design-pressure header, independently
+  // tied to this selected normalized line cell in the import worker.
+  // Any rounded/edited or override P1 must NOT inherit its old unit.
+  const original=numbers(lineRow?._sourceP1OriginalValue);
+  const mapped=numbers(lineRow?.p1);
+  const bandUnit=String(lineRow?._sourceP1Unit||'').toUpperCase();
+  const bandSource=String(lineRow?._sourceP1HeaderSource||'');
+  if (bandSource.startsWith('line-list-header-band:') && bandUnit
+      && original!==null && mapped!==null
+      && Math.abs(original-p)<=Math.max(1,Math.abs(p))*1e-9
+      && Math.abs(mapped-p)<=Math.max(1,Math.abs(p))*1e-9)
+    found.push({unit:bandUnit,source:bandSource});
   for (const row of [lineRow?._raw, lineRow]) {
     for (const [header, value] of Object.entries(row || {})) {
       const h = String(header).toUpperCase();
