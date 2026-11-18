@@ -125,6 +125,9 @@ test('4 Preview only: displayed P1/T1/material and selected basis determine B31.
    xmlText:'<Pipe><Pressure1>99999999</Pressure1><Temperature1>700</Temperature1><PressureUnits>bar</PressureUnits></Pipe>'});
  assert.equal(left.summary.inputRows,1);
  assert.equal(right.summary.inputRows,1);
+ assert.equal(left.calculationInputAuthority,'EFFECTIVE_4_PREVIEW_ONLY');
+ assert.equal(right.rawXmlDesignInputsConsumed,false);
+ assert.match(renderPreviewB313WallAuditHtml(left),/Calculation inputs: effective 4 Preview rows only/);
  assert.equal(left.rows[0].code,right.rows[0].code);
  const a=left.rows[0].screeningReference,b=right.rows[0].screeningReference;
  assert.equal(a.pressure,13001);
