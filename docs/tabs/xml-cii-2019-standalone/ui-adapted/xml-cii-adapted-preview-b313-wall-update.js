@@ -738,11 +738,26 @@ export function buildPreviewB313ScreeningReference({
   const scoped=previewNodeRows.filter(n=>Number(n.branchOccurrenceIndex)===rowIndex
     && positive(n.outsideDiameterMm));
   const ods=[...new Set(scoped.map(n=>positive(n.outsideDiameterMm)).filter(Boolean))];
-  const od=ods.length===1?ods[0]:null;
-  if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
-    :'Source node outside diameter missing');
+  const effectiveDn=positive(row?.sizeMm??row?.boreMm);
+  const classDn=positive(row?.pipingClassPipeDnMm);
   const referenceOd=dimension.standard
-    ? masterOutsideDiameterMm(row?.sizeMm??row?.boreMm,dimension.standard):null;
+    ? masterOutsideDiameterMm(effectiveDn,dimension.standard):null;
+  // A conditional SCREENING-only calculation can use the pipe-wall dimension
+  // master if the physical XML node ledger carries no OD, but only where
+  // the effective 4 Preview confirms an exact-DN class pipe product.
+  // NEVER use the nominal OD to authorize Pull or assert XML parity.
+  const exactDnClassReference=Boolean(effectiveDn && classDn
+    && Math.abs(effectiveDn-classDn)<1e-6
+    && positive(row?.pipingClassPipeWallMm)
+    && text(row?.pipingClassPipeSchedule)
+    && text(row?.pipingClassPipeMaterial)
+    && text(row?.pipingClassPipeSourceRow));
+  const referenceOnlyOd=ods.length===0 && exactDnClassReference && referenceOd;
+  const od=ods.length===1?ods[0]:(referenceOnlyOd?referenceOd:null);
+  const outsideDiameterSource=ods.length===1?'step4-preview-node-ledger'
+    :referenceOnlyOd?'pipe-wall-master-exact-DN-SCREENING-ONLY':'unresolved';
+  if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
+    :'Neither a unique source-node OD nor an exact-DN class/dimension reference is available');
   if (od && (!referenceOd || Math.abs(od-referenceOd)>Math.max(1.5,referenceOd*0.02)))
     holdReasons.push('Source OD and size-master reference do not agree');
   // Each route is a WHAT-IF scenario if the source did not establish a route.
@@ -810,7 +825,11 @@ export function buildPreviewB313ScreeningReference({
     materialSource:text(row?.materialSource),
     pressure:pressure||null,pressureUnit:pressureBasis.unit||null,
     pressureUnitSource:pressureBasis.source||null,
-    outsideDiameterMm:od,corrosionAllowanceMm:corrosion,
+    outsideDiameterMm:od,outsideDiameterSource,
+    outsideDiameterReferenceOnly:outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY',
+    outsideDiameterSourceMatched:outsideDiameterSource==='step4-preview-node-ledger',
+    outsideDiameterReferenceMm:referenceOd,
+    corrosionAllowanceMm:corrosion,
     negativeMillTolerance:manualBasis.negativeMillTolerance
       || basisConfig.millTolerance || {basis:'percent',value:12.5},
     declaredRoute:declaredRoute||null,
