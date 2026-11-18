@@ -109,6 +109,22 @@ function authorityLabel(mode) {
   return text(mode) || 'UNRESOLVED';
 }
 
+/**
+ * The real numeric B31.3 wall is a separate audit column, even when the
+ * source/master approval path has not produced an authorized Pull proposal.
+ */
+function calculatedWallAuditCell(row) {
+  const r=row?.calculatedWallDisplay;
+  const hasValue=r?.ok===true;
+  const note=hasValue?(r.pressureUnitAssumed
+    ?'what-if · assumed kPa':'P unit '+text(r.pressureUnit)):(text(r?.reason)||'Input incomplete');
+  return `<td data-b313-calculated-audit style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;min-width:145px;">
+    <strong data-b313-calculated-audit-value style="color:#0f172a;font-size:13px;">${hasValue?fixed(r.requiredNominalThicknessMm,3):'—'}</strong>
+    <div style="color:#64748b;font-size:10px;">${esc(note)}</div>
+    ${hasValue?`<div style="color:#64748b;font-size:10px;">t ${fixed(r.pressureDesignThicknessMm,3)} mm · E ${compact(r.factors.E)}</div>`:''}
+  </td>`;
+}
+
 function updatedRowHtml(row) {
   const evidence = row?.evidence || {};
   const result = row?.result || {};
@@ -129,6 +145,7 @@ function updatedRowHtml(row) {
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;">${esc(material)}</div><div style="font-size:10px;color:#64748b;">${esc(materialId)} · T1 ${esc(t1)} °C</div></td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#166534;">${esc(factorMode)}</div><div style="font-size:10px;color:#475569;">${factorDetail}</div><div style="font-size:10px;color:#64748b;">${esc(factorSource)}</div></td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div>${wallDetail}</div><div style="font-size:10px;color:#475569;margin-top:2px;">${resultDetail}</div></td>
+    ${calculatedWallAuditCell(row)}
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;white-space:nowrap;">${statusPill(row.status || 'UPDATED')}</td>
   </tr>`;
 }
@@ -255,6 +272,7 @@ function failedRowHtml(row) {
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;">${esc(materialId || 'Material identity unresolved')}</div>${materialSource ? `<div style="font-size:10px;color:#64748b;">identity source ${esc(materialSource)}${finite(t1) === null ? '' : ` · T1 ${esc(t1)} °C`}</div>` : ''}</td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#92400e;">${esc(factorMode)}</div>${factorHint ? `<div style="font-size:10px;color:#92400e;margin-top:3px;">${esc(factorHint)}</div>` : ''}${screeningFactor}</td>
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;"><div style="font-weight:700;color:#991b1b;">${esc(row.code || 'B313_PREVIEW_NOT_UPDATED')}</div><div style="font-size:11px;color:#475569;margin-top:2px;">${esc(reason)}</div>${odHint ? `<div style="font-size:10px;color:#64748b;margin-top:3px;">${esc(odHint)}</div>` : ''}${independentHint}${screeningWall}</td>
+    ${calculatedWallAuditCell(row)}
     <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;white-space:nowrap;">${statusPill('NOT_UPDATED')}</td>
   </tr>`;
 }
@@ -326,7 +344,7 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
       : `Eligible proposals 0 · Held ${summary.notUpdatedRows}`;
   const titleColor = summary.allUpdated ? '#166534' : '#92400e';
   const tableRows = rows.map((row) => ['UPDATED', 'CALCULATED'].includes(row.status) ? updatedRowHtml(row) : failedRowHtml(row)).join('');
-  const emptyRows = rows.length ? '' : '<tr><td colspan="5" style="padding:12px;text-align:center;color:#64748b;">No row-level audit evidence available.</td></tr>';
+  const emptyRows = rows.length ? '' : '<tr><td colspan="6" style="padding:12px;text-align:center;color:#64748b;">No row-level audit evidence available.</td></tr>';
 
   return `<details data-mc-b313-report open style="margin:10px 0;border:1px solid ${border};border-radius:8px;background:#ffffff;padding:10px;box-shadow:0 1px 2px rgba(15,23,42,.06);">
     <summary style="cursor:pointer;font-weight:800;color:${titleColor};">B31.3 wall update audit · Evaluated ${summary.evaluatedRows} · ${countsLabel}</summary>
@@ -354,6 +372,7 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
           <th style="text-align:left;padding:7px 10px;">Material / T1</th>
           <th style="text-align:left;padding:7px 10px;">Factor authority / S-E-W-Y</th>
           <th style="text-align:left;padding:7px 10px;">Wall calculation / selection</th>
+          <th style="text-align:left;padding:7px 10px;">Calculated required (mm)</th>
           <th style="text-align:left;padding:7px 10px;">Status</th>
         </tr></thead>
         <tbody>${tableRows}${emptyRows}</tbody>
