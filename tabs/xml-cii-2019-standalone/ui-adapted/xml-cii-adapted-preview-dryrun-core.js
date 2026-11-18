@@ -63,7 +63,10 @@ export function _xmlCiiNormalizeLineKey(value) { return _toText(value).trim().to
 function _xmlCiiLineKeyAliases(value) {
   const compact = _xmlCiiNormalizeLineKey(value);
   if (!compact) return [];
-  const withoutServicePrefix = compact.replace(/^[A-Z](?=\d{5,}$)/, '');
+  // Match native BM2 semantics: only a P-prefixed pipe line may consume
+  // an otherwise unique bare numeric line sequence. B/X family keys must
+  // never borrow that pipe pressure/temperature record.
+  const withoutServicePrefix = compact.replace(/^P(?=\d{5,}$)/, '');
   return _uniqueKeys([compact, withoutServicePrefix]);
 }
 
