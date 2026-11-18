@@ -330,6 +330,7 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
 
   return `<details data-mc-b313-report open style="margin:10px 0;border:1px solid ${border};border-radius:8px;background:#ffffff;padding:10px;box-shadow:0 1px 2px rgba(15,23,42,.06);">
     <summary style="cursor:pointer;font-weight:800;color:${titleColor};">B31.3 wall update audit · Evaluated ${summary.evaluatedRows} · ${countsLabel}</summary>
+    <div style="font-size:11px;font-weight:700;color:#334155;margin-top:7px;">Calculation inputs: effective 4 Preview rows only · Material / T1 / P1 / pressure unit / DN / CA · Raw XML values are not used.</div>
     <div style="font-size:11px;color:#475569;margin:8px 0;">Line-list and Piping Class data may resolve the governed material identity. They do not invent numeric S/E/W/Y. Automatic factors must still come from strict VERIFIED / PROJECT_APPROVED B31.3 factor records at the row T1 and, where applicable, the manufacturing route. Factor lookups from the existing screening master are shown below as numerical references (including temperature interpolation). These results are <strong>not approved for Pull</strong>. Only qualified B31.3 S/E/W/Y or explicitly reviewed controlled manual factors can produce eligible Pull proposals.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       <span style="padding:4px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-size:10px;"><strong>Code basis</strong> ASME B31.3-2024 §304.1.2 Eq. (3a)</span>
@@ -448,7 +449,7 @@ function bindAuditButton(host, config, xmlText, options, getSnapshotRows, getLiv
     const rows = selectPreviewB313AuditRows(getSnapshotRows(), liveRows);
     try {
       const report = rows.length
-        ? buildPreviewB313WallUpdateReport({ rows, config, xmlText, host })
+        ? buildPreviewB313WallUpdateReport({ rows, config, host })
         : zeroInputReport();
       await options?.onSaveConfig?.(config);
       await options?.onB313WallUpdateReport?.(report);
