@@ -88,6 +88,62 @@ test('physical GLRD preview uses master factors, OD, P1 and CA for conditional w
  assert.equal(JSON.stringify(cfg),before,'reference lookup must not change configuration');
 });
 
+test('no source OD: exact-DN class/dimension master supplies read-only screening OD only',()=>{
+ const cfg=config(), saved=JSON.stringify(cfg);
+ const ref=buildPreviewB313ScreeningReference({
+  row:row(),config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(ref.ok,true,JSON.stringify(ref));
+ assert.equal(ref.outsideDiameterSource,'pipe-wall-master-exact-DN-SCREENING-ONLY');
+ assert.equal(ref.outsideDiameterReferenceOnly,true);
+ assert.equal(ref.outsideDiameterSourceMatched,false);
+ near(ref.outsideDiameterMm,168.3);
+ assert.equal(ref.conditionalManufacturing,'SEAMLESS');
+ assert.equal(ref.conditionalE,1);
+ const s=ref.conditionalScenario;
+ assert(s&&s.calculationOk,JSON.stringify(ref));
+ near(s.pressureDesignThicknessMm,5.244757871,1e-5);
+ assert.equal(s.classNominalWallMm,7.112);
+ assert.equal(s.classPass,true);
+ assert.equal(ref.eligibleForPull,false);
+ assert.equal(JSON.stringify(cfg),saved,'screening reference must not mutate approval state');
+ const html=renderPreviewB313WallAuditHtml({
+  summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
+  rows:[{branchName:row().branchName,lineKey:'P4110001',
+    status:'NOT_UPDATED',screeningReference:ref,code:'TEST_SCREENING_ONLY'}],
+ });
+ assert.match(html,/exact-DN dimensional master \(screening assumption; source XML OD unavailable\)/);
+ assert.match(html,/5\.2448 mm/);
+ assert.match(html,/Eligible proposals 0/);
+});
+
+test('missing P1 unit with class master OD: show verified factor and OD, but no calculation',()=>{
+ const cfg=config(), r={...row(),p1Unit:''};
+ const ref=buildPreviewB313ScreeningReference({
+  row:r,config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(ref.ok,true);
+ assert.equal(ref.outsideDiameterReferenceOnly,true);
+ assert(ref.holdReasons.includes('P1 pressure unit unresolved'));
+ assert.equal(ref.scenarios.length,0);
+ const html=renderPreviewB313WallAuditHtml({
+  summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
+  rows:[{branchName:r.branchName,lineKey:r.lineKey,status:'NOT_UPDATED',code:'TEST',
+    screeningReference:ref}],
+ });
+ assert.match(html,/Select the actual documented P unit/);
+ assert.match(html,/exact-DN dimensional master/);
+ assert.doesNotMatch(html,/data-b313-screening-scenario=/);
+});
+
+test('no physical OD and no exact-DN class identity must not invent screening geometry',()=>{
+ const r={...row(),pipingClassPipeDnMm:200};
+ const ref=buildPreviewB313ScreeningReference({
+  row:r,config:config(),previewNodeRows:[],rowIndex:0});
+ assert.equal(ref.outsideDiameterMm,null);
+ assert.equal(ref.outsideDiameterReferenceOnly,false);
+ assert.equal(ref.scenarios.length,0);
+ assert(ref.holdReasons.some(msg=>/Neither a unique source-node OD/.test(msg)));
+});
+
 test('saved physical P1 unit absent yields factor reference but NO wall arithmetic',()=>{
  const r={...row(),p1Unit:''};
  const ref=buildPreviewB313ScreeningReference({row:r,config:config(),previewNodeRows:nodes,rowIndex:0});
