@@ -152,7 +152,7 @@ test('4 Preview pressure-unit authority excludes raw Line List relookup at calcu
    fieldMap:{}};
  const unresolved=buildPreviewB313ScreeningReference({
    row:blank,config:cfg,previewNodeRows:[],rowIndex:0});
- assert.equal(unresolved.pressureUnit,'');
+ assert.equal(unresolved.pressureUnit,null,'display reference uses null for unresolved 4 Preview pressure unit');
  assert(unresolved.holdReasons.includes('P1 pressure unit unresolved'));
  assert.equal(unresolved.scenarios.length,0,'Unresolved Preview P1 unit must block numerical wall');
  assert.equal(resolveB313EffectivePreviewPressureUnit(blank,{}).unit,'');
