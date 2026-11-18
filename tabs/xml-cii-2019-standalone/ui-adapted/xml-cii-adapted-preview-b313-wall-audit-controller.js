@@ -200,7 +200,7 @@ function screeningWallHtml(reference) {
   </div>`;
 }
 
-function bindConditionalManufacturing(host) {
+export function bindPreviewB313ConditionalManufacturing(host) {
   for (const select of host?.querySelectorAll?.('[data-b313-conditional-manufacturing]') || []) {
     if (select.dataset.b313ConditionalBound==='true') continue;
     select.dataset.b313ConditionalBound='true';
@@ -371,20 +371,20 @@ function renderReport(host, report) {
   if (sharedSlot) {
     sharedSlot.innerHTML = renderPreviewB313WallAuditHtml(report);
     bindSourceNavigation(host);
-    bindConditionalManufacturing(host);
+    bindPreviewB313ConditionalManufacturing(host);
     return;
   }
   const editor = host?.querySelector?.('[data-mc-b313-basis-editor]');
   if (editor) {
     editor.insertAdjacentHTML('afterend', renderPreviewB313WallAuditHtml(report));
     bindSourceNavigation(host);
-    bindConditionalManufacturing(host);
+    bindPreviewB313ConditionalManufacturing(host);
     return;
   }
   const actionBar = host?.querySelector?.('[data-mc-preview-build]')?.parentElement;
   actionBar?.parentElement?.insertAdjacentHTML?.('afterend', renderPreviewB313WallAuditHtml(report));
   bindSourceNavigation(host);
-    bindConditionalManufacturing(host);
+    bindPreviewB313ConditionalManufacturing(host);
 }
 
 function bindAuditButton(host, config, xmlText, options, getSnapshotRows, getLiveRows) {
