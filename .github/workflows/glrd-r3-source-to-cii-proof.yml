@@ -57,6 +57,17 @@ jobs:
           assert s['s_E_W_YApproval']['SApprovedRecordCount']==0
           assert s['s_E_W_YApproval']['E_W_YApprovedRuleCount']==0
           assert s['pullApprovedRows']==0
+          assert s['historicalCandidateUniqueLineKeys']==['P4110001','P4110003']
+          bykey={r['lineKey']:r for r in r['rows']}
+          assert bykey['P4110001']['historicalCandidateDesignPressureValue']=='13001.3'
+          assert bykey['P4110001']['historicalCandidateWorkingPressureValue']=='11000'
+          assert bykey['P4110001']['historicalCandidateDesignPressureUnit']=='kPa(g)'
+          assert bykey['P4110001']['historicalCandidateDesignTemperatureValue']=='120'
+          assert bykey['P4110003']['historicalCandidateDesignPressureValue']=='701.3'
+          assert bykey['P4110003']['historicalCandidateDesignTemperatureValue']=='82'
+          assert bykey['B4110001']['historicalCandidateCount']==0
+          assert bykey['B4110003']['historicalCandidateCount']==0
+
           assert all(not row['eligibleForPull'] and row['qualifiedP1'] is None
                      for row in r['rows'])
           print('PSI02 RECOVERY PROOF: 30/30 XML P1/T1 placeholders; 0 source-approved Line List, 0 qualified factor approvals and 0 false Pull')
