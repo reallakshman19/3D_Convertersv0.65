@@ -170,7 +170,7 @@ function screeningFactorHtml(reference) {
   const S=reference.S||{}, bracket=Array.isArray(S.bracket)?S.bracket:[];
   const bracketText=bracket.map(x=>esc(x.temperatureC)+'°C:'+compact(x.Sksi,5)+' ksi').join(' → ');
   const routes=Array.isArray(reference.routeOptions)?reference.routeOptions:[];
-  const routeOptions=routes.map(route=>`<option value="${esc(route.route)}" data-b313-e="${compact(route.value)}"${route.route===reference.conditionalManufacturing?' selected':''}>${esc(route.route.replaceAll('_',' '))}</option>`).join('');
+  const routeOptions=routes.map(route=>`<option value="${esc(route.route)}" data-b313-e="${compact(route.value)}"${route.route===reference.conditionalManufacturing?' selected':''}>${esc(route.route==='SEAMLESS'?'Seamless':route.route.replaceAll('_',' '))}</option>`).join('');
   const routeSelect=routes.length
     ? `<label>Conditional manufacturing <select data-b313-conditional-manufacturing aria-label="Conditional manufacturing (screening only)" style="padding:3px;border:1px solid #d97706;border-radius:4px;">${routeOptions}</select></label>`
     : 'Conditional manufacturing unavailable';
@@ -192,7 +192,7 @@ function screeningWallHtml(reference) {
     <strong>CONDITIONAL REFERENCE ONLY — not design approved</strong>
     <div>P1 ${compact(reference.pressure)} ${esc(reference.pressureUnit)} · OD ${fixed(reference.outsideDiameterMm,3)} mm · CA ${compact(reference.corrosionAllowanceMm)} mm</div>
     ${scenarios.map(s=>`<div data-b313-screening-scenario="${esc(s.manufacturingRoute)}" style="border-top:1px solid #fde68a;padding-top:4px;margin-top:4px;${s.manufacturingRoute===reference.conditionalManufacturing?'':'display:none;'}">
-      Conditional manufacturing: ${esc(s.manufacturingRoute.replaceAll('_',' '))}${s.routeAssumed?' (what-if; not verified)':''} · E = ${compact(s.E)}:
+      Conditional manufacturing: ${esc(s.manufacturingRoute==='SEAMLESS'?'Seamless':s.manufacturingRoute.replaceAll('_',' '))}${s.routeAssumed?' (what-if; not verified)':''} · E = ${compact(s.E)}:
       ${s.calculationOk
         ? `pressure wall ${fixed(s.pressureDesignThicknessMm,4)} mm → required nominal ${fixed(s.requiredNominalThicknessMm,4)} mm · class ${fixed(s.classNominalWallMm,4)} mm / ${esc(s.classSchedule||'?')} · ${s.classPass?'class reference PASS':'class reference HOLD '+esc(s.classCode||'UNAVAILABLE')}`
         : `no result (${esc(s.code)})`}
