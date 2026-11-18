@@ -133,6 +133,47 @@ try {
     pipingClassPipeSchedule:'40S',pipingClassPipeWallMm:7.112,
     pipingClassPipeMaterial:'ASTM A790 UNS S31803',
   };
+  // Browser-visible 4 Preview proof: immediately show S/E/W/Y numbers
+  // from the master, before any pressure unit, factor approval or Calculate.
+  const screenHost=document.createElement('section');
+  screenHost.innerHTML='<button type="button" data-mc-b313-wall-update>Calculate</button><details data-mc-b313-basis-editor></details>';
+  card.appendChild(screenHost);
+  const screeningOnlyRow={...conditionalRow,p1Unit:''};
+  const screenConfig={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{}}};
+  let basisSaveCount=0,screeningCalculateClicks=0;
+  screenHost.querySelector('[data-mc-b313-wall-update]')
+    .addEventListener('click',()=>{screeningCalculateClicks++;});
+  installPreviewB313AutoBasisPanel({host:screenHost,config:screenConfig,
+    rows:[screeningOnlyRow],watchLive:false,
+    options:{onSaveConfigPreservePreview:async()=>{basisSaveCount++;}}});
+  const screeningEl=screenHost.querySelector('[data-b313-auto-screening-reference]');
+  assert(screeningEl && screeningEl.getClientRects().length>0,
+    'Numerical material-master screening reference is not visibly rendered in 4 Preview');
+  assert(screeningEl.textContent.includes('S 203.395 MPa'),
+    '4 Preview does not display exact DSS master S at T1=120°C');
+  assert(screeningEl.textContent.includes('E 1 (conditional Seamless) · W 1 · Y 0.4'),
+    'Visible screening E/W/Y values are not resolved');
+  assert(screenHost.querySelector('[data-b313-auto-field="allowableStress"]').value==='',
+    'Screening values must NOT be written into controlled manual S field');
+  const unitChoice=screenHost.querySelector('[data-b313-auto-field="pressureUnit"]');
+  assert(unitChoice?.value==='AUTO','Missing unit should remain AUTO until user chooses');
+  unitChoice.value='KPA';
+  unitChoice.dispatchEvent(new Event('change',{bubbles:true}));
+  await waitFor(()=>basisSaveCount===1&&screeningCalculateClicks===1,
+    'screening-only pressure unit change to recalculate');
+  const unitKey=screenHost.querySelector('[data-b313-auto-key]').dataset.b313AutoKey;
+  assert(screenConfig.b313WallUpdate.bases[unitKey]?.pressureUnit==='KPA',
+    'Chosen 4 Preview B31.3 P unit was not saved by occurrence');
+  assert(screenConfig.b313WallUpdate.bases[unitKey]?.designApproved!==true,
+    'Selecting a P unit must not approve screening S/E/W/Y');
+  assert(!Object.keys(screenConfig.b313WallUpdate.proposalsByBranch).length,
+    'Changing a screening P unit must not create Pull proposals');
+  const screenResult=buildPreviewB313ScreeningReference({row:screeningOnlyRow,
+    config:screenConfig,previewNodeRows:[],rowIndex:0});
+  assert(screenResult.pressureUnit==='KPA' && screenResult.conditionalScenario?.calculationOk,
+    'Explicit Preview P unit did not unlock numerical screening wall');
+  screenHost.remove();
+
   const conditionalConfig={b313WallUpdate:{bases:{},proposalsByBranch:{},
     acceptedWallByBranch:{},millTolerance:{basis:'percent',value:12.5}}};
   const conditionalBefore=JSON.stringify(conditionalConfig);
@@ -305,7 +346,9 @@ try {
       'Accepted Step 4 wall did not propagate to native enriched XML');
   }
 
-  done({ ok: true, perBranchSourceWallLedgerExportVerified: true,
+  done({ ok: true, liveNumericScreeningPanelVerified: true,
+    screeningUnitChangeBrowserVerified: true,
+    perBranchSourceWallLedgerExportVerified: true,
     conditionalSeamlessDefaultVerified: true,
     conditionalE: 1, conditionalAlternativeRouteSwitchVerified: true,
     conditionalMasterOdReferenceVerified: true,

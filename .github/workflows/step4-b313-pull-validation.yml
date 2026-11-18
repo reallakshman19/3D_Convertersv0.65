@@ -88,6 +88,7 @@ jobs:
             tests/xml-cii-b313-preview-pull-v065.test.mjs \
             tests/xml-cii-b313-preview-wall-update.test.mjs \
             tests/xml-cii-b313-preview-screening-reference.test.mjs \
+            tests/xml-cii-b313-preview-visible-screening-interpolation.test.mjs \
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
             tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
