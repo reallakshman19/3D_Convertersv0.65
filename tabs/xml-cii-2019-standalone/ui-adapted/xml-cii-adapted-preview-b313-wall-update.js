@@ -1223,11 +1223,11 @@ export function previewB313LedgerCsv(ledger = {}) {
   const headers=rows.length?Object.keys(rows[0]):['ordinal','branchName','lineKey'];
   const quote=(value)=>{
     let s=value===null||value===undefined?'':String(value);
-    if (/^[\\s]*[=+@\\-\\t\\r]/.test(s)) s="'"+s;
+    if (/^\s*[=+@-]/.test(s)) s="'"+s;
     return '"'+s.replaceAll('"','""')+'"';
   };
   return [headers.map(quote).join(','),...rows.map(row=>
-    headers.map(key=>quote(row[key])).join(','))].join('\\r\\n')+'\\r\\n';
+    headers.map(key=>quote(row[key])).join(','))].join('\r\n')+'\r\n';
 }
 
 function installAction(host, config, xmlText, options, suppliedRows) {
