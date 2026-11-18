@@ -529,15 +529,26 @@ export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, pre
  * but the B31.3 button MUST NOT re-read the workbook or original XML to
  * resolve a missing design-pressure unit.
  */
-export function resolveB313EffectivePreviewPressureUnit(row = {}, basis = {}) {
+export function resolveB313EffectivePreviewPressureUnit(row = {}, basis = {}, sharedFallback = 'AUTO') {
   const visible=normalizePressureUnit(row?.p1Unit);
   const chosen=normalizePressureUnit(basis?.pressureUnit);
   if (visible && chosen && visible!==chosen) return {
     unit:'',source:'P1_UNIT_AUTHORITIES_CONFLICT',
     previewUnit:visible,basisUnit:chosen,
   };
-  if (visible) return {unit:visible,source:text(row?.p1UnitSource)||'4-preview'};
-  if (chosen) return {unit:chosen,source:'4-preview-b313-basis'};
+  if (visible) return {unit:visible,source:text(row?.p1UnitSource)||'4-preview',assumed:false};
+  if (chosen) return {unit:chosen,source:'4-preview-b313-basis',assumed:false};
+  // A common fallback is a screening assumption only, never P1 source evidence.
+  // A recorded conflict cannot be resolved by a broad project-wide assumption.
+  const previewSource=normalizedToken(row?.p1UnitSource);
+  if (/CONFLICT|AMBIGUOUS/.test(previewSource)) return {
+    unit:'',source:'P1_UNIT_SOURCE_CONFLICT',previewUnitSource:previewSource,
+  };
+  const common=normalizePressureUnit(sharedFallback);
+  if (common) return {
+    unit:common,source:'B313_COMMON_PRESSURE_UNIT_FALLBACK',
+    assumed:true,eligibleForPull:false,
+  };
   return {unit:'',source:'PREVIEW_PRESSURE_UNIT_UNRESOLVED'};
 }
 
@@ -849,7 +860,7 @@ export function buildPreviewB313ScreeningReference({
   const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
   if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
     holdReasons.push('Positive source P1 is missing or default-only');
-  const pressureBasis = resolveB313EffectivePreviewPressureUnit(row,manualBasis);
+  const pressureBasis = resolveB313EffectivePreviewPressureUnit(row,manualBasis,basisConfig.commonPressureUnitFallback);
   if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
   const corrosion=nonNegative(row?.corrosion);
   if (corrosion===null) holdReasons.push('Corrosion allowance missing');
@@ -946,6 +957,7 @@ export function buildPreviewB313ScreeningReference({
     materialSource:text(row?.materialSource),
     pressure:pressure||null,pressureUnit:pressureBasis.unit||null,
     pressureUnitSource:pressureBasis.source||null,
+    pressureUnitAssumed:pressureBasis.assumed===true,
     outsideDiameterMm:od,outsideDiameterSource,
     outsideDiameterReferenceOnly:outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY',
     outsideDiameterSourceMatched:outsideDiameterSource==='step4-preview-node-ledger',
@@ -969,10 +981,9 @@ export function buildPreviewB313ScreeningReference({
  * are preserved and shown to the user. Nothing from this function is eligible
  * for Pull or writes an engineering/approved factor basis.
  *
- * When the Preview P unit is unknown, show an explicitly labeled what-if
- * using 1 Preview pressure unit = 1 kPa. This never modifies the actual P
- * unit or publishes a governed wall; changing the existing P-unit selector
- * recalculates the same column in the correct selected unit.
+ * When Preview P1 has no trustworthy unit, only an explicitly configured
+ * common project fallback can provide a labeled WHAT-IF value. It never
+ * modifies the effective Preview P1, authorizes Pull or sets approval.
  */
 export function buildPreviewB313CalculatedWallDisplay({
   row = {},config = {},previewNodeRows = [],rowIndex = 0,reference = null,
@@ -980,21 +991,10 @@ export function buildPreviewB313CalculatedWallDisplay({
   const initial=reference || buildPreviewB313ScreeningReference({
     row,config,previewNodeRows,rowIndex,
   });
-  let chosen=initial;
-  let pressureUnitAssumed=false;
-  if (initial?.ok && !initial?.conditionalScenario?.calculationOk
-      && !initial?.pressureUnit
-      && Array.isArray(initial.holdReasons)
-      && initial.holdReasons.includes('P1 pressure unit unresolved')) {
-    const trial=buildPreviewB313ScreeningReference({
-      row:{...row,p1Unit:'KPA',p1UnitSource:'CONDITIONAL_DISPLAY_KPA_ASSUMPTION'},
-      config,previewNodeRows,rowIndex,
-    });
-    if(trial?.conditionalScenario?.calculationOk) {
-      chosen=trial;
-      pressureUnitAssumed=true;
-    }
-  }
+  const chosen=initial;
+  // No implicit hardcoded kPa branch. The shared, user-selected fallback
+  // belongs to config.b313WallUpdate and is labeled WHAT-IF, never source.
+  const pressureUnitAssumed=chosen?.pressureUnitAssumed===true;
   const scenario=chosen?.conditionalScenario;
   const errors=Array.isArray(chosen?.holdReasons)?chosen.holdReasons:[];
   if(!chosen?.ok || !scenario?.calculationOk
@@ -1002,7 +1002,7 @@ export function buildPreviewB313CalculatedWallDisplay({
     return {
       ok:false,code:chosen?.code||'PREVIEW_CALC_INPUTS_INCOMPLETE',
       rowIndex,requiredNominalThicknessMm:null,pressureDesignThicknessMm:null,
-      reason:errors[0]||chosen?.code||'Missing 4 Preview calculation inputs',
+      reason:errors.length?errors.join('; '):chosen?.code||'Missing 4 Preview calculation inputs',
       pressureUnitAssumed:false,eligibleForPull:false,
     };
   }
@@ -1014,6 +1014,7 @@ export function buildPreviewB313CalculatedWallDisplay({
     classSchedule:scenario.classSchedule,
     classPass:scenario.classPass,
     pressureUnit:chosen.pressureUnit,
+    pressureUnitSource:chosen.pressureUnitSource,
     pressureUnitAssumed,
     pressure:chosen.pressure,
     materialId:chosen.materialId,

@@ -9,18 +9,19 @@ test('class transaction rebuild is worker/basis fenced and must propagate failur
   const s=await code();
   const classCallback=s.match(/rebuildPreview:\s*async\s*\(\{\s*hydrationResult,[\s\S]*?\n\s*\},\n\s*\}\)\.catch/);
   assert.ok(classCallback,'atomic class transaction callback absent');
-  assert.match(classCallback[0],/await xmlCiiRebuildPreviewThroughWorker\(rootEl, xmlText, config, options\)/);
+  assert.match(classCallback[0],/await xmlCiiRebuildPreviewThroughWorker\(rootEl,\s*xmlText,\s*config,\s*options\)/);
   assert.doesNotMatch(classCallback[0],/await xmlCiiBuildAndRenderPreview\(/);
   assert.match(s,/export async function xmlCiiRebuildPreviewThroughWorker/);
   assert.match(s,/if \(!rendered\)\s*\{\s*throw Object.assign/);
   assert.match(s,/skipLegacyCache:\s*true/);
   assert.match(s,/precomputedPreview:\s*result/);
 });
-test('branch-map rebuild cannot fire unobserved synchronous enrichment',async()=>{
+test('branch-map save prompts manual rebuild without launching Worker',async()=>{
   const s=await code();
   const cb=s.match(/onRebuildPreview:\s*\(\)\s*=>\s*\{[\s\S]*?\n\s*\}\n\s*\}\);/);
   assert.ok(cb,'line map callback missing');
-  assert.match(cb[0],/void xmlCiiRebuildPreviewThroughWorker\([\s\S]*?\.catch\(/);
+  assert.match(cb[0],/suggestManualPreviewRebuild\(host/);
+  assert.doesNotMatch(cb[0],/xmlCiiRebuildPreviewThroughWorker\(/);
   assert.doesNotMatch(cb[0],/void xmlCiiBuildAndRenderPreview\(/);
 });
 test('renderer deployment mirror is exact',async()=>{

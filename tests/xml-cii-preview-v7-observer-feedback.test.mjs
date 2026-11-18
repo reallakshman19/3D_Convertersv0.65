@@ -44,6 +44,8 @@ test('numeric B31.3 wall cells are presentation-only and never cause cache recap
     '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer-v7.js',
     import.meta.url),'utf8');
   assert.match(file,/\[data-mc-b313-calculated-row\]/);
+  assert.match(file,/\[data-b313-auto-calculated-wall\]/,
+    'B31.3 review-table read-only wall cells must not start background Preview recapture');
   // The actual DOM closest() returns our calculated cell for its
   // value/detail descendants; their text mutations must not invalidate
   // Preview or kick off another expensive background cache recapture.

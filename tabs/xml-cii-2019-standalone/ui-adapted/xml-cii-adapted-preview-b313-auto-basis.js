@@ -7,9 +7,15 @@ import {
 import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import {
   previewB313BasisKey,
+  buildPreviewB313CalculatedWallDisplay,
   resolvePreviewB313MaterialFromRow,
   b313SourceConfirmsA106Seamless,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-source-unit-class-1';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-b313-common-punit-1';
+
+import {
+  buildPreviewB313AutomaticWallColumnReport,
+  renderPreviewB313CalculatedWallCells,
+} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-b313-common-punit-1';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
@@ -494,9 +500,77 @@ function stressUnitCell(model) {
   return `<select data-b313-auto-field="stressUnit" style="background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${['MPa','ksi','psi'].map((unit) => `<option value="${unit}" ${current === unit.toUpperCase() ? 'selected' : ''}>${unit}</option>`).join('')}</select>`;
 }
 
-function panelHtml(models, config = {}, physicalRowCount = models.length) {
+
+/**
+ * Read-only calculated wall in the same B31.3 review table. A model/basis
+ * group may contain more than one *physical* Preview row; keep all occurrence
+ * values separately and never present their wall as one shared group value.
+ */
+export function buildPreviewB313BasisWallCells(rows = [], config = {}, previewNodeRows = []) {
+  const byBasis = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row, rowIndex) => {
+    if (!row || typeof row !== 'object') return;
+    const key = previewB313BasisKey(row, config);
+    const result = buildPreviewB313CalculatedWallDisplay({
+      row,config,previewNodeRows,rowIndex,
+    });
+    if (!byBasis.has(key)) byBasis.set(key, []);
+    byBasis.get(key).push({
+      rowIndex,lineKey:text(row.lineKey),branchName:text(row.branchName),
+      sizeMm:text(row.sizeMm),result,
+    });
+  });
+  return byBasis;
+}
+
+function wallCellHtml(entries = []) {
+  if (!entries.length) return '<span style="color:#94a3b8;">— · no physical Preview row</span>';
+  return entries.map(({rowIndex,lineKey,branchName,result},i) => {
+    const identity=entries.length>1
+      ? '<div style="font-size:10px;color:#94a3b8;">Row '+(rowIndex+1)+' · '+esc(lineKey||branchName||'?')+'</div>' : '';
+    if (!result?.ok) return '<div data-b313-auto-wall-occurrence="'+rowIndex+'">'+identity+
+      '<strong style="color:#fbbf24;">—</strong>'+
+      '<div style="font-size:10px;color:#fbbf24;">'+esc(result?.reason||'Calculation inputs incomplete')+'</div></div>';
+    const value=Number(result.requiredNominalThicknessMm);
+    const status=result.pressureUnitAssumed
+      ? 'WHAT-IF · common P1 '+text(result.pressureUnit)
+      : 'Calculated reference · P1 '+text(result.pressureUnit);
+    return '<div data-b313-auto-wall-occurrence="'+rowIndex+'" '+
+      (i?'style="margin-top:5px;padding-top:5px;border-top:1px solid #334155;"':'')+'>'+
+      identity+'<strong style="font-size:13px;color:#e2e8f0;">'+value.toFixed(3)+' mm</strong>'+
+      '<div style="font-size:10px;color:'+(result.pressureUnitAssumed?'#fbbf24':'#94a3b8')+';">'+
+      esc(status)+' · not Pull approved</div></div>';
+  }).join('');
+}
+
+function refreshCalculatedWallPanelCells(panel, host, config, rows) {
+  const previewNodeRows=Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
+    ?host.__xmlCiiPreviewResult.nodeBoreWallRows:[];
+  const byBasis=buildPreviewB313BasisWallCells(rows,config,previewNodeRows);
+  panel?.querySelectorAll?.('[data-b313-auto-key]').forEach(tr=>{
+    const cell=tr.querySelector?.('[data-b313-auto-calculated-wall]');
+    if(cell)cell.innerHTML=wallCellHtml(byBasis.get(text(tr.dataset?.b313AutoKey))||[]);
+  });
+}
+
+function panelHtml(models, config = {}, physicalRows = [], previewNodeRows = []) {
+  const physicalRowCount = physicalRows.length;
+  const calculatedWalls = buildPreviewB313BasisWallCells(physicalRows,config,previewNodeRows);
   const tolerance = config?.b313WallUpdate?.millTolerance || { basis: 'percent', value: 12.5 };
   const csFallback = config?.b313WallUpdate?.materialFallback?.enabled !== false;
+  const commonPUnit = text(config?.b313WallUpdate?.commonPressureUnitFallback || 'AUTO').toUpperCase();
+  // A source header is a suggestion for the one shared fallback, not proof
+  // that every effective Preview P1 still matches its original source cell.
+  const sourceUnits = [...new Set((config?.linelist?.masterRows || [])
+    .filter(r => /^line-list-header-band:/i.test(text(r?._sourceP1HeaderSource))
+      && Array.isArray(r?._sourceP1HeaderTexts)
+      && r._sourceP1HeaderTexts.some(h => /PRESSURE\s+(MAX|MAXIMUM)|DESIGN\s+PRESSURE/i.test(text(h))))
+    .map(r => text(r?._sourceP1Unit).toUpperCase()).filter(Boolean))];
+  const lineListHint = sourceUnits.length === 1
+    ? 'Selected Line List design-pressure header: ' + (sourceUnits[0] === 'KPA' ? 'kPa(g)' : sourceUnits[0])
+      + '. This is a shared fallback suggestion, NOT row-level P1 verification.'
+    : sourceUnits.length > 1 ? 'Selected Line List has conflicting design-pressure units; verify before fallback.'
+      : 'No consistent selected Line List design-pressure header receipt is available.';
   const rowsHtml = models.map((model) => {
     const source = model.materialSource ? `source ${esc(model.materialSource)}` : 'source unknown';
     const t1 = model.t1 ? `${esc(model.t1)} °C` : 'unresolved';
@@ -521,6 +595,7 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${renderPreviewB313NumericScreeningReference(model)}<div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
+      <td data-b313-auto-calculated-wall style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:166px;max-width:260px;">${wallCellHtml(calculatedWalls.get(model.basisKey)||[])}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:180px;">
         <strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div>
         <input type="text" data-b313-auto-route aria-label="Actual pipe manufacturing route" placeholder="SEAMLESS / EFW_..." value="${esc(model.storedBasis?.manufacturingRoute || (model.routeSource==='confirmed ASTM A106 product specification'?model.route:''))}" style="margin-top:4px;width:98%;">
@@ -533,9 +608,9 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'W', 'weldStrengthReductionW', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'Y', 'coefficientY', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:260px;">
-        <div style="display:flex;gap:4px;"><select data-b313-auto-field="pressureUnit" aria-label="4 Preview P unit for conditional calculation"><option value="AUTO">P unit AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.pressureUnit)===u?'selected':''}>${u}</option>`).join('')}</select>
+        <div style="display:flex;gap:4px;"><span data-b313-auto-preview-punit style="font-size:10px;">P1 unit ${esc(model.previewP1Unit || (text(model.storedBasis?.pressureUnit) && text(model.storedBasis.pressureUnit).toUpperCase() !== 'AUTO' ? 'legacy basis '+model.storedBasis.pressureUnit : 'unresolved'))}</span>
         <select data-b313-auto-field="dimensionStandard" aria-label="Pipe dimension standard"><option value="AUTO">Dimension AUTO</option>${['ASME B36.10M','ASME B36.19M'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.dimensionStandard)===u?'selected':''}>${u}</option>`).join('')}</select></div>
-        <div style="font-size:9px;color:#fbbf24;margin:3px 0;">P unit changes recalculate screening only; S/E/W/Y remain unapproved.</div>
+        <div style="font-size:9px;color:#fbbf24;margin:3px 0;">Use the common P1-unit fallback above when the Preview source unit is missing; S/E/W/Y remain unapproved.</div>
         <div data-b313-auto-factor-qualification data-b313-qualification="${esc(prefill.qualification)}" style="font-size:10px;color:#fbbf24;font-weight:700;">Qualification: ${esc(prefill.qualification)} · ${prefill.eligibleForPull?'qualified values':'not approved for Pull'}</div>
         <div data-b313-auto-evidence style="font-size:9px;color:#cbd5e1;max-width:360px;overflow-wrap:anywhere;">Evidence: ${esc(evidenceText)}</div>
         <input type="text" data-b313-auto-source-reference aria-label="Factor source reference; replace screening evidence to qualify" placeholder="Qualified source reference (required to approve)" value="${esc(prefill.sourceReference)}" style="margin-top:4px;width:98%;">
@@ -551,12 +626,14 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>Wall Thickness Review — DTXR evidence, B31.3 basis &amp; results</strong><span style="font-size:10px;color:#94a3b8;">${physicalRowCount} physical Preview row(s) · ${models.length} occurrence-scoped basis entry/entries</span></div>
     <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data. Only source-confirmed ASTM A106 pipe may imply seamless manufacturing; generic CS does not.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
+      <label>Common P1 unit fallback <select data-b313-common-pressure-unit aria-label="Shared pressure unit fallback for 4 Preview B31.3 screening"><option value="AUTO" ${commonPUnit==='AUTO'?'selected':''}>None / AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI','PA'].map(u=>`<option value="${u}" ${commonPUnit===u?'selected':''}>${u==='KPA'?'kPa(g)':u}</option>`).join('')}</select></label>
+      <small style="color:#fbbf24;">${esc(lineListHint)} Fallback applies only to missing P1 units, gives a WHAT-IF number and never permits Pull.</small>
       <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
       <input type="number" step="any" min="0" data-b313-mill-value value="${esc(tolerance.value ?? 12.5)}" style="width:80px;">
       <label><input type="checkbox" data-b313-cs-fallback ${csFallback?'checked':''}> Use CS fallback for unknown material</label>
       <small>Changed tolerance requires recalculation; qualified factors are still mandatory.</small>
     </div>
-    <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th>Basis / source / review</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+    <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Calculated wall (mm)<div style="font-size:9px;font-weight:400;">Read-only · no Pull</div></th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th>Basis / source / review</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
     <div data-mc-dtxr-unified-review-slot style="margin-top:10px;border-top:1px solid #475569;padding-top:8px;"><div style="font-size:11px;color:#94a3b8;">DTXR schedule proposals: use Review DTXR wall candidates above. No source candidate is applied without checking individual physical keys. Existing overrides and B31.3 accepted walls remain protected.</div></div>
     <div data-mc-b313-unified-audit-slot style="margin-top:10px;border-top:1px solid #475569;padding-top:8px;">
       <div style="font-size:11px;color:#94a3b8;">Calculation results appear here after the B31.3 calculate action. DTXR source wall and B31.3 design wall remain separate authorities. Calculating does not update wall thickness: explicit Pull remains required.</div>
@@ -645,7 +722,9 @@ function bindRefresh(panel, host, config, models, options) {
       designApproved: rowEl?.querySelector?.('[data-b313-auto-design-approved]')?.checked === true,
       csFallbackReviewed: rowEl?.querySelector?.('[data-b313-auto-cs-reviewed]')?.checked === true,
       identityReviewed: rowEl?.querySelector?.('[data-b313-auto-identity-reviewed]')?.checked === true,
-      pressureUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="pressureUnit"]')?.value || 'AUTO'),
+      // Preserve any older per-basis unit for compatibility; common fallback
+      // is edited once above and never duplicated into per-row basis records.
+      pressureUnit: text(model.storedBasis?.pressureUnit || 'AUTO'),
       dimensionStandard: text(rowEl?.querySelector?.('[data-b313-auto-field="dimensionStandard"]')?.value || 'AUTO'),
     };
     const status = rowEl.querySelector?.('[data-b313-auto-status]');
@@ -742,20 +821,36 @@ export function setPreviewB313PressureUnitOnly(config, basisKey, pressureUnit) {
     basisKey,pressureUnit:chosen,eligibleForPull:false};
 }
 
+/** One common P1 fallback for all unresolved 4 Preview rows, never a row override. */
+export function setPreviewB313CommonPressureUnitFallback(config, pressureUnit) {
+  const allowed=new Set(['AUTO','PA','KPA','MPA','BAR','BARG','PSI','PSIG']);
+  const chosen=text(pressureUnit).toUpperCase();
+  if(!config || !allowed.has(chosen)) return {ok:false,code:'INVALID_COMMON_P1_UNIT'};
+  if(!config.b313WallUpdate || typeof config.b313WallUpdate!=='object'
+      || Array.isArray(config.b313WallUpdate)) config.b313WallUpdate={};
+  config.b313WallUpdate.commonPressureUnitFallback=chosen;
+  config.b313WallUpdate.commonPressureUnitFallbackSource=chosen==='AUTO'
+    ?'DISABLED':'USER_SELECTED_SHARED_SCREENING_ASSUMPTION';
+  return {ok:true,code:'COMMON_P1_UNIT_SCREENING_ONLY',pressureUnit:chosen,
+    eligibleForPull:false};
+}
+
 function bindScreeningPressureUnit(panel,host,config,models,options) {
-  const byKey=new Map(models.map(model=>[text(model.basisKey),model]));
-  panel?.querySelectorAll?.('select[data-b313-auto-field="pressureUnit"]').forEach(select=>
-    select.addEventListener('change',async()=>{
-      const row=select.closest('[data-b313-auto-key]');
-      const key=text(row?.dataset?.b313AutoKey);
-      if(!byKey.has(key))return;
-      const result=setPreviewB313PressureUnitOnly(config,key,select.value);
-      if(!result.ok)return;
-      // Preserve the user's effective 4 Preview snapshot. Re-evaluate the
-      // separate conditional screening result using the explicit chosen unit.
-      await options?.onSaveConfigPreservePreview?.(config);
-      host?.querySelector?.('[data-mc-b313-wall-update]')?.click?.();
-    }));
+  const select=panel?.querySelector?.('[data-b313-common-pressure-unit]');
+  select?.addEventListener('change',async()=>{
+    const result=setPreviewB313CommonPressureUnitFallback(config,select.value);
+    if(!result.ok)return;
+    await options?.onSaveConfigPreservePreview?.(config);
+    // Refresh only the display cells. Do not invoke the governed B31.3
+    // action, mutate proposalsByBranch or alter saved Wall Thk/CII.
+    const liveRows=Array.isArray(host?.__xmlCiiPreviewResult?.branchRows)
+      ?host.__xmlCiiPreviewResult.branchRows:[];
+    if(liveRows.length) {
+      const report=buildPreviewB313AutomaticWallColumnReport({rows:liveRows,config,host});
+      renderPreviewB313CalculatedWallCells(host,report);
+      refreshCalculatedWallPanelCells(panel,host,config,liveRows);
+    }
+  });
 }
 
 function bindMillAndCsControls(panel, host, config, rows, options) {
@@ -781,6 +876,9 @@ function bindMillAndCsControls(panel, host, config, rows, options) {
       enabled: cs?.checked !== false, family: 'CS', mode: 'PROPOSE_FOR_REVIEW'
     };
     await options?.onSaveConfigPreservePreview?.(config);
+    const liveRows=Array.isArray(host?.__xmlCiiPreviewResult?.branchRows)
+      ?host.__xmlCiiPreviewResult.branchRows:rows;
+    refreshCalculatedWallPanelCells(panel,host,config,liveRows);
   };
   type?.addEventListener('change', async () => {
     if (value) value.value = type.value === 'absolute' ? '1.5' : '12.5';
@@ -838,10 +936,12 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
 
   host.querySelector?.('[data-mc-b313-auto-basis-panel]')?.remove?.();
   if (models.length) {
-    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config, rows.length));
+    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config, rows,
+      host?.__xmlCiiPreviewResult?.nodeBoreWallRows || []));
     else {
       const actionBar = host.querySelector?.('[data-mc-preview-build]')?.parentElement;
-      actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models, config, rows.length));
+      actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models, config, rows,
+        host?.__xmlCiiPreviewResult?.nodeBoreWallRows || []));
     }
     const panel = host.querySelector?.('[data-mc-b313-auto-basis-panel]');
     // The audit may run before this lazy-rendered editor mounts. In that case

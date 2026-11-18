@@ -8,7 +8,7 @@ import { renderStandaloneImportMastersPanel } from './xml-cii-adapted-import-mas
 import { renderStandaloneRegexTesterPanel } from './xml-cii-adapted-regex-tester.js?v=20261001-weight-output-2';
 import { renderStandaloneResolverJsonTracePanel } from './xml-cii-adapted-resolver-json-trace.js';
 import { renderStandaloneInputXmlElementSideloadPanel, renderStandaloneManualElementSideloadPanel } from './xml-cii-adapted-manual-element-sideload.js';
-import { renderStandaloneDiagnosticsReportPanel, renderStandalonePreviewReportPanel } from './xml-cii-adapted-preview-diagnostics-audit-v7.js?v=20261113-x5a-2';
+import { renderStandaloneDiagnosticsReportPanel, renderStandalonePreviewReportPanel } from './xml-cii-adapted-preview-diagnostics-audit-v7.js?v=20261118-manual-preview-2';
 import { renderStandalonePropagationAuditPanel } from './xml-cii-adapted-propagation-audit.js?v=20261001-weight-output-2';
 import { renderAdaptedWeightMatchPanelV2 } from './xml-cii-adapted-weight-match-v2.js?v=20261113-x5a-2';
 import { renderStandaloneSupportTypeMapperPanel } from './xml-cii-adapted-support-type-mapper.js?v=20261001-weight-output-2';

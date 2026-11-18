@@ -166,12 +166,12 @@ try {
   // The new independent table column must print actual computed millimetres
   // for a GLRD-shaped Preview row even if approved Pull remains unavailable.
   const candidateWithUnit={...conditionalRow,p1Unit:''};
-  const candidateConfig={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{}}};
+  const candidateConfig={b313WallUpdate:{commonPressureUnitFallback:'KPA',bases:{},proposalsByBranch:{},acceptedWallByBranch:{}}};
   const wallBefore=JSON.stringify(candidateConfig);
   const displayResult=buildPreviewB313CalculatedWallDisplay({
     row:candidateWithUnit,config:candidateConfig,previewNodeRows:[],rowIndex:0});
   assert(displayResult.ok&&displayResult.pressureUnitAssumed,
-    'An explicitly identified assumed-kPa what-if must compute numerical wall');
+    'User-configured common kPa what-if must compute read-only numerical wall');
   const independentTableHost=document.createElement('section');
   independentTableHost.innerHTML='<table data-resizable-table="branch-preview"><tbody><tr class="mc-preview-row">'
     +'<td><span data-test-preserved-wall>7.112</span></td>'
@@ -225,7 +225,7 @@ try {
   const calcCell=independentTableHost.querySelector('[data-mc-b313-calculated-row="0"]');
   assert(calcCell.querySelector('[data-mc-b313-calculated-value]').textContent==='5.983',
     'Required nominal wall must appear as 5.983 mm next to Wall Thk');
-  assert(calcCell.querySelector('[data-mc-b313-calculated-detail]').textContent.includes('Assumed kPa'),
+  assert(calcCell.querySelector('[data-mc-b313-calculated-detail]').textContent.includes('Common fallback KPA'),
     'Hypothetical pressure unit must be visible without opening a tooltip');
   assert(calcCell.title.includes('Source')||calcCell.title.includes('Evidence'),
     'Displayed wall must have independent source and interpolation proof');
@@ -242,6 +242,7 @@ try {
   card.appendChild(screenHost);
   const screeningOnlyRow={...conditionalRow,p1Unit:''};
   const screenConfig={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{}}};
+  screenHost.__xmlCiiPreviewResult={branchRows:[screeningOnlyRow],nodeBoreWallRows:[]};
   let basisSaveCount=0,screeningCalculateClicks=0;
   screenHost.querySelector('[data-mc-b313-wall-update]')
     .addEventListener('click',()=>{screeningCalculateClicks++;});
@@ -283,27 +284,32 @@ try {
   assert(info && !info.hidden && info.textContent.includes('29.5 ksi'),
     'Factor S popup omitted exact temperature lookup and source');
   infoButton.click();
-  const unitChoice=screenHost.querySelector('[data-b313-auto-field="pressureUnit"]');
-  assert(unitChoice?.value==='AUTO','Missing unit should remain AUTO until user chooses');
+  const unitChoice=screenHost.querySelector('[data-b313-common-pressure-unit]');
+  assert(unitChoice?.value==='AUTO','Shared missing P1 unit must remain AUTO before selection');
   unitChoice.value='KPA';
   unitChoice.dispatchEvent(new Event('change',{bubbles:true}));
-  await waitFor(()=>basisSaveCount===1&&screeningCalculateClicks===1,
-    'screening-only pressure unit change to recalculate');
+  await waitFor(()=>basisSaveCount===1 &&
+    screenHost.querySelector('[data-b313-auto-calculated-wall]')?.textContent.includes('5.983'),
+    'common kPa fallback must update existing B31.3 calculated-wall column');
+  assert(screeningCalculateClicks===0,
+    'Shared P1 fallback must not auto-click the governed Calculate action');
   const unitKey=screenHost.querySelector('[data-b313-auto-key]').dataset.b313AutoKey;
-  assert(screenConfig.b313WallUpdate.bases[unitKey]?.pressureUnit==='KPA',
-    'Chosen 4 Preview B31.3 P unit was not saved by occurrence');
+  assert(screenConfig.b313WallUpdate.commonPressureUnitFallback==='KPA',
+    'One common P1 fallback was not saved to the shared B31.3 configuration');
+  assert(screenConfig.b313WallUpdate.bases[unitKey]?.pressureUnit===undefined,
+    'Shared P1 fallback must not be duplicated across row-specific basis records');
   assert(screenConfig.b313WallUpdate.bases[unitKey]?.designApproved!==true,
     'Selecting a P unit must not approve screening S/E/W/Y');
   const refresh=screenHost.querySelector('[data-b313-auto-refresh]');
   refresh.click();
-  assert(screeningCalculateClicks===2,
-    'Refresh with auto-filled screening basis should recalculate conditionally');
+  assert(screeningCalculateClicks===1,
+    'User-requested factor Refresh may recalculate conditionally, not an automatic rebuild');
   assert(screenConfig.b313WallUpdate.bases[unitKey]?.allowableStress===undefined,
     'Screening factors were incorrectly stored as approved manual factor basis');
   const review=screenHost.querySelector('[data-b313-auto-design-approved]');
   review.checked=true;
   refresh.click();
-  assert(screeningCalculateClicks===2,
+  assert(screeningCalculateClicks===1,
     'Merely checking reviewed must NOT authorize screening evidence');
   assert(screenHost.querySelector('[data-b313-auto-status]').textContent.includes('SCREENING SOURCE IS NOT QUALIFIED'),
     'Unqualified screening approval attempt did not display explicit reason');
@@ -407,7 +413,8 @@ try {
     'Manual factor approvals must be physically occurrence-scoped');
   const seedPanel = host.querySelector('[data-mc-b313-auto-basis-panel]');
   assert(seedRow.textContent.includes('Seed 120 °C'), 'T1 82 did not show the 120 °C common seed');
-  assert(seedRow.querySelectorAll('[data-b313-auto-field]').length >= 7, 'S/unit/E/W/Y and pressure/dimension basis controls are incomplete');
+  assert(seedRow.querySelectorAll('[data-b313-auto-field]').length >= 6 && seedPanel.querySelector('[data-b313-common-pressure-unit]'),
+    'S/unit/E/W/Y and shared P1 unit / dimension basis controls are incomplete');
   assert(seedRow.querySelectorAll('[data-b313-factor-info-button]').length === 4, 'Factor provenance controls are incomplete');
   assert(!seedRow.querySelector('[data-b313-auto-refresh]').disabled, 'The manual basis save action is disabled');
   assert(seedRow.querySelector('[data-b313-auto-source-reference]'), 'Qualified manual basis source input is missing');

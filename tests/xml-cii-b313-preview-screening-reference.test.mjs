@@ -208,8 +208,9 @@ test('new 4 Preview column calculates actual required nominal mm from displayed 
  assert.equal(calculated.eligibleForPull,false);
  assert.equal(JSON.stringify(cfg),before,'display calculation must never modify approved config');
 });
-test('missing effective 4 Preview P-unit still shows a numerical explicitly assumed-kPa what-if, not fake approval',()=>{
- const cfg=config(),before=JSON.stringify(cfg);
+test('one common kPa fallback yields clearly assumed screening wall without approving Pull',()=>{
+ const cfg=config();cfg.b313WallUpdate.commonPressureUnitFallback='KPA';
+ const before=JSON.stringify(cfg);
  const visible={...row(),p1Unit:'',p1UnitSource:''};
  const display=buildPreviewB313CalculatedWallDisplay({
   row:visible,config:cfg,previewNodeRows:[],rowIndex:0});
@@ -228,7 +229,8 @@ test('missing effective 4 Preview P-unit still shows a numerical explicitly assu
  assert.equal(noT1.requiredNominalThicknessMm,null);
 });
 test('strict governed Pull report independently contains numeric calculated-wall column for factor HOLD rows',()=>{
- const cfg=config(),beforeOverrides=JSON.stringify(cfg.overrides);
+ const cfg=config();cfg.b313WallUpdate.commonPressureUnitFallback='KPA';
+ const beforeOverrides=JSON.stringify(cfg.overrides);
  const report=buildPreviewB313WallUpdateReport({
   rows:[{...row(),p1Unit:''}],config:cfg,host:{dataset:{},
   __xmlCiiPreviewResult:{branchRows:[],nodeBoreWallRows:[]}}});
@@ -242,7 +244,7 @@ test('strict governed Pull report independently contains numeric calculated-wall
  const audit=renderPreviewB313WallAuditHtml(report);
  assert.match(audit,/Calculated required \(mm\)/);
  assert.match(audit,/data-b313-calculated-audit/);
- assert.match(audit,/what-if · assumed kPa/);
+ assert.match(audit,/what-if · common fallback KPA/);
  assert.match(audit,/5\.983/);
 });
 test('no physical OD and no exact-DN class identity must not invent screening geometry',()=>{

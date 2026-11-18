@@ -192,7 +192,36 @@ function _renderManualPreviewIdle(host, rootEl, xmlText, config, options) {
   _bindParsedCustomSourceToggle(host, config, options);
 }
 
+/**
+ * User-facing stale Preview notice. Saving a master/override does not trigger
+ * a new Worker build. The existing Build/Rebuild Preview button is the only
+ * operation that starts the ordinary Preview rebuild.
+ */
+export function suggestManualPreviewRebuild(host, detail = 'Inputs were saved.') {
+  if (!host) return;
+  host.dataset.mcB313PreviewDirty='true';
+  host.dataset.mcPreviewNeedsRebuild='true';
+  const message='Preview needs rebuilding — '+_toText(detail)+
+    ' Displayed Preview values remain from the previous build. Select Rebuild Preview to apply changes.';
+  let note=host.querySelector?.('[data-mc-preview-save-note]');
+  if (!note) {
+    note=host.ownerDocument?.createElement?.('div');
+    if (!note) return;
+    note.dataset.mcPreviewSaveNote='true';
+    note.className='model-converters-workflow-detail-note';
+    note.style.cssText='margin:0 0 8px;border:1px solid #d97706;color:#92400e;background:#fffbeb;padding:9px;border-radius:6px;';
+    host.prepend(note);
+  }
+  note.setAttribute('role','status');
+  note.setAttribute('aria-live','polite');
+  note.textContent=message;
+}
+
 function _markPreviewSaved(host, message = 'Saved. Click Rebuild Preview when you want to recompute suggestions.') {
+  if (/rebuild preview|rebuild required/i.test(message)) {
+    suggestManualPreviewRebuild(host,message);
+    return;
+  }
   const existing = host?.querySelector('[data-mc-preview-save-note]');
   if (existing) {
     existing.textContent = message;
@@ -634,11 +663,9 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         _markPreviewSaved(host, 'Branch mappings saved. Click Rebuild Preview to apply.');
       },
       onRebuildPreview: () => {
-        void xmlCiiRebuildPreviewThroughWorker(rootEl, xmlText, config, options).catch((error) => {
-          const currentHost = rootEl?.querySelector('#mc-preview-table-host');
-          if (currentHost) _markPreviewSaved(currentHost,
-            'Branch mapping rebuild failed: ' + _toText(error?.message || error));
-        });
+        // Save & Apply is a config write, not permission to rebuild without
+        // pressing the native Rebuild Preview button.
+        suggestManualPreviewRebuild(host,'Branch mappings saved.');
       }
     });
   }
