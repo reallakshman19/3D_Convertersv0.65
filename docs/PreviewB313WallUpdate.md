@@ -1,5 +1,16 @@
 # Phase 4 Preview — B31.3 wall update
 
+## 2026-11-18 — Owner correction: B31.3 reads 4 Preview only
+
+**Calculation input contract:** the existing **XML→CII 2019 Standalone → 4 Preview** branch-row snapshot is the sole process-design input for this B31.3 calculation. Use the row's effective Material, T1, P1, P1 unit (or its explicit B31.3 basis), DN, corrosion allowance and Piping Class data. S is looked up/interpolated by Material + T1 in the coefficient master; the conditional manufacture display defaults to Seamless / E=1. The Preview node ledger or exact-DN dimensional master provides geometry according to documented provenance.
+
+**Do not** read or infer design pressure, pressure units or T1 from source XML, parse XML during a wall calculation, substitute 0 or −100000 sentinel fields, or extrapolate from another branch. Explicitly changing XML metadata must have no effect on the calculation or audit. In particular the source document's `PressureUnits` is not authority for the Preview row's design P1.
+
+The audit distinguishes complete and incomplete **4 Preview** rows. If a row has no effective P1/T1 or no resolved design-pressure unit, display the missing 4 Preview input and keep the qualified Pull on HOLD; do not fill a blank from any earlier source. The separate workbook Line List matching diagnostic explains where Preview values originated; it never replaces displayed Preview P1/T1 during calculation. The user can correct the current 4 Preview row/basis and rebuild.
+
+**Acceptance witness:** `tests/xml-cii-b313-preview-screening-reference.test.mjs` passes two different contradictory `xmlText` values with identical effective 4 Preview rows; B31.3 screening thickness, coefficient lookup and HOLD status remain identical. `tests/xml-cii-b313-preview-pressure-unit.test.mjs` confirms XML pressure units cannot supply a missing 4 Preview unit. Neither test is proof of engineering-approved factors or native CII output.
+
+
 ## Action
 
 Phase 4 Preview exposes the explicit action:
