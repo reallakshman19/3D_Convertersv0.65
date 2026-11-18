@@ -29,7 +29,8 @@ class RecoveryTests(unittest.TestCase):
         p=module.candidate_for_line("P4110001",cells)
         self.assertEqual(len(p),1)
         self.assertEqual(p[0]["method"],"P_ONLY_NUMERIC_ALIAS")
-        self.assertEqual(p[0]["K9ProfilePressureCandidate"],"11000")
+        self.assertEqual(p[0]["KWorkingPressureCandidate"],"11000")
+        self.assertEqual(p[0]["WDesignPressureCandidateValue"],"")
         self.assertEqual(p[0]["Y9ProfileTemperatureCandidate"],"120")
         self.assertEqual(p[0]["authority"],
                          "HISTORICAL_BM2_UNQUALIFIED_CANDIDATE_ONLY")
