@@ -7,6 +7,7 @@ import {
 import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import {
   previewB313BasisKey,
+  buildPreviewB313CalculatedWallDisplay,
   resolvePreviewB313MaterialFromRow,
   b313SourceConfirmsA106Seamless,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-b313-common-punit-1';
@@ -499,7 +500,62 @@ function stressUnitCell(model) {
   return `<select data-b313-auto-field="stressUnit" style="background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${['MPa','ksi','psi'].map((unit) => `<option value="${unit}" ${current === unit.toUpperCase() ? 'selected' : ''}>${unit}</option>`).join('')}</select>`;
 }
 
-function panelHtml(models, config = {}, physicalRowCount = models.length) {
+
+/**
+ * Read-only calculated wall in the same B31.3 review table. A model/basis
+ * group may contain more than one *physical* Preview row; keep all occurrence
+ * values separately and never present their wall as one shared group value.
+ */
+export function buildPreviewB313BasisWallCells(rows = [], config = {}, previewNodeRows = []) {
+  const byBasis = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row, rowIndex) => {
+    if (!row || typeof row !== 'object') return;
+    const key = previewB313BasisKey(row, config);
+    const result = buildPreviewB313CalculatedWallDisplay({
+      row,config,previewNodeRows,rowIndex,
+    });
+    if (!byBasis.has(key)) byBasis.set(key, []);
+    byBasis.get(key).push({
+      rowIndex,lineKey:text(row.lineKey),branchName:text(row.branchName),
+      sizeMm:text(row.sizeMm),result,
+    });
+  });
+  return byBasis;
+}
+
+function wallCellHtml(entries = []) {
+  if (!entries.length) return '<span style="color:#94a3b8;">— · no physical Preview row</span>';
+  return entries.map(({rowIndex,lineKey,branchName,result},i) => {
+    const identity=entries.length>1
+      ? '<div style="font-size:10px;color:#94a3b8;">Row '+(rowIndex+1)+' · '+esc(lineKey||branchName||'?')+'</div>' : '';
+    if (!result?.ok) return '<div data-b313-auto-wall-occurrence="'+rowIndex+'">'+identity+
+      '<strong style="color:#fbbf24;">—</strong>'+
+      '<div style="font-size:10px;color:#fbbf24;">'+esc(result?.reason||'Calculation inputs incomplete')+'</div></div>';
+    const value=Number(result.requiredNominalThicknessMm);
+    const status=result.pressureUnitAssumed
+      ? 'WHAT-IF · common P1 '+text(result.pressureUnit)
+      : 'Calculated reference · P1 '+text(result.pressureUnit);
+    return '<div data-b313-auto-wall-occurrence="'+rowIndex+'" '+
+      (i?'style="margin-top:5px;padding-top:5px;border-top:1px solid #334155;"':'')+'>'+
+      identity+'<strong style="font-size:13px;color:#e2e8f0;">'+value.toFixed(3)+' mm</strong>'+
+      '<div style="font-size:10px;color:'+(result.pressureUnitAssumed?'#fbbf24':'#94a3b8')+';">'+
+      esc(status)+' · not Pull approved</div></div>';
+  }).join('');
+}
+
+function refreshCalculatedWallPanelCells(panel, host, config, rows) {
+  const previewNodeRows=Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
+    ?host.__xmlCiiPreviewResult.nodeBoreWallRows:[];
+  const byBasis=buildPreviewB313BasisWallCells(rows,config,previewNodeRows);
+  panel?.querySelectorAll?.('[data-b313-auto-key]').forEach(tr=>{
+    const cell=tr.querySelector?.('[data-b313-auto-calculated-wall]');
+    if(cell)cell.innerHTML=wallCellHtml(byBasis.get(text(tr.dataset?.b313AutoKey))||[]);
+  });
+}
+
+function panelHtml(models, config = {}, physicalRows = [], previewNodeRows = []) {
+  const physicalRowCount = physicalRows.length;
+  const calculatedWalls = buildPreviewB313BasisWallCells(physicalRows,config,previewNodeRows);
   const tolerance = config?.b313WallUpdate?.millTolerance || { basis: 'percent', value: 12.5 };
   const csFallback = config?.b313WallUpdate?.materialFallback?.enabled !== false;
   const commonPUnit = text(config?.b313WallUpdate?.commonPressureUnitFallback || 'AUTO').toUpperCase();
@@ -539,6 +595,7 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${renderPreviewB313NumericScreeningReference(model)}<div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
+      <td data-b313-auto-calculated-wall style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:166px;max-width:260px;">${wallCellHtml(calculatedWalls.get(model.basisKey)||[])}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:180px;">
         <strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div>
         <input type="text" data-b313-auto-route aria-label="Actual pipe manufacturing route" placeholder="SEAMLESS / EFW_..." value="${esc(model.storedBasis?.manufacturingRoute || (model.routeSource==='confirmed ASTM A106 product specification'?model.route:''))}" style="margin-top:4px;width:98%;">
@@ -576,7 +633,7 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
       <label><input type="checkbox" data-b313-cs-fallback ${csFallback?'checked':''}> Use CS fallback for unknown material</label>
       <small>Changed tolerance requires recalculation; qualified factors are still mandatory.</small>
     </div>
-    <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th>Basis / source / review</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+    <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th style="text-align:left;padding:5px;">Preview Material / T1</th><th style="text-align:left;padding:5px;">B31.3 identity / status</th><th style="text-align:left;padding:5px;">Calculated wall (mm)<div style="font-size:9px;font-weight:400;">Read-only · no Pull</div></th><th style="text-align:left;padding:5px;">Route</th><th style="text-align:left;padding:5px;">Fallback S</th><th style="text-align:left;padding:5px;">S unit</th><th style="text-align:left;padding:5px;">E</th><th style="text-align:left;padding:5px;">W</th><th style="text-align:left;padding:5px;">Y</th><th>Basis / source / review</th><th style="text-align:center;padding:5px;">Recalc / Table</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
     <div data-mc-dtxr-unified-review-slot style="margin-top:10px;border-top:1px solid #475569;padding-top:8px;"><div style="font-size:11px;color:#94a3b8;">DTXR schedule proposals: use Review DTXR wall candidates above. No source candidate is applied without checking individual physical keys. Existing overrides and B31.3 accepted walls remain protected.</div></div>
     <div data-mc-b313-unified-audit-slot style="margin-top:10px;border-top:1px solid #475569;padding-top:8px;">
       <div style="font-size:11px;color:#94a3b8;">Calculation results appear here after the B31.3 calculate action. DTXR source wall and B31.3 design wall remain separate authorities. Calculating does not update wall thickness: explicit Pull remains required.</div>
@@ -791,6 +848,7 @@ function bindScreeningPressureUnit(panel,host,config,models,options) {
     if(liveRows.length) {
       const report=buildPreviewB313AutomaticWallColumnReport({rows:liveRows,config,host});
       renderPreviewB313CalculatedWallCells(host,report);
+      refreshCalculatedWallPanelCells(panel,host,config,liveRows);
     }
   });
 }
@@ -818,6 +876,9 @@ function bindMillAndCsControls(panel, host, config, rows, options) {
       enabled: cs?.checked !== false, family: 'CS', mode: 'PROPOSE_FOR_REVIEW'
     };
     await options?.onSaveConfigPreservePreview?.(config);
+    const liveRows=Array.isArray(host?.__xmlCiiPreviewResult?.branchRows)
+      ?host.__xmlCiiPreviewResult.branchRows:rows;
+    refreshCalculatedWallPanelCells(panel,host,config,liveRows);
   };
   type?.addEventListener('change', async () => {
     if (value) value.value = type.value === 'absolute' ? '1.5' : '12.5';
@@ -875,10 +936,12 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
 
   host.querySelector?.('[data-mc-b313-auto-basis-panel]')?.remove?.();
   if (models.length) {
-    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config, rows.length));
+    if (legacyEditor) legacyEditor.insertAdjacentHTML('afterend', panelHtml(models, config, rows,
+      host?.__xmlCiiPreviewResult?.nodeBoreWallRows || []));
     else {
       const actionBar = host.querySelector?.('[data-mc-preview-build]')?.parentElement;
-      actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models, config, rows.length));
+      actionBar?.parentElement?.insertAdjacentHTML?.('afterend', panelHtml(models, config, rows,
+        host?.__xmlCiiPreviewResult?.nodeBoreWallRows || []));
     }
     const panel = host.querySelector?.('[data-mc-b313-auto-basis-panel]');
     // The audit may run before this lazy-rendered editor mounts. In that case
