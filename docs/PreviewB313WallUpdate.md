@@ -264,6 +264,18 @@ XML OD, alter strict factor eligibility, create an accepted wall, or
 authorize Pull**. Conflicting/mixed positive node ODs continue to HOLD;
 the master cannot override a known physical mismatch.
 
+Source precision note: the project's pinned
+`docs/Masters/NPS_OD_BORE_SCHEDULE_MASTER.tsv` lists **DN150 OD(mm)=168**
+and **OD(in)=6.625**, equivalent to 168.275 mm. The screening-only
+fallback consumes the master **as published** (168 mm), rather than
+silently rewriting it to an external dimensional value or the source-node
+fixture's 168.3 mm. A real positive physical-node OD remains preferred.
+With the conditional synthetic P1=13001 kPa, DSS S=29.5 ksi at 120°C,
+Seamless E=1, CA=0, the master-only fallback calculates
+**t=5.235409 mm** and required nominal wall **5.983324 mm** (12.5%
+negative tolerance). This numerical difference from the physical-source
+168.3-mm witness is kept visible; the master itself is not changed.
+
 The code **does not assume pressure units** from P1 magnitude or simply
 infer that `13001` means kPa. Source-verified same-line P1 units may
 resolve automatically from unit-bearing Line List columns; otherwise the
