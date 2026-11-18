@@ -118,7 +118,8 @@ function calculatedWallAuditCell(row) {
   const r=row?.calculatedWallDisplay;
   const hasValue=r?.ok===true;
   const note=hasValue?(r.pressureUnitAssumed
-    ?'what-if · assumed kPa':'P unit '+text(r.pressureUnit)):(text(r?.reason)||'Input incomplete');
+    ?'what-if · common fallback '+text(r.pressureUnit)
+    :'P unit '+text(r.pressureUnit)):(text(r?.reason)||'Input incomplete');
   return `<td data-b313-calculated-audit style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;min-width:145px;">
     <strong data-b313-calculated-audit-value style="color:#0f172a;font-size:13px;">${hasValue?fixed(r.requiredNominalThicknessMm,3):'—'}</strong>
     <div style="color:#64748b;font-size:10px;">${esc(note)}</div>
@@ -461,7 +462,7 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
     if(result.pressureUnitAssumed)assumedUnits++;
     if(value)value.textContent=Number(result.requiredNominalThicknessMm).toFixed(3);
     if(detail)detail.textContent=result.pressureUnitAssumed
-      ?'Assumed kPa · confirm P unit'
+      ?'Common fallback '+result.pressureUnit+' · WHAT-IF only'
       :'P unit '+result.pressureUnit+' · t '+Number(result.pressureDesignThicknessMm).toFixed(3);
     const bracket=Array.isArray(result.interpolationBracket)
       ? result.interpolationBracket.map(x=>x.temperatureC+'°C='+x.Sksi+' ksi').join(' → '):'';
@@ -469,7 +470,8 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
       'Calculated B31.3 required nominal: '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
       'Pressure-design wall t: '+Number(result.pressureDesignThicknessMm).toFixed(4)+' mm',
       'P1: '+result.pressure+' '+result.pressureUnit
-        +(result.pressureUnitAssumed?' (WHAT-IF ASSUMPTION)':''),
+        +(result.pressureUnitAssumed?' (WHAT-IF: common fallback, NOT SOURCE VERIFIED)':''),
+      'P1 unit evidence: '+(result.pressureUnitSource||'unresolved'),
       'T1: '+result.temperatureC+'°C',
       'S '+result.factors.S_MPa+' MPa · E '+result.factors.E
         +' · W '+result.factors.W+' · Y '+result.factors.Y,
@@ -625,6 +627,7 @@ export function installPreviewB313WallUpdateAuditController({ host, config, xmlT
       ]),
       nodeRows:host.__xmlCiiPreviewResult?.nodeBoreWallRows?.length||0,
       bases:config?.b313WallUpdate?.bases||{},
+      commonPressureUnitFallback:config?.b313WallUpdate?.commonPressureUnitFallback||'AUTO',
       tolerance:config?.b313WallUpdate?.millTolerance||{},
     });
     if(lastAutoSignature===signature
