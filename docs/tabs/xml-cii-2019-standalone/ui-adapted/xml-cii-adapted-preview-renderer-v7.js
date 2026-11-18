@@ -1,7 +1,8 @@
 import {
   xmlCiiBuildAndRenderPreview as buildLegacyPreview,
   xmlCiiRenderPreviewPhase,
-} from './xml-cii-adapted-preview-renderer.js?v=20261116-b313-pull-v065';
+  suggestManualPreviewRebuild,
+} from './xml-cii-adapted-preview-renderer.js?v=20261118-b313-review-column-manual-1';
 import {
   XML_CII_PREVIEW_CACHE_SCHEMA,
   XML_CII_PREVIEW_LEGACY_CACHE_KEY,
@@ -119,11 +120,12 @@ function installDtxrRatingAction({ host, rootEl, xmlText, config, options, branc
     }
     try {
       await options?.onSaveConfig?.(config);
-      await xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, { ...options, forceBuild: true });
-      const rebuiltHost = rootEl?.querySelector?.('#mc-preview-table-host');
-      addNotice(rebuiltHost, ratingFetchMessage(result), result.applied === 0);
+      // Explicit Fetch Rating saves a source-scoped override; it never starts
+      // an unrelated Build/Rebuild Preview operation.
+      suggestManualPreviewRebuild(host,ratingFetchMessage(result));
     } catch (error) {
       addNotice(host, `DTXR Rating fetch failed: ${text(error?.message || error)}`, true);
+    } finally {
       button.disabled = false;
     }
   });
