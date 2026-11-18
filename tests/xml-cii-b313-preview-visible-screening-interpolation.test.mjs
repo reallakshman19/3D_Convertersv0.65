@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   derivePreviewB313AutoBasisRow, renderPreviewB313NumericScreeningReference,
-  setPreviewB313PressureUnitOnly,
+  setPreviewB313PressureUnitOnly,previewB313FactorPrefill,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
 import {
   buildPreviewB313ScreeningReference,previewB313BasisKey,
@@ -123,6 +123,78 @@ test('a saved physical P-unit choice is occurrence scoped and leaves factor appr
  assert.equal(cfg.b313WallUpdate.bases[key2],undefined);
  assert.deepEqual(setPreviewB313PressureUnitOnly(cfg,key1,'kilograms'),{
    ok:false,code:'INVALID_PREVIEW_P_UNIT'});
+});
+
+
+test('automatic 4 Preview S/E/W/Y controls are populated from source master with qualification and evidence',()=>{
+ const expected={allowableStress:0,qualityFactorE:1,weldStrengthReductionW:1,coefficientY:0.4};
+ for(const sample of models){
+   const row=physicalRow(sample);
+   const cfg={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{}}};
+   const before=JSON.stringify(cfg);
+   const model=derivePreviewB313AutoBasisRow(row,cfg);
+   const prefill=previewB313FactorPrefill(model);
+   assert.equal(prefill.qualification,'SCREENING_NOT_QUALIFIED');
+   assert.equal(prefill.stressUnit,'MPa');
+   near(prefill.values.allowableStress,sample.expectedS*6.894757293168361,0.00001);
+   for(const field of Object.keys(expected).filter(k=>k!=='allowableStress')){
+     assert.equal(prefill.values[field],expected[field],sample.lineKey+' '+field);
+   }
+   assert(Object.values(prefill.origins).every(v=>v==='SCREENING_MASTER'));
+   assert.equal(prefill.eligibleForPull,false);
+   assert.match(prefill.sourceReference,/^SCREENING_ONLY:OWNER-B313-SEWY-2026-08-11/);
+   assert.equal(prefill.evidence.basisStatus,'SCREENING');
+   assert.equal(prefill.evidence.stressLookupMethod,sample.lookup);
+   assert.equal(prefill.evidence.qualification,'SCREENING_NOT_VERIFIED_FOR_PROJECT_B313_2024');
+   assert.equal(prefill.evidence.eligibleForPull,false);
+   assert.match(prefill.evidence.sourceReference,/User message 2026-08-11/);
+   assert.match(prefill.evidence.editionBasis,/not independently verified/);
+   assert.equal(JSON.stringify(cfg),before,'auto-fill must not modify saved bases or approve Pull');
+ }
+});
+
+test('reviewed/manual entered values are preserved; unfilled columns still use interpolated master',()=>{
+ const row=physicalRow(models[2]),key=previewB313BasisKey(row,{});
+ const cfg={b313WallUpdate:{bases:{[key]:{
+   allowableStress:149,stressUnit:'MPa',qualityFactorE:0.85,
+   sourceReference:'CONTROLLED-ENG-REF-123',designApproved:true,
+ }}}};
+ const model=derivePreviewB313AutoBasisRow(row,cfg);
+ const prefill=previewB313FactorPrefill(model);
+ assert.equal(prefill.values.allowableStress,149);
+ assert.equal(prefill.values.qualityFactorE,0.85);
+ assert.equal(prefill.values.weldStrengthReductionW,1);
+ assert.equal(prefill.values.coefficientY,0.4);
+ assert.equal(prefill.origins.allowableStress,'EXPLICIT_SAVED');
+ assert.equal(prefill.origins.qualityFactorE,'EXPLICIT_SAVED');
+ assert.equal(prefill.origins.weldStrengthReductionW,'SCREENING_MASTER');
+ assert.equal(prefill.sourceReference,'CONTROLLED-ENG-REF-123');
+ assert.equal(prefill.qualification,'SCREENING_NOT_QUALIFIED',
+   'Mixed manual/screening values must not be considered qualified as a whole');
+});
+
+test('missing T1 and absent screening basis never invent qualified factor values',()=>{
+ const row=physicalRow(models[0]);row.t1='';
+ const prefill=previewB313FactorPrefill(derivePreviewB313AutoBasisRow(row,{}));
+ assert.equal(prefill.values.allowableStress,'');
+ assert.equal(prefill.qualification,'SOURCE_OR_FACTOR_MISSING');
+ assert.equal(prefill.evidence,null);
+ assert.equal(prefill.sourceReference,'');
+});
+
+test('SCREENING_ONLY cannot pass manual factor basis qualification even if a reviewer box is set',async()=>{
+ const {resolvePreviewB313FactorBasis}=await import('../converters/xml-cii2019-core/b313-preview-wall-update.js');
+ const row=physicalRow(models[0]),model=derivePreviewB313AutoBasisRow(row,{});
+ const filled=previewB313FactorPrefill(model);
+ const bad=resolvePreviewB313FactorBasis({
+   materialIdentity:{ok:true,material:{materialId:'DSS-A790-S31803'}},
+   designTemperatureC:120,manufacturingRoute:'SEAMLESS',
+   manualBasis:{...filled.values,stressUnit:'MPa',
+     sourceReference:filled.sourceReference,designApproved:true}
+ });
+ assert.equal(bad.ok,false,'Screening-only source must never become qualified manual fallback');
+ assert.equal(bad.code,'B313_PREVIEW_FACTOR_BASIS_UNAVAILABLE');
+ assert(bad.details.manualMissing.some(x=>x.includes('SCREENING master evidence')));
 });
 
 test('served docs and source auto-basis modules stay byte identical',()=>{
