@@ -444,8 +444,9 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'W', 'weldStrengthReductionW', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'Y', 'coefficientY', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:260px;">
-        <div style="display:flex;gap:4px;"><select data-b313-auto-field="pressureUnit" aria-label="Design pressure unit"><option value="AUTO">P unit AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.pressureUnit)===u?'selected':''}>${u}</option>`).join('')}</select>
+        <div style="display:flex;gap:4px;"><select data-b313-auto-field="pressureUnit" aria-label="4 Preview P unit for conditional calculation"><option value="AUTO">P unit AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.pressureUnit)===u?'selected':''}>${u}</option>`).join('')}</select>
         <select data-b313-auto-field="dimensionStandard" aria-label="Pipe dimension standard"><option value="AUTO">Dimension AUTO</option>${['ASME B36.10M','ASME B36.19M'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.dimensionStandard)===u?'selected':''}>${u}</option>`).join('')}</select></div>
+        <div style="font-size:9px;color:#fbbf24;margin:3px 0;">P unit changes recalculate screening only; S/E/W/Y remain unapproved.</div>
         <input type="text" data-b313-auto-source-reference placeholder="Qualified source reference (required)" value="${esc(model.storedBasis?.sourceReference || '')}" style="margin-top:4px;width:98%;">
         <label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-design-approved ${model.storedBasis?.designApproved === true ? 'checked' : ''}> Qualified manual basis reviewed</label>
         ${model.materialFallbackApplied ? `<label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-cs-reviewed ${model.storedBasis?.csFallbackReviewed === true ? 'checked' : ''}> Confirm CS fallback applies</label>` : ''}
@@ -599,6 +600,43 @@ function applyT1Guard(host, models) {
     ? `${missing} material/T1 group(s) require T1; other valid Preview rows can still be calculated.`
     : button.dataset.mcB313AutoBasisOriginalTitle;
 }
+/**
+ * Selecting the 4 Preview B31.3 pressure-unit basis is NOT approval of
+ * screening stress coefficients. This action is deliberately independent
+ * of the "Accept manual factors" refresh button and preserves all existing
+ * factor/route fields unchanged.
+ */
+export function setPreviewB313PressureUnitOnly(config, basisKey, pressureUnit) {
+  const allowed = new Set(['AUTO','PA','KPA','MPA','BAR','BARG','PSI','PSIG']);
+  const chosen = text(pressureUnit).toUpperCase();
+  if (!text(basisKey) || !allowed.has(chosen)) return {ok:false,code:'INVALID_PREVIEW_P_UNIT'};
+  const bases=ensureBasisBucket(config);
+  const prior=bases[basisKey] || {};
+  bases[basisKey]={
+    ...prior,pressureUnit:chosen,
+    pressureUnitSelectionSource:chosen==='AUTO'?'AUTO_FROM_4_PREVIEW'
+      :'USER_SELECTED_4_PREVIEW_B313_BASIS',
+  };
+  return {ok:true,code:'SCREENING_PRESSURE_UNIT_RECALCULATE',
+    basisKey,pressureUnit:chosen,eligibleForPull:false};
+}
+
+function bindScreeningPressureUnit(panel,host,config,models,options) {
+  const byKey=new Map(models.map(model=>[text(model.basisKey),model]));
+  panel?.querySelectorAll?.('select[data-b313-auto-field="pressureUnit"]').forEach(select=>
+    select.addEventListener('change',async()=>{
+      const row=select.closest('[data-b313-auto-key]');
+      const key=text(row?.dataset?.b313AutoKey);
+      if(!byKey.has(key))return;
+      const result=setPreviewB313PressureUnitOnly(config,key,select.value);
+      if(!result.ok)return;
+      // Preserve the user's effective 4 Preview snapshot. Re-evaluate the
+      // separate conditional screening result using the explicit chosen unit.
+      await options?.onSaveConfigPreservePreview?.(config);
+      host?.querySelector?.('[data-mc-b313-wall-update]')?.click?.();
+    }));
+}
+
 function bindMillAndCsControls(panel, host, config, rows, options) {
   const tolerance = config.b313WallUpdate || (config.b313WallUpdate = {});
   const type = panel.querySelector?.('[data-b313-mill-basis]');
@@ -701,6 +739,7 @@ export function installPreviewB313AutoBasisPanel({ host, config, rows = [], opti
     bindTableLinks(panel);
     bindInfoPopups(panel);
     bindRefresh(panel, host, config, models, options);
+    bindScreeningPressureUnit(panel, host, config, models, options);
     bindMillAndCsControls(panel, host, config, rows, options);
   }
   applyT1Guard(host, models);
