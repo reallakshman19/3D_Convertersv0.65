@@ -788,8 +788,24 @@ export function buildPreviewB313ScreeningReference({
       classMarginMm:classSelection?.ok?classSelection.marginMm:null,
     });
   }
+  // Screening-only default: conditional pipe manufacture is SEAMLESS
+  // (E = 1) unless the caller's basis already names a supported route.
+  // This default does NOT establish actual pipe manufacture or give Pull
+  // authority. All alternative E routes remain independently calculated.
+  const conditionalChoice = reference.routeOptions.find(choice =>
+    normalizedToken(choice.route) === normalizedToken(reference.selectedRoute || 'SEAMLESS')) || null;
+  const conditionalRoute = conditionalChoice?.route || null;
+  const conditionalE = conditionalChoice?.value ?? null;
+  const conditionalScenario = scenarios.find(s =>
+    normalizedToken(s.manufacturingRoute) === normalizedToken(conditionalRoute)) || null;
   return {
     ...reference,
+    conditionalManufacturing: conditionalRoute,
+    conditionalE,
+    conditionalRouteSource: reference.selectedRoute ? 'DECLARED_ROUTE_SCREENING_ONLY'
+      : conditionalChoice ? 'DEFAULT_SEAMLESS_SCREENING_ONLY' : 'ROUTE_UNRESOLVED',
+    conditionalRouteAssumed: !reference.selectedRoute,
+    conditionalScenario,
     rowIndex,branchName:text(row?.branchName),lineKey:text(row?.lineKey),
     materialSource:text(row?.materialSource),
     pressure:pressure||null,pressureUnit:pressureBasis.unit||null,
