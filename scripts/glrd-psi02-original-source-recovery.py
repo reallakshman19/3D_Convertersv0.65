@@ -114,13 +114,13 @@ def candidate_for_line(key, row_cells):
         result.append({
             "method": method, "worksheetRow": number,
             "lineCell": "C" + str(number), "lineCellText": line,
-            "K9ProfilePressureCandidateCell": "K" + str(number),
-            "K9ProfilePressureCandidate": cells.get("K", {}).get("value", ""),
-            "Y9ProfileTemperatureCandidateCell": "Y" + str(number),
-            "Y9ProfileTemperatureCandidate": cells.get("Y", {}).get("value", ""),
-            "V9ProfileClassCandidate": cells.get("V", {}).get("value", ""),
-            "WDesignCandidateCell": "W" + str(number),
-            "WDesignCandidateValue": cells.get("W", {}).get("value", ""),
+            "KWorkingPressureCandidateCell": "K" + str(number),
+            "KWorkingPressureCandidate": cells.get("K", {}).get("value", ""),
+            "YDesignTemperatureCandidateCell": "Y" + str(number),
+            "YDesignTemperatureCandidate": cells.get("Y", {}).get("value", ""),
+            "VPipingClassCandidate": cells.get("V", {}).get("value", ""),
+            "WDesignPressureCandidateCell": "W" + str(number),
+            "WDesignPressureCandidateValue": cells.get("W", {}).get("value", ""),
             "XDesignCandidateCell": "X" + str(number),
             "XDesignCandidateValue": cells.get("X", {}).get("value", ""),
             "ZDesignCandidateCell": "Z" + str(number),
@@ -171,6 +171,19 @@ def audit(manifest_path, matrix_path, source_dir, master_path, rules_path, outpu
     if not xml_pressure_unit or not xml_temp_unit:
         raise ValueError("SOURCE_XML_UNITS_UNAVAILABLE")
     wb = workbook_sheet_rows(path_line)
+    headers = {e["cell"]: e["text"].strip().upper()
+               for cells in wb["headerByColumn"].values() for e in cells}
+    # The published BM2 sheet distinguishes *working* K from *design*
+    # pressure W. Never identify K9 as P1 merely because K8 is kPa(g).
+    exact_headers = {
+        "C5": "LINE NUMBER", "K5": "AT WORKING CONDITIONS",
+        "K6": "PRESSURE", "W5": "DESIGN CONDITIONS",
+        "W6": "PRESSURE MAX", "W8": "KPA(G)",
+        "Y6": "TEMP. MAX", "Y8": "ºC"
+    }
+    for cell, expected in exact_headers.items():
+        if headers.get(cell) != expected:
+            raise ValueError("BM2_DESIGN_HEADER_SOURCE_CHANGED:" + cell)
     factors = factor_census(json.loads(Path(master_path).read_text()),
                             json.loads(Path(rules_path).read_text()))
     items = []
@@ -203,10 +216,14 @@ def audit(manifest_path, matrix_path, source_dir, master_path, rules_path, outpu
             "historicalCandidateStatus": candstatus,
             "historicalCandidateCount": len(candidates),
             "historicalLineCell": candidates[0]["lineCell"] if len(candidates) == 1 else None,
-            "historicalCandidatePressureCell": candidates[0]["K9ProfilePressureCandidateCell"] if len(candidates) == 1 else None,
-            "historicalCandidatePressureValue": candidates[0]["K9ProfilePressureCandidate"] if len(candidates) == 1 else None,
-            "historicalCandidateTemperatureCell": candidates[0]["Y9ProfileTemperatureCandidateCell"] if len(candidates) == 1 else None,
-            "historicalCandidateTemperatureValue": candidates[0]["Y9ProfileTemperatureCandidate"] if len(candidates) == 1 else None,
+            "historicalCandidateDesignPressureCell": candidates[0]["WDesignPressureCandidateCell"] if len(candidates) == 1 else None,
+            "historicalCandidateDesignPressureValue": candidates[0]["WDesignPressureCandidateValue"] if len(candidates) == 1 else None,
+            "historicalCandidateDesignPressureUnit": "kPa(g)" if len(candidates) == 1 else None,
+            "historicalCandidateDesignPressureUnitCell": "W8" if len(candidates) == 1 else None,
+            "historicalCandidateWorkingPressureCell": candidates[0]["KWorkingPressureCandidateCell"] if len(candidates) == 1 else None,
+            "historicalCandidateWorkingPressureValue": candidates[0]["KWorkingPressureCandidate"] if len(candidates) == 1 else None,
+            "historicalCandidateDesignTemperatureCell": candidates[0]["YDesignTemperatureCandidateCell"] if len(candidates) == 1 else None,
+            "historicalCandidateDesignTemperatureValue": candidates[0]["YDesignTemperatureCandidate"] if len(candidates) == 1 else None,
             "qualifiedP1": None, "qualifiedP1Unit": None, "qualifiedT1": None,
             "sourceEvidenceStatus": "HOLD_PSI02_GOVERNED_LINE_LIST_CELLS_NOT_VERIFIED",
             "factorStatus": "HOLD_PROJECT_QUALIFIED_B313_FACTORS_NOT_AVAILABLE",
