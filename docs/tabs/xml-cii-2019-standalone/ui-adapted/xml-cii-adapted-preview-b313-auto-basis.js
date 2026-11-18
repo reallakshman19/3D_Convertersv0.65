@@ -373,9 +373,14 @@ export function previewB313FactorPrefill(model = {}) {
       values[field]='';origins[field]='MISSING';
     }
   }
-  const unit=strict ? text(strict.stressUnit||'MPa')
-    :text(stored.stressUnit)
-      ||(origins.allowableStress==='SCREENING_MASTER'?'MPa':text(seed?.stressUnit||'MPa'));
+  // Unit always follows the actual S value, not a stale saved unit from
+  // an incomplete prior basis. In particular screening S.MPa is never
+  // displayed with a previously stored "ksi" dropdown.
+  const unit=origins.allowableStress==='QUALIFIED_MASTER'?'MPa'
+    :origins.allowableStress==='SCREENING_MASTER'?'MPa'
+    :origins.allowableStress==='EXPLICIT_SAVED'
+      ?text(stored.stressUnit||'MPa')
+      :text(seed?.stressUnit||'MPa');
   const allStrict=fields.every(field=>origins[field]==='QUALIFIED_MASTER');
   const allStored=fields.every(field=>origins[field]==='EXPLICIT_SAVED');
   const hasScreening=fields.some(field=>origins[field]==='SCREENING_MASTER');
