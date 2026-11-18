@@ -66,6 +66,7 @@ test('real 4 Preview calculate path uses header unit + exact class wall and crea
     branchName:'PIPE-A',lineKey:'P4110001',sizeMm:150,material:'ASTM A106-B',
     materialSource:'process-linelist-material',
     t1:'120',t1Source:'linelist',p1:'5110',p1Source:'linelist',
+    p1Unit:'KPA',p1UnitSource:'line-list-column:Pressure Max kPa(g)',
     corrosion:'1.5',pipingClass:'31441C4',
     pipingClassPipeDnMm:150,pipingClassPipeSchedule:'40',
     pipingClassPipeWallMm:7.112,pipingClassPipeMaterial:'ASTM A106 Gr B',
