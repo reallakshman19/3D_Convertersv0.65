@@ -2,54 +2,28 @@ function text(value) {
   return value === undefined || value === null ? '' : String(value).trim();
 }
 
-function tryAutoBuild(details) {
-  if (!details?.open) return false;
-  const build = details.querySelector('[data-mc-preview-build]');
-  if (!build || build.dataset.modeAPreviewAutoBuilt === 'true') return false;
-  if (!/^Build Preview$/i.test(text(build.textContent))) return false;
-  build.dataset.modeAPreviewAutoBuilt = 'true';
-  build.click();
-  return true;
-}
-
-function disconnectObserver(details) {
-  details?.__modeAPreviewToolObserver?.disconnect?.();
-  details.__modeAPreviewToolObserver = null;
-}
-
-function scheduleAutoBuild(details) {
-  if (!details?.open) {
-    disconnectObserver(details);
-    return;
-  }
-
-  // The individual Preview is lazy-rendered. Observe child insertion so the
-  // click happens after the native Build Preview listener has been installed.
-  if (typeof MutationObserver !== 'undefined' && !details.__modeAPreviewToolObserver) {
-    const observer = new MutationObserver(() => {
-      if (tryAutoBuild(details)) disconnectObserver(details);
-    });
-    observer.observe(details, { childList: true, subtree: true });
-    details.__modeAPreviewToolObserver = observer;
-  }
-
-  setTimeout(() => {
-    if (tryAutoBuild(details)) disconnectObserver(details);
-  }, 0);
-}
-
+/**
+ * Mode A Preview must remain user-operated. Previous visibility wiring called
+ * Build Preview programmatically on open (including after lazy DOM mounting),
+ * potentially discarding unsaved review context. This function is now only
+ * a presentation aid; explicit Build/Rebuild button handlers are unchanged.
+ */
 export function installModeAIndividualPreviewToolVisibility(workspace) {
   if (!workspace) return false;
-  let installed = false;
+  let labeled = false;
   for (const details of workspace.querySelectorAll('details[data-mode-a-source-phase]')) {
     const summary = details.querySelector('summary');
-    if (!/Preview\s*\/\s*Review/i.test(text(summary?.textContent))) continue;
-    if (details.dataset.modeAPreviewToolsBound !== 'true') {
-      details.dataset.modeAPreviewToolsBound = 'true';
-      details.addEventListener('toggle', () => scheduleAutoBuild(details));
-      installed = true;
+    if (!/Preview\\s*\\/\\s*Review/i.test(text(summary?.textContent))) continue;
+    if (details.dataset.modeAPreviewToolsBound === 'true') continue;
+    details.dataset.modeAPreviewToolsBound = 'true';
+    const span=details.ownerDocument?.createElement?.('span');
+    if (span && summary) {
+      span.dataset.modeAPreviewManualHint = 'true';
+      span.textContent = ' · Manual Build/Rebuild Preview';
+      span.style.cssText = 'font-size:11px;color:#fbbf24;font-weight:500;';
+      summary.appendChild(span);
+      labeled = true;
     }
-    if (details.open) scheduleAutoBuild(details);
   }
-  return installed;
+  return labeled;
 }
