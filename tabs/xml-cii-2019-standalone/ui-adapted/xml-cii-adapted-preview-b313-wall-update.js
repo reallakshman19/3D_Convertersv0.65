@@ -8,7 +8,7 @@ import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../../co
 import { listPipeWallsForSize } from '../../../converters/pipe-wall-master/index.js';
 import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import { markAdaptedPreviewOverrideManual } from './xml-cii-adapted-preview-filldown.js';
-import { _xmlCiiFindLineListRow } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
+import { _xmlCiiFindLineListRow, _xmlCiiDiagnoseLineListMatch } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 export const B313_PREVIEW_ACTION_LABEL = 'Update wall thickness as per B31.3 Sec II';
@@ -59,8 +59,9 @@ function temperatureText(row) {
 
 /**
  * A loaded Line List is not proof it covers the active physical branch set.
- * This diagnostic consumes the ACTUAL current Preview snapshot; it never
- * assigns or copies material, design pressure, or design temperature.
+ * Diagnostics check every unique/ambiguous exact or alias master match against
+ * the live 4 Preview, without copying missing process fields or authorizing
+ * engineering Pull. They also flag stale Preview/master mismatches.
  */
 export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
   const actual = Array.isArray(rows) ? rows.filter(r => r && typeof r === 'object') : [];
@@ -71,8 +72,54 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
   const missingP1 = actual.filter(r => !text(r.p1));
   const loadedLineListRows = Array.isArray(config?.linelist?.masterRows)
     ? config.linelist.masterRows.length : null;
+  const sourceReceipts=actual.map((row,ordinal)=>{
+    const match=_xmlCiiDiagnoseLineListMatch(row?.lineKey,config);
+    const explicitInput=text(row?.p1Source).toLowerCase()==='override'
+      && text(row?.t1Source).toLowerCase()==='override';
+    const hasP1=Boolean(text(row?.p1));
+    const hasT1=Boolean(temperatureText(row));
+    const sourceUnit=resolvePreviewP1LineListHeaderUnit(row,config);
+    const sourceMatch=match.matchIndex!==null;
+    let code;
+    if (match.code==='DUPLICATE_EXACT'||match.code==='DUPLICATE_ALIAS')
+      code='AMBIGUOUS_SELECTED_MASTER';
+    else if (!sourceMatch && explicitInput && hasP1 && hasT1)
+      code='EXPLICIT_OVERRIDE_NO_LINE_LIST_MATCH';
+    else if (!sourceMatch && row?.lineMiss===false)
+      code='PREVIEW_MASTER_OUT_OF_SYNC';
+    else if (!sourceMatch)
+      code='NO_SELECTED_MASTER_LINE';
+    else if (row?.lineMiss===true)
+      code='PREVIEW_REBUILD_REQUIRED';
+    else if (!hasP1||!hasT1)
+      code='MATCHED_SOURCE_PROCESS_FIELDS_MISSING';
+    else if (!text(row?.p1Unit) && !sourceUnit.unit)
+      code='P1_UNIT_SOURCE_UNRESOLVED';
+    else code='MATCHED_PROCESS_INPUTS_PRESENT';
+    return Object.freeze({
+      rowOrdinal:ordinal+1,
+      branchName:text(row?.branchName),
+      lineKey:text(row?.lineKey),
+      code,
+      previewLineMatched:row?.lineMiss===false,
+      selectedMasterMatch:match.code,
+      selectedMasterRowOrdinal:sourceMatch?match.matchIndex+1:null,
+      selectedMasterExactMatches:match.exactCount,
+      selectedMasterAliasMatches:match.aliasCount,
+      p1:text(row?.p1),p1Source:text(row?.p1Source),
+      p1Unit:text(row?.p1Unit||sourceUnit.unit),
+      p1UnitSource:text(row?.p1UnitSource||sourceUnit.source),
+      t1:temperatureText(row),t1Source:text(row?.t1Source),
+      material:materialText(row),
+      overrideComplete:explicitInput,
+    });
+  });
+  const codeCounts={};
+  for(const receipt of sourceReceipts) codeCounts[receipt.code]=(codeCounts[receipt.code]||0)+1;
+  const masterConfirmed=sourceReceipts.filter(r=>r.selectedMasterRowOrdinal!==null
+    && r.previewLineMatched).length;
   return {
-    schema: 'b313-preview-linelist-coverage/v1',
+    schema: 'b313-preview-linelist-coverage/v2',
     physicalRows: actual.length,
     loadedLineListRows,
     matchedPhysicalRows: matched.length,
@@ -81,10 +128,20 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
     missingP1Rows: missingP1.length,
     missingProcessRows: missingProcess.length,
     missingLineKeys: [...new Set(missingProcess.map(r => text(r.lineKey)).filter(Boolean))].sort(),
-    // Explicit physical line match is required; neither class-specific
-    // material lookup nor a service-consensus candidate is design authority.
+    sourceReceipts,
+    sourceCodeCounts:codeCounts,
+    selectedMasterConfirmedPhysicalRows:masterConfirmed,
+    selectedMasterAmbiguousPhysicalRows:sourceReceipts.filter(
+      r=>r.code==='AMBIGUOUS_SELECTED_MASTER').length,
+    previewMasterOutOfSyncPhysicalRows:sourceReceipts.filter(
+      r=>r.code==='PREVIEW_MASTER_OUT_OF_SYNC'||r.code==='PREVIEW_REBUILD_REQUIRED').length,
+    sourceWorkbookIdentity: 'NOT_AVAILABLE_IN_PREVIEW_CONFIG',
+    // Original user-visible process coverage is unchanged; source/master
+    // identity remains separately classified for truly provenance-safe use.
     sourceEvidenceComplete: missingProcess.length === 0 && missingT1.length === 0
       && missingP1.length === 0,
+    selectedMasterIdentityComplete:sourceReceipts.every(r=>
+      r.selectedMasterRowOrdinal!==null && r.previewLineMatched),
   };
 }
 
