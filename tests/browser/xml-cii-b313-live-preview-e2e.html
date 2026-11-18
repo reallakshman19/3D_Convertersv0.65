@@ -62,14 +62,15 @@ try {
 
   const liveBranchTable=host.querySelector('table[data-resizable-table="branch-preview"]');
   assert(liveBranchTable,'No effective physical 4 Preview table found');
-  const requiredHeader=liveBranchTable.querySelector('[data-col-id="b313CalculatedWall"]');
-  const currentHeaders=[...liveBranchTable.querySelectorAll('thead th')]
+  const headerElements=[...liveBranchTable.querySelectorAll('thead th')];
+  const requiredHeader=headerElements.find(h=>h.dataset.colId==='b313CalculatedWall');
+  const currentHeaders=headerElements
     .map(x=>(x.dataset.colId||'?')+'='+x.textContent.trim().slice(0,38));
   assert(requiredHeader?.textContent.includes('B31.3 Required (mm)'),
     'Required nominal wall must be its own visible 4 Preview column. Headers: '+currentHeaders.join(' | '));
   assert(liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]').length===41,
     'Calculated wall column must exist for all physical Preview rows');
-  assert(liveBranchTable.querySelector('[data-col-id="wallThickness"]'),
+  assert(headerElements.some(h=>h.dataset.colId==='wallThickness'),
     'Existing editable Wall Thk column was replaced instead of preserved');
   const legacy = host.querySelector('[data-mc-b313-basis-editor]');
   assert(!legacy || legacy.hidden || legacy.style.display === 'none', 'Legacy B31.3 editor is visible');
