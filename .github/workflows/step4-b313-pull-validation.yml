@@ -22,6 +22,7 @@ on:
       - 'converters/xml-cii2019-core/default-piping-class-material-code-rows.js'
       - 'docs/Masters/SpecwisePipingClass/93833.json'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
+      - 'tests/xml-cii-preview-v7-observer-feedback.test.mjs'
       - 'tests/b313-material-factors.test.mjs'
       - 'tests/b313-material-factors-editor-provenance.test.mjs'
       - 'tests/glrd-b313-qualification-readiness.test.mjs'
@@ -101,6 +102,7 @@ jobs:
             tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs \
             tests/xml-cii-b313-unified-review-rca.test.mjs \
             tests/xml-cii-glrd-unified-wall-review-approval.test.mjs \
+            tests/xml-cii-preview-v7-observer-feedback.test.mjs \\
             tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs
   step4-chromium:
     name: Browser Step 4 live Preview
