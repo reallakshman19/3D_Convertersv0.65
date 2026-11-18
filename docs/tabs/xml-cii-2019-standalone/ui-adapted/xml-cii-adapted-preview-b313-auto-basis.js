@@ -383,7 +383,7 @@ export function previewB313FactorPrefill(model = {}) {
   const sourceRef=text(stored.sourceReference) || (hasScreening
     ?'SCREENING_ONLY:'+basis+' | '+text(screening.sourceReference):'');
   const qualification=allStrict?'QUALIFIED_ACTIVE_MASTER'
-    :hasScreening?'SCREENING_NOT_QUALIFIED'
+    :(hasScreening||/^SCREENING_ONLY:/i.test(sourceRef))?'SCREENING_NOT_QUALIFIED'
     :allStored?'EXPLICIT_MANUAL_SOURCE_REVIEW'
     :seed?'UNQUALIFIED_NEAREST_SEED':'SOURCE_OR_FACTOR_MISSING';
   const evidence=screening ?{
@@ -403,6 +403,22 @@ export function previewB313FactorPrefill(model = {}) {
 }
 
 function sourceInfo(model, factor) {
+  const prefill=previewB313FactorPrefill(model);
+  const field={S:'allowableStress',E:'qualityFactorE',W:'weldStrengthReductionW',Y:'coefficientY'}[factor];
+  if(field && prefill.origins[field]==='SCREENING_MASTER'){
+    const evidence=prefill.evidence||{};
+    const bracket=Array.isArray(evidence.stressBrackets)
+      ?evidence.stressBrackets.map(x=>`${x.temperatureC}°C=${x.Sksi} ksi`).join(' → '):'';
+    return [
+      factor+' '+text(prefill.values[field])+(factor==='S'?' MPa':''),
+      'qualification=SCREENING_NOT_VERIFIED', 'basis='+text(evidence.basisId),
+      'T1='+text(evidence.temperatureC)+'°C',
+      factor==='S'?'lookup='+text(evidence.stressLookupMethod):'conditional Seamless E / master W/Y',
+      factor==='S'?'bracket='+bracket:'',
+      'source='+text(evidence.sourceReference),'edition='+text(evidence.editionBasis),
+      'not eligible for Pull',
+    ].filter(Boolean).join(' · ');
+  }
   const source = model.fallback?.factorSources?.[factor] || model.factorBasis?.factorSources?.[factor] || null;
   if (!source) {
     const availability = factorAvailabilityFrom(model.factorBasis)?.factors?.[factor];
@@ -632,6 +648,36 @@ function bindRefresh(panel, host, config, models, options) {
     const routeOnly = !!record.manufacturingRoute
       && !!record.manufacturingRouteSourceReference
       && record.manufacturingRouteEvidenceReviewed === true;
+    const sourceIsScreening=/^SCREENING_ONLY:/i.test(record.sourceReference);
+    // SCREENING candidate numbers and their master reference are
+    // automatically displayed but do NOT count as a reviewed source.
+    // Auto-filled input fields cannot be silently serialized into the
+    // controlled manual factor basis, even if the review checkbox is set.
+    if(sourceIsScreening){
+      if(record.designApproved){
+        if(status){
+          status.textContent='SCREENING SOURCE IS NOT QUALIFIED; REPLACE WITH AN INDEPENDENT CONTROLLED SOURCE';
+          status.style.color='#fca5a5';
+        }
+        return;
+      }
+      // Preserve any previously reviewed route evidence separately without
+      // storing S/E/W/Y as authoritative material factors.
+      if(routeOnly){
+        const prior=ensureBasisBucket(config)[key]||{};
+        ensureBasisBucket(config)[key]={...prior,
+          manufacturingRoute:record.manufacturingRoute,
+          manufacturingRouteSourceReference:record.manufacturingRouteSourceReference,
+          manufacturingRouteEvidenceReviewed:true};
+        await options?.onSaveConfigPreservePreview?.(config);
+      }
+      if(status){
+        status.textContent='SCREENING VALUES POPULATED; QUALIFICATION PENDING — CONDITIONAL RECALCULATION ONLY';
+        status.style.color='#fbbf24';
+      }
+      host?.querySelector?.('[data-mc-b313-wall-update]')?.click?.();
+      return;
+    }
     const manualFactorsComplete = validateFallbackRecord(record) && !!text(record.sourceReference);
     // Allow physical route evidence to be saved independently of manual
     // factor overrides; a newly verified route may unlock strict code data.
