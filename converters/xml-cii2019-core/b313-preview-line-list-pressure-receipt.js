@@ -12,7 +12,7 @@ function token(row,...keys){
 }
 function aliases(value){
   const v=compact(value);
-  return v?[...new Set([v,v.replace(/^[A-Z](?=\d{5,}$)/,'')])]:[];
+  return v?[...new Set([v,v.replace(/^P(?=\d{5,}$)/,'')])]:[];
 }
 function selectedLineListRow(lineKey,config){
   const rows=Array.isArray(config?.linelist?.masterRows)?config.linelist.masterRows:[];
