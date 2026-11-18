@@ -72,6 +72,24 @@ test('master diagnostics distinguish unique exact, unique alias, duplicates and 
  assert.equal(exact.sourceReceipts[0].selectedMasterRowOrdinal,1);
  assert.equal(exact.sourceReceipts[0].p1Unit,'KPA');
  assert.equal(exact.sourceReceipts[0].code,'MATCHED_PROCESS_INPUTS_PRESENT');
+ assert.equal(exact.sourceReceipts[0].sourceP1,'13001');
+ assert.equal(exact.sourceReceipts[0].sourceT1,'120');
+ assert.equal(exact.sourceReceipts[0].sourceP1MatchesPreview,true);
+ assert.equal(exact.sourceReceipts[0].sourceT1MatchesPreview,true);
+ assert.equal(exact.sourceReceipts[0].p1UnitSource,'line-list-column:Pressure Max kPa(g)');
+ const changedP=buildPreviewB313LineListCoverage([{...base,p1:'13002'}],
+   {linelist:{masterRows:[row1]}});
+ assert.equal(changedP.sourceReceipts[0].code,'PREVIEW_SOURCE_P1_CONFLICT');
+ assert.equal(changedP.sourceReceipts[0].sourceP1MatchesPreview,false);
+ const changedT=buildPreviewB313LineListCoverage([{...base,t1:'121'}],
+   {linelist:{masterRows:[row1]}});
+ assert.equal(changedT.sourceReceipts[0].code,'PREVIEW_SOURCE_T1_CONFLICT');
+ assert.equal(changedT.sourceReceipts[0].sourceT1MatchesPreview,false);
+ const ranged=buildPreviewB313LineListCoverage([base],{linelist:{
+   masterRows:[{...row1,'Temp. Max °C':'80-120'}]}});
+ assert.equal(ranged.sourceReceipts[0].sourceT1Raw,'80-120');
+ assert.equal(ranged.sourceReceipts[0].sourceT1,'120');
+ assert.equal(ranged.sourceReceipts[0].sourceT1MatchesPreview,true);
  const duplicate=buildPreviewB313LineListCoverage([base],
    {linelist:{masterRows:[row1,row2]}});
  assert.equal(duplicate.sourceReceipts[0].code,'AMBIGUOUS_SELECTED_MASTER');
