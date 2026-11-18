@@ -412,7 +412,62 @@ function bindB313EvidenceDownload(host, report) {
   }
 }
 
+
+/**
+ * Put the calculated B31.3 required nominal wall directly beside the
+ * existing editable Wall Thk cell in 4 Preview, not in an approval dialog.
+ * This is display-only; no row override, Pull proposal or source mutation.
+ */
+export function renderPreviewB313CalculatedWallCells(host,report={}) {
+  const rows=normalizeRows(report?.rows);
+  const physical=host?.querySelectorAll?.(
+    'table[data-resizable-table="branch-preview"] tbody tr.mc-preview-row'
+  )||[];
+  let calculated=0,assumedUnits=0;
+  for(let i=0;i<physical.length;i++){
+    const cell=physical[i].querySelector?.('[data-mc-b313-calculated-row]');
+    if(!cell) continue;
+    const value=cell.querySelector?.('[data-mc-b313-calculated-value]');
+    const detail=cell.querySelector?.('[data-mc-b313-calculated-detail]');
+    const result=rows[i]?.calculatedWallDisplay;
+    if(!result?.ok){
+      if(value)value.textContent='—';
+      if(detail)detail.textContent=result?.reason||'Input incomplete';
+      cell.title=result?.reason||'Calculate B31.3 to see result';
+      cell.dataset.mcB313CalculatedStatus='INPUT_REQUIRED';
+      continue;
+    }
+    calculated++;
+    if(result.pressureUnitAssumed)assumedUnits++;
+    if(value)value.textContent=Number(result.requiredNominalThicknessMm).toFixed(3);
+    if(detail)detail.textContent=result.pressureUnitAssumed
+      ?'Assumed kPa · confirm P unit'
+      :'P unit '+result.pressureUnit+' · t '+Number(result.pressureDesignThicknessMm).toFixed(3);
+    const bracket=Array.isArray(result.interpolationBracket)
+      ? result.interpolationBracket.map(x=>x.temperatureC+'°C='+x.Sksi+' ksi').join(' → '):'';
+    cell.title=[
+      'Calculated B31.3 required nominal: '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
+      'Pressure-design wall t: '+Number(result.pressureDesignThicknessMm).toFixed(4)+' mm',
+      'P1: '+result.pressure+' '+result.pressureUnit
+        +(result.pressureUnitAssumed?' (WHAT-IF ASSUMPTION)':''),
+      'T1: '+result.temperatureC+'°C',
+      'S '+result.factors.S_MPa+' MPa · E '+result.factors.E
+        +' · W '+result.factors.W+' · Y '+result.factors.Y,
+      'S lookup: '+result.stressLookupMethod+' '+bracket,
+      'OD: '+result.outsideDiameterMm+' mm ('+result.outsideDiameterSource+')',
+      'CA: '+result.corrosionAllowanceMm+' mm',
+      'Class wall: '+result.classNominalWallMm+' mm · class pass: '+result.classPass,
+      'Evidence: '+result.factorBasisId+' · '+result.factorSourceReference,
+      'Edition/source qualification: '+result.factorCodeEditionBasis,
+      'Independent calculation: NOT a saved Wall Thk or approved Pull',
+    ].join('\\n');
+    cell.dataset.mcB313CalculatedStatus=result.pressureUnitAssumed?'WHAT_IF_P_UNIT':'CALCULATED';
+  }
+  return {physicalRows:physical.length,calculatedRows:calculated,assumedPressureUnitRows:assumedUnits};
+}
+
 function renderReport(host, report) {
+  renderPreviewB313CalculatedWallCells(host,report);
   host?.querySelector?.('[data-mc-b313-report]')?.remove?.();
   const sharedSlot = host?.querySelector?.('[data-mc-b313-unified-audit-slot]');
   if (sharedSlot) {
