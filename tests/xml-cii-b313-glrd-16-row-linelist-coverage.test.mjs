@@ -80,6 +80,15 @@ test('master diagnostics distinguish unique exact, unique alias, duplicates and 
    {linelist:{masterRows:[{'Line number':'4110001','Pressure Max kPa(g)':13001}]}});
  assert.equal(alias.sourceReceipts[0].selectedMasterMatch,'ALIAS_UNIQUE');
  assert.equal(alias.sourceReceipts[0].selectedMasterRowOrdinal,1);
+ const unrelatedB=buildPreviewB313LineListCoverage([
+   {...base,lineKey:'B4110001',lineMiss:true}],
+   {linelist:{masterRows:[{'Line number':'4110001','Pressure Max kPa(g)':13001}]}});
+ assert.equal(unrelatedB.sourceReceipts[0].selectedMasterMatch,'NO_MATCH',
+   'B branch cannot borrow P pipe numeric-only source row');
+ const unrelatedBFromP=buildPreviewB313LineListCoverage([
+   {...base,lineKey:'B4110001',lineMiss:true}],
+   {linelist:{masterRows:[{'Line number':'P4110001','Pressure Max kPa(g)':13001}]}});
+ assert.equal(unrelatedBFromP.sourceReceipts[0].selectedMasterMatch,'NO_MATCH');
  const changed=buildPreviewB313LineListCoverage([{...base,lineMiss:true}],
    {linelist:{masterRows:[row1]}});
  assert.equal(changed.sourceReceipts[0].code,'PREVIEW_REBUILD_REQUIRED');
