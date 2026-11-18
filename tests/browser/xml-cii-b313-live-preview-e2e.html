@@ -413,7 +413,8 @@ try {
     'Manual factor approvals must be physically occurrence-scoped');
   const seedPanel = host.querySelector('[data-mc-b313-auto-basis-panel]');
   assert(seedRow.textContent.includes('Seed 120 °C'), 'T1 82 did not show the 120 °C common seed');
-  assert(seedRow.querySelectorAll('[data-b313-auto-field]').length >= 7, 'S/unit/E/W/Y and pressure/dimension basis controls are incomplete');
+  assert(seedRow.querySelectorAll('[data-b313-auto-field]').length >= 6 && seedPanel.querySelector('[data-b313-common-pressure-unit]'),
+    'S/unit/E/W/Y and shared P1 unit / dimension basis controls are incomplete');
   assert(seedRow.querySelectorAll('[data-b313-factor-info-button]').length === 4, 'Factor provenance controls are incomplete');
   assert(!seedRow.querySelector('[data-b313-auto-refresh]').disabled, 'The manual basis save action is disabled');
   assert(seedRow.querySelector('[data-b313-auto-source-reference]'), 'Qualified manual basis source input is missing');
