@@ -147,6 +147,31 @@ try {
     'Selecting screening manufacturing route mutated saved engineering config');
   probe.remove();
 
+  // Regression: physical source has no positive outside-diameter node;
+  // reference only may use the exact-DN B36.19 dimensional master, while
+  // engineering Pull and the physical Preview must remain unchanged.
+  const odless=buildPreviewB313ScreeningReference({
+    row:conditionalRow,config:conditionalConfig,rowIndex:0,previewNodeRows:[],
+  });
+  assert(odless.ok && odless.outsideDiameterReferenceOnly,
+    'Screening must identify exact-DN dimensional-master OD as assumption');
+  assert(odless.outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY',
+    'Source of fallback OD is missing from audit receipt');
+  assert(odless.conditionalScenario?.calculationOk,
+    'Screening wall could not be calculated from exact-DN master OD');
+  assert(odless.eligibleForPull===false, 'Master OD should never authorize Pull');
+  const fallbackAudit=renderPreviewB313WallAuditHtml({
+    summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
+    rows:[{branchName:conditionalRow.branchName,lineKey:'P4110001',
+      status:'NOT_UPDATED',code:'REFERENCE_ONLY',screeningReference:odless}],
+  });
+  assert(fallbackAudit.includes('source XML OD unavailable'),
+    'Audit does not disclose the assumed screening dimensional OD');
+  assert(fallbackAudit.includes('5.2448 mm'),
+    'Master OD fallback did not render conditional calculated wall');
+  assert(JSON.stringify(conditionalConfig)===conditionalBefore,
+    'Master OD calculation changed persisted engineering basis');
+
   const rows = host.__xmlCiiPreviewResult.branchRows;
   const a106 = rows.find((row) => String(row.material || '').includes('A106'));
   assert(a106, 'The 41-branch Preview did not resolve A106 material');
@@ -250,6 +275,7 @@ try {
 
   done({ ok: true, conditionalSeamlessDefaultVerified: true,
     conditionalE: 1, conditionalAlternativeRouteSwitchVerified: true,
+    conditionalMasterOdReferenceVerified: true,
     syntheticPullAccepted: true, sameOdNodesUpdated: pipeLedger.length,
     zeroOdNodesProtected: branchLedger.length - pipeLedger.length,
     nativeParityFields: nativeInput.appliedFields, nativeWallNodesVerified: pipeLedger.length,
