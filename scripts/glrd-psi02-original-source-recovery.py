@@ -87,7 +87,7 @@ def workbook_sheet_rows(path, sheet_name="Linelist"):
                          "text": by_row[n][col]["value"]}
                         for n in sorted(by_row) if n < 9 and col in by_row[n]
                     ]
-                    for col in ("C", "K", "Y", "V")
+                    for col in ("C", "K", "V", "W", "X", "Y", "Z")
                 }}
 
 
@@ -119,6 +119,12 @@ def candidate_for_line(key, row_cells):
             "Y9ProfileTemperatureCandidateCell": "Y" + str(number),
             "Y9ProfileTemperatureCandidate": cells.get("Y", {}).get("value", ""),
             "V9ProfileClassCandidate": cells.get("V", {}).get("value", ""),
+            "WDesignCandidateCell": "W" + str(number),
+            "WDesignCandidateValue": cells.get("W", {}).get("value", ""),
+            "XDesignCandidateCell": "X" + str(number),
+            "XDesignCandidateValue": cells.get("X", {}).get("value", ""),
+            "ZDesignCandidateCell": "Z" + str(number),
+            "ZDesignCandidateValue": cells.get("Z", {}).get("value", ""),
             "authority": "HISTORICAL_BM2_UNQUALIFIED_CANDIDATE_ONLY"
         })
     # Exact source line keys outrank unique numeric aliases. Ambiguous
@@ -239,7 +245,11 @@ def audit(manifest_path, matrix_path, source_dir, master_path, rules_path, outpu
         for item in items:
             writer.writerow({key: item[key] for key in columns})
     print(json.dumps(summary, indent=2))
-    print("Source header coordinate witness:", json.dumps(wb["headerByColumn"], ensure_ascii=False)[:3000])
+    print("Source header coordinate witness:", json.dumps(wb["headerByColumn"], ensure_ascii=False)[:8000])
+    for key in summary["historicalCandidateUniqueLineKeys"]:
+        candidate=next(r["historicalCandidateDetails"][0]
+          for r in items if r["lineKey"]==key and len(r["historicalCandidateDetails"])==1)
+        print("CANDIDATE SOURCE CELLS", key, json.dumps(candidate, ensure_ascii=False))
     return summary
 
 
