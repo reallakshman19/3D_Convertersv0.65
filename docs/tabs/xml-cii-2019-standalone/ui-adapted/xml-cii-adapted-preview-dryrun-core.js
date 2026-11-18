@@ -79,24 +79,49 @@ export function _lineListRowKey(row, config) {
   return _rowText(row, ['lineKey', 'LineNo', 'Line No', 'Line Number', 'PipelineReference']);
 }
 
-export function _xmlCiiFindLineListRow(branchLineKey, config) {
-  const rows = Array.isArray(config.linelist?.masterRows) ? config.linelist.masterRows : [];
+/**
+ * Unambiguous source-line classifier for the SAME exact/unique-alias lookup
+ * used to populate 4 Preview. Diagnostic only: fuzzy or nearest-similar
+ * line keys must never become design P1/T1 evidence.
+ */
+export function _xmlCiiDiagnoseLineListMatch(branchLineKey, config = {}) {
+  const rows = Array.isArray(config?.linelist?.masterRows) ? config.linelist.masterRows : [];
   const lookupKey = _xmlCiiNormalizeLineKey(branchLineKey);
   const lookupAliases = new Set(_xmlCiiLineKeyAliases(branchLineKey));
-  const columnRegex = config.linelist?.linelistColumnRegex || '';
-  const columnGroup = config.linelist?.linelistColumnGroup || 1;
-  const aliasMatches = [], exactMatches = [];
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index];
-    const rawKey = _lineListRowKey(row, config);
-    const cleanKey = _xmlCiiNormalizeLineKey(_xmlCiiLineKeyRegexValue(rawKey, columnRegex, columnGroup));
-    if (cleanKey && cleanKey === lookupKey) exactMatches.push({ row, index });
-    if (_xmlCiiLineKeyAliases(cleanKey).some((key) => lookupAliases.has(key))) aliasMatches.push({ row, index });
+  const columnRegex = config?.linelist?.linelistColumnRegex || '';
+  const columnGroup = config?.linelist?.linelistColumnGroup || 1;
+  const exactMatches = [], aliasMatches = [];
+  if (!lookupKey) return { code:'LINE_KEY_REQUIRED',matchIndex:null,
+    matchMethod:'none',exactCount:0,aliasCount:0,loadedRows:rows.length };
+  for (let index=0;index<rows.length;index++) {
+    const rawKey = _lineListRowKey(rows[index],config);
+    const cleanKey = _xmlCiiNormalizeLineKey(
+      _xmlCiiLineKeyRegexValue(rawKey,columnRegex,columnGroup));
+    if (!cleanKey) continue;
+    if (cleanKey===lookupKey) exactMatches.push(index);
+    if (_xmlCiiLineKeyAliases(cleanKey).some(key=>lookupAliases.has(key)))
+      aliasMatches.push(index);
   }
-  if (exactMatches.length === 1) return exactMatches[0];
-  if (exactMatches.length > 1) return null;
-  if (aliasMatches.length === 1) return aliasMatches[0];
-  return null;
+  const common={
+    lineKey:lookupKey,loadedRows:rows.length,exactCount:exactMatches.length,
+    aliasCount:aliasMatches.length,
+  };
+  if (exactMatches.length===1) return {...common,code:'EXACT_UNIQUE',
+    matchMethod:'exact',matchIndex:exactMatches[0]};
+  if (exactMatches.length>1) return {...common,code:'DUPLICATE_EXACT',
+    matchMethod:'none',matchIndex:null};
+  if (aliasMatches.length===1) return {...common,code:'ALIAS_UNIQUE',
+    matchMethod:'unique-alias',matchIndex:aliasMatches[0]};
+  if (aliasMatches.length>1) return {...common,code:'DUPLICATE_ALIAS',
+    matchMethod:'none',matchIndex:null};
+  return {...common,code:'NO_MATCH',matchMethod:'none',matchIndex:null};
+}
+
+export function _xmlCiiFindLineListRow(branchLineKey, config) {
+  const diagnostic=_xmlCiiDiagnoseLineListMatch(branchLineKey,config);
+  if (diagnostic.matchIndex === null) return null;
+  return {row:config.linelist.masterRows[diagnostic.matchIndex],
+    index:diagnostic.matchIndex};
 }
 
 // --- Similar Linekey (fuzzy) fallback ---------------------------------------
