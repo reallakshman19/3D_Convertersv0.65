@@ -9,7 +9,7 @@ test('class transaction rebuild is worker/basis fenced and must propagate failur
   const s=await code();
   const classCallback=s.match(/rebuildPreview:\s*async\s*\(\{\s*hydrationResult,[\s\S]*?\n\s*\},\n\s*\}\)\.catch/);
   assert.ok(classCallback,'atomic class transaction callback absent');
-  assert.match(classCallback[0],/await xmlCiiRebuildPreviewThroughWorker\(rootEl, xmlText, config, options\)/);
+  assert.match(classCallback[0],/await xmlCiiRebuildPreviewThroughWorker\(rootEl,\s*xmlText,\s*config,\s*options\)/);
   assert.doesNotMatch(classCallback[0],/await xmlCiiBuildAndRenderPreview\(/);
   assert.match(s,/export async function xmlCiiRebuildPreviewThroughWorker/);
   assert.match(s,/if \(!rendered\)\s*\{\s*throw Object.assign/);
