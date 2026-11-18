@@ -77,7 +77,7 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
     const parse=(value)=>{
       const s=text(value).replace(/,/g,'');
       if (!s) return null;
-      const match=s.match(/[-+]?\\d*\\.?\\d+(?:[Ee][-+]?\\d+)?/);
+      const match=s.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/);
       return match&&Number.isFinite(Number(match[0]))?Number(match[0]):null;
     };
     const aa=parse(a),bb=parse(b);
