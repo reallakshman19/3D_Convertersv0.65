@@ -519,7 +519,8 @@ export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, pre
   // document's declared unit never supplies a design-pressure unit here.
   // sourceXml is kept as a deprecated positional argument solely for
   // compatibility with existing third-party callers.
-  return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
+  return { unit: '', source: previewOnly
+    ? 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' : 'unresolved' };
 }
 
 export function inferPreviewDimensionStandard(row, basis = {}, materialIdentity = null) {
