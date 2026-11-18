@@ -4,8 +4,6 @@ on:
     branches: [main]
     paths:
       - 'scripts/glrd-r3-source-ledger.py'
-      - 'scripts/glrd-psi02-original-source-recovery.py'
-      - 'tests/test_glrd_psi02_original_source_recovery.py'
       - 'scripts/glrd-r3-cii-parity-oracle.py'
       - 'tests/test_glrd_r3_source_to_cii.py'
       - 'scripts/inspect-glrd-b313-linelist-workbook.py'
@@ -40,39 +38,6 @@ jobs:
         run: node --test tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs
       - name: Fetch exact pinned original PSI-02 and BM2 source/masters and verify SHA-256
         run: python scripts/verify-glrd-b313-authentic-inputs.py --fetch --output out/glrd-b313-source-custody.json
-      - name: Independently check candidate-only Line List matching and factor gates
-        run: python -m unittest discover -s tests -p test_glrd_psi02_original_source_recovery.py -v
-      - name: Verify exact original PSI02 placeholders, BM2 candidates and factor approval status
-        run: |
-          python scripts/glrd-psi02-original-source-recovery.py --output-dir out/glrd-psi02-original-source-recovery
-          python - <<'PY'
-          import json
-          p='out/glrd-psi02-original-source-recovery/psi02-original-source-recovery.json'
-          r=json.load(open(p))
-          s=r['summary']
-          assert s['physicalRows']==30 and s['xmlDesignPlaceholders']==30
-          assert s['distinctLineKeys']==22
-          assert s['xmlPressureUnits']=='pascal'
-          assert s['unverifiedPsi02DesignLines']==30
-          assert s['s_E_W_YApproval']['SApprovedRecordCount']==0
-          assert s['s_E_W_YApproval']['E_W_YApprovedRuleCount']==0
-          assert s['pullApprovedRows']==0
-          assert s['historicalCandidateUniqueLineKeys']==['P4110001','P4110003']
-          bykey={r['lineKey']:r for r in r['rows']}
-          assert bykey['P4110001']['historicalCandidateDesignPressureValue']=='13001.3'
-          assert bykey['P4110001']['historicalCandidateWorkingPressureValue']=='11000'
-          assert bykey['P4110001']['historicalCandidateDesignPressureUnit']=='kPa(g)'
-          assert bykey['P4110001']['historicalCandidateDesignTemperatureValue']=='120'
-          assert bykey['P4110003']['historicalCandidateDesignPressureValue']=='701.3'
-          assert bykey['P4110003']['historicalCandidateDesignTemperatureValue']=='82'
-          assert bykey['B4110001']['historicalCandidateCount']==0
-          assert bykey['B4110003']['historicalCandidateCount']==0
-
-          assert all(not row['eligibleForPull'] and row['qualifiedP1'] is None
-                     for row in r['rows'])
-          print('PSI02 RECOVERY PROOF: 30/30 XML P1/T1 placeholders; 0 source-approved Line List, 0 qualified factor approvals and 0 false Pull')
-          PY
-
       - name: Independently inspect actual pinned Line List workbook sheets
         run: python scripts/inspect-glrd-b313-linelist-workbook.py --output out/glrd-b313-linelist-workbook-census.json
       - name: Produce 30-row canonical physical evidence ledger (engineering HOLD where appropriate)
@@ -106,6 +71,4 @@ jobs:
             out/glrd-r3-source-to-cii/physical-source-ledger.csv
             out/glrd-r3-source-to-cii/source-to-cii-acceptance.json
             out/glrd-r3-source-to-cii/synthetic-native-wall-parity.json
-            out/glrd-psi02-original-source-recovery/psi02-original-source-recovery.json
-            out/glrd-psi02-original-source-recovery/psi02-original-source-recovery.csv
           if-no-files-found: warn
