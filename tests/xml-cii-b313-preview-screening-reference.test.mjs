@@ -100,7 +100,13 @@ test('saved physical P1 unit absent yields factor reference but NO wall arithmet
 test('missing route shows all master E choices as independent what-if cases',()=>{
  const ref=buildPreviewB313ScreeningReference({
    row:row(),config:config(),previewNodeRows:nodes,rowIndex:0});
- assert.equal(ref.E,null);
+ assert.equal(ref.E,null,'physical manufacturing route remains unverified');
+ assert.equal(ref.conditionalManufacturing,'SEAMLESS');
+ assert.equal(ref.conditionalE,1);
+ assert.equal(ref.conditionalRouteSource,'DEFAULT_SEAMLESS_SCREENING_ONLY');
+ assert.equal(ref.conditionalRouteAssumed,true);
+ assert.equal(ref.conditionalScenario?.manufacturingRoute,'SEAMLESS');
+ assert.equal(ref.conditionalScenario?.E,1);
  assert(ref.scenarios.length>1);
  assert(ref.scenarios.every(s=>s.routeAssumed===true));
  const different=new Set(ref.scenarios.map(s=>s.requiredNominalThicknessMm));
@@ -120,6 +126,12 @@ test('actual audit shows source-derived screening factors and never grants Pull'
  assert.equal(cfg.overrides.wallThickness.P4110001,wallBefore);
  const html=renderPreviewB313WallAuditHtml(report);
  assert.match(html,/SCREENING MASTER LOOKUP — NOT PULL ELIGIBLE/);
+ assert.match(html,/Conditional manufacturing/);
+ assert.match(html,/data-b313-conditional-manufacturing/);
+ assert.match(html,/<option value="SEAMLESS" data-b313-e="1" selected>/);
+ assert.match(html,/data-b313-conditional-e-value>1<\/strong>/);
+ assert.match(html,/data-b313-screening-scenario="SEAMLESS"/);
+ assert.match(html,/Default Seamless: screening assumption, NOT verified pipe manufacture/);
  assert.match(html,/203\.395 MPa/);
  assert.match(html,/LINEAR_INTERPOLATION|EXACT/);
  assert.match(html,/5\.2448 mm/);
