@@ -187,10 +187,19 @@ function screeningFactorHtml(reference) {
 function screeningWallHtml(reference) {
   if (!reference?.ok) return '';
   const scenarios=Array.isArray(reference.scenarios)?reference.scenarios:[];
-  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;"><strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}</div>`;
+  const odProvenance=reference.outsideDiameterReferenceOnly
+    ? `<div data-b313-screening-od-source style="font-size:10px;font-weight:700;color:#92400e;">OD ${fixed(reference.outsideDiameterMm,3)} mm from exact-DN dimensional master (screening assumption; source XML OD unavailable)</div>`
+    :reference.outsideDiameterSourceMatched
+      ? `<div data-b313-screening-od-source style="font-size:10px;">OD ${fixed(reference.outsideDiameterMm,3)} mm from actual Preview node ledger</div>`
+      :'';
+  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;"><strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}
+    ${odProvenance}
+    ${(reference.holdReasons||[]).includes('P1 pressure unit unresolved')?'<div>Select the actual documented P unit in the existing B31.3 basis; no unit is inferred from P1 magnitude.</div>':''}
+  </div>`;
   return `<div data-b313-screening-wall style="margin-top:7px;padding:6px;border:1px solid #f59e0b;border-radius:5px;background:#fffbeb;color:#7c2d12;">
     <strong>CONDITIONAL REFERENCE ONLY — not design approved</strong>
     <div>P1 ${compact(reference.pressure)} ${esc(reference.pressureUnit)} · OD ${fixed(reference.outsideDiameterMm,3)} mm · CA ${compact(reference.corrosionAllowanceMm)} mm</div>
+    ${odProvenance}
     ${scenarios.map(s=>`<div data-b313-screening-scenario="${esc(s.manufacturingRoute)}" style="border-top:1px solid #fde68a;padding-top:4px;margin-top:4px;${s.manufacturingRoute===reference.conditionalManufacturing?'':'display:none;'}">
       Conditional manufacturing: ${esc(s.manufacturingRoute==='SEAMLESS'?'Seamless':s.manufacturingRoute.replaceAll('_',' '))}${s.routeAssumed?' (what-if; not verified)':''} · E = ${compact(s.E)}:
       ${s.calculationOk
