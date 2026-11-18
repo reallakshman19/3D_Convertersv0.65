@@ -116,15 +116,18 @@ function authorityLabel(mode) {
  */
 function calculatedWallAuditCell(row) {
   const r=row?.calculatedWallDisplay;
-  const hasValue=r?.ok===true;
-  const note=hasValue?(r.hypotheticalKpa
-    ?'HYPOTHETICAL: if P1 is kPa(g); source unit unresolved · NO Pull'
-    :r.pressureUnitAssumed?'what-if · selected common fallback '+text(r.pressureUnit)
-    :'P unit '+text(r.pressureUnit)):(text(r?.reason)||'Input incomplete');
+  const hypothetical=r?.ok!==true&&r?.hypotheticalScenario?.ok===true;
+  const shown=hypothetical?r.hypotheticalScenario:r;
+  const hasValue=shown?.ok===true;
+  const note=hypothetical
+    ?'HYPOTHETICAL kPa(g) ONLY; source unit unresolved; governing result INPUT REQUIRED; NO Pull'
+    :hasValue?(shown.pressureUnitAssumed
+      ?'what-if · common fallback '+text(shown.pressureUnit)
+      :'P unit '+text(shown.pressureUnit)):(text(r?.reason)||'Input incomplete');
   return `<td data-b313-calculated-audit style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;min-width:145px;">
-    <strong data-b313-calculated-audit-value style="color:#0f172a;font-size:13px;">${hasValue?fixed(r.requiredNominalThicknessMm,3):'—'}</strong>
+    <strong data-b313-calculated-audit-value style="color:#0f172a;font-size:13px;">${hasValue?fixed(shown.requiredNominalThicknessMm,3):'—'}</strong>
     <div style="color:#64748b;font-size:10px;">${esc(note)}</div>
-    ${hasValue?`<div style="color:#64748b;font-size:10px;">t ${fixed(r.pressureDesignThicknessMm,3)} mm · E ${compact(r.factors.E)}</div>`:''}
+    ${hasValue?`<div style="color:#64748b;font-size:10px;">t ${fixed(shown.pressureDesignThicknessMm,3)} mm · E ${compact(shown.factors.E)}</div>`:''}
   </td>`;
 }
 
@@ -453,18 +456,35 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
     const detail=cell.querySelector?.('[data-mc-b313-calculated-detail]');
     const result=rows[i]?.calculatedWallDisplay;
     if(!result?.ok){
-      if(value)value.textContent='—';
-      if(detail)detail.textContent=result?.reason||'Input incomplete';
-      cell.title=result?.reason||'Calculate B31.3 to see result';
-      cell.dataset.mcB313CalculatedStatus='INPUT_REQUIRED';
+      const hypothetical=result?.hypotheticalScenario?.ok===true
+        ?result.hypotheticalScenario:null;
+      if(hypothetical){
+        if(value)value.textContent=Number(hypothetical.requiredNominalThicknessMm).toFixed(3);
+        if(detail)detail.textContent='HYPOTHETICAL kPa(g) ONLY · source P1 unit UNKNOWN · governing wall HELD';
+        cell.title=[
+          'HYPOTHETICAL, NOT ENGINEERING DESIGN / NO Pull',
+          'Assume P1 '+hypothetical.pressure+' kPa(g) with UNVERIFIED unit',
+          'Required nominal '+Number(hypothetical.requiredNominalThicknessMm).toFixed(4)+' mm',
+          'Pressure-design t '+Number(hypothetical.pressureDesignThicknessMm).toFixed(4)+' mm',
+          'S '+hypothetical.factors.S_MPa+' MPa · E '+hypothetical.factors.E+
+          ' · W '+hypothetical.factors.W+' · Y '+hypothetical.factors.Y,
+          'OD '+hypothetical.outsideDiameterMm+' mm · '+hypothetical.outsideDiameterSource,
+          'Source P1 unit still unresolved; no basis, Pull, Wall Thk or CII changes',
+        ].join('\n');
+        cell.dataset.mcB313CalculatedStatus='HYPOTHETICAL_KPA_UNIT_UNKNOWN';
+      }else{
+        if(value)value.textContent='—';
+        if(detail)detail.textContent=result?.reason||'Input incomplete';
+        cell.title=result?.reason||'Calculate B31.3 to see result';
+        cell.dataset.mcB313CalculatedStatus='INPUT_REQUIRED';
+      }
       continue;
     }
     calculated++;
     if(result.pressureUnitAssumed)assumedUnits++;
     if(value)value.textContent=Number(result.requiredNominalThicknessMm).toFixed(3);
-    if(detail)detail.textContent=result.hypotheticalKpa
-      ?'HYPOTHETICAL kPa(g) · source unit UNKNOWN · no Pull'
-      :result.pressureUnitAssumed?'Selected common fallback '+result.pressureUnit+' · WHAT-IF only'
+    if(detail)detail.textContent=result.pressureUnitAssumed
+      ?'Common fallback '+result.pressureUnit+' · WHAT-IF only'
       :'P unit '+result.pressureUnit+' · t '+Number(result.pressureDesignThicknessMm).toFixed(3);
     const bracket=Array.isArray(result.interpolationBracket)
       ? result.interpolationBracket.map(x=>x.temperatureC+'°C='+x.Sksi+' ksi').join(' → '):'';
