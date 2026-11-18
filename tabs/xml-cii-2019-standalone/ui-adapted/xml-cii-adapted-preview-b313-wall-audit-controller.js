@@ -7,7 +7,7 @@ import {
   previewB313LedgerCsv,
   installPreviewB313WallUpdateController,
   selectPreviewB313ActionRows,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-source-unit-class-1';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-b313-common-punit-1';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 function text(value) {
