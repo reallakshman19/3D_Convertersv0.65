@@ -121,7 +121,10 @@ def candidate_for_line(key, row_cells):
             "V9ProfileClassCandidate": cells.get("V", {}).get("value", ""),
             "authority": "HISTORICAL_BM2_UNQUALIFIED_CANDIDATE_ONLY"
         })
-    return result
+    # Exact source line keys outrank unique numeric aliases. Ambiguous
+    # duplicate exact source rows remain ambiguous and are never selected.
+    exact = [row for row in result if row["method"] == "EXACT"]
+    return exact if exact else result
 
 
 def factor_census(master, rules):
