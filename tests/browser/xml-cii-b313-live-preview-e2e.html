@@ -78,8 +78,9 @@ try {
     'automatic physical 4 Preview calculated-wall column before clicking Calculate');
   assert(!host.querySelector('[data-mc-b313-report]'),
     'Auto-calculating display column must not execute governed audit/Pull button');
-  assert(host.querySelectorAll('[data-mc-b313-calculated-status="INPUT_REQUIRED"]').length===0,
-    'Only actual calculated cell data attributes are allowed; synthetic statuses must not replace rows');
+  assert([...liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]')]
+    .some(cell=>cell.dataset.mcB313CalculatedStatus==='INPUT_REQUIRED'),
+    'Rows lacking real P1/T1 must retain a visible incomplete-input status');
   const legacy = host.querySelector('[data-mc-b313-basis-editor]');
   assert(!legacy || legacy.hidden || legacy.style.display === 'none', 'Legacy B31.3 editor is visible');
   const panel = host.querySelector('[data-mc-b313-auto-basis-panel]');
