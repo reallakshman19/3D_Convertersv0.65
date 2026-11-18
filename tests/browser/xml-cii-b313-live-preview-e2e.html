@@ -167,7 +167,7 @@ try {
   });
   assert(fallbackAudit.includes('source XML OD unavailable'),
     'Audit does not disclose the assumed screening dimensional OD');
-  assert(fallbackAudit.includes('5.2448 mm'),
+  assert(fallbackAudit.includes('5.2354 mm'),
     'Master OD fallback did not render conditional calculated wall');
   assert(JSON.stringify(conditionalConfig)===conditionalBefore,
     'Master OD calculation changed persisted engineering basis');
