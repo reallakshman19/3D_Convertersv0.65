@@ -264,9 +264,21 @@ W=1, Y=0.4, and route-dependent E. `LTCS-A333-6` at 82°C
 interpolates S=20 ksi between the 80°C and 120°C master records.
 The displayed provenance and interpolation bracket allow direct review.
 
-A route not evidenced in 4 Preview is **never auto-chosen**: its
-E values are shown as separate labeled what-if scenarios, each with
-`routeAssumed=true`. If the P1 pressure unit is unresolved, S/E/W/Y
+For the **conditional screening calculation**, when a physical manufacturing route
+has not been evidenced in 4 Preview the *display default* is now
+**Conditional manufacturing = Seamless; E = 1.0**, read directly from that
+material's existing screening EByRoute entry. This is an explicitly labeled
+assumption, **not** a claim about the physical pipe. A route selector in the
+existing B31.3 audit switches between the other master-supplied E scenarios,
+without changing any source data or approval.
+
+The actual physical route remains unknown until reviewed pipe-product
+evidence establishes it. The screening-default route never sets the strict
+factor basis or a Pull approval. The reference also preserves
+`conditionalRouteSource: 'DEFAULT_SEAMLESS_SCREENING_ONLY'` and
+`conditionalRouteAssumed: true` in its evidence.
+
+ If the P1 pressure unit is unresolved, S/E/W/Y
 can still be displayed but **no numerical pressure wall** is calculated.
 Missing source OD, unsupported temperature, material conflicts and missing
 corrosion likewise remain visible HOLDs.
