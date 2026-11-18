@@ -5,6 +5,7 @@ import {lookupB313ScreeningFactors} from '../converters/b313-material-factors/sc
 import {resolveB313DesignFactors} from '../converters/b313-material-factors/index.js';
 import {
   buildPreviewB313ScreeningReference,buildPreviewB313WallUpdateReport,
+  resolveB313EffectivePreviewPressureUnit,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import {renderPreviewB313WallAuditHtml} from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
 
@@ -86,6 +87,115 @@ test('physical GLRD preview uses master factors, OD, P1 and CA for conditional w
  assert.equal(seamless.classNominalWallMm,7.112);
  assert.equal(seamless.classPass,true);
  assert.equal(JSON.stringify(cfg),before,'reference lookup must not change configuration');
+});
+
+test('no source OD: exact-DN class/dimension master supplies read-only screening OD only',()=>{
+ const cfg=config(), saved=JSON.stringify(cfg);
+ const ref=buildPreviewB313ScreeningReference({
+  row:row(),config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(ref.ok,true,JSON.stringify(ref));
+ assert.equal(ref.outsideDiameterSource,'pipe-wall-master-exact-DN-SCREENING-ONLY');
+ assert.equal(ref.outsideDiameterReferenceOnly,true);
+ assert.equal(ref.outsideDiameterSourceMatched,false);
+ near(ref.outsideDiameterMm,168); // project TSV uses rounded OD(mm)=168
+ assert.equal(ref.conditionalManufacturing,'SEAMLESS');
+ assert.equal(ref.conditionalE,1);
+ const s=ref.conditionalScenario;
+ assert(s&&s.calculationOk,JSON.stringify(ref));
+ near(s.pressureDesignThicknessMm,5.235408926,1e-5);
+ assert.equal(s.classNominalWallMm,7.112);
+ assert.equal(s.classPass,true);
+ assert.equal(ref.eligibleForPull,false);
+ assert.equal(JSON.stringify(cfg),saved,'screening reference must not mutate approval state');
+ const html=renderPreviewB313WallAuditHtml({
+  summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
+  rows:[{branchName:row().branchName,lineKey:'P4110001',
+    status:'NOT_UPDATED',screeningReference:ref,code:'TEST_SCREENING_ONLY'}],
+ });
+ assert.match(html,/exact-DN dimensional master \(screening assumption; 4 Preview node OD unavailable\)/);
+ assert.match(html,/5\.2354 mm/);
+ assert.match(html,/Eligible proposals 0/);
+});
+
+test('4 Preview only: displayed P1/T1/material and selected basis determine B31.3; XML text cannot override',()=>{
+ const preview=row(); // effective visible 4 Preview branch
+ const base=()=>({rows:[preview],config:config()});
+ const left=buildPreviewB313WallUpdateReport({...base(),
+   xmlText:'<Pipe><Pressure1>0</Pressure1><Temperature1>-100000</Temperature1><PressureUnits>pascal</PressureUnits></Pipe>'});
+ const right=buildPreviewB313WallUpdateReport({...base(),
+   xmlText:'<Pipe><Pressure1>99999999</Pressure1><Temperature1>700</Temperature1><PressureUnits>bar</PressureUnits></Pipe>'});
+ assert.equal(left.summary.inputRows,1);
+ assert.equal(right.summary.inputRows,1);
+ assert.equal(left.calculationInputAuthority,'EFFECTIVE_4_PREVIEW_ONLY');
+ assert.equal(right.rawXmlDesignInputsConsumed,false);
+ assert.match(renderPreviewB313WallAuditHtml(left),/Calculation inputs: effective 4 Preview rows only/);
+ assert.equal(left.rows[0].code,right.rows[0].code);
+ const a=left.rows[0].screeningReference,b=right.rows[0].screeningReference;
+ assert.equal(a.pressure,13001);
+ assert.equal(a.pressureUnit,'KPA');
+ assert.equal(a.temperatureC,120);
+ assert.equal(a.conditionalManufacturing,'SEAMLESS');
+ assert.equal(a.conditionalE,1);
+ assert.equal(a.outsideDiameterSource,'pipe-wall-master-exact-DN-SCREENING-ONLY');
+ assert.equal(a.conditionalScenario.calculationOk,true);
+ near(a.conditionalScenario.pressureDesignThicknessMm,5.235408926);
+ assert.deepEqual(b,a,'Changing XML pressure, temperature and units must not affect 4 Preview wall calculation');
+ assert.equal(left.summary.updatedRows,0);
+ assert.equal(right.summary.updatedRows,0);
+});
+
+test('4 Preview pressure-unit authority excludes raw Line List relookup at calculation time',()=>{
+ const blank={...row(),p1Unit:'',p1UnitSource:''};
+ const cfg=config();
+ cfg.linelist={masterRows:[
+   {'Line number':'P4110001','Pressure Max kPa(g)':13001}],
+   fieldMap:{}};
+ const unresolved=buildPreviewB313ScreeningReference({
+   row:blank,config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(unresolved.pressureUnit,null,'display reference uses null for unresolved 4 Preview pressure unit');
+ assert(unresolved.holdReasons.includes('P1 pressure unit unresolved'));
+ assert.equal(unresolved.scenarios.length,0,'Unresolved Preview P1 unit must block numerical wall');
+ assert.equal(resolveB313EffectivePreviewPressureUnit(blank,{}).unit,'');
+ const explicit=resolveB313EffectivePreviewPressureUnit(blank,{pressureUnit:'KPA'});
+ assert.equal(explicit.unit,'KPA');
+ assert.equal(explicit.source,'4-preview-b313-basis');
+ const chosen=buildPreviewB313ScreeningReference({
+   row:{...blank,p1Unit:'KPA',p1UnitSource:'reviewed-preview-cell'},
+   config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(chosen.pressureUnit,'KPA');
+ assert.equal(chosen.conditionalScenario.calculationOk,true);
+ const conflict=resolveB313EffectivePreviewPressureUnit({
+   ...blank,p1Unit:'KPA'}, {pressureUnit:'BARG'});
+ assert.equal(conflict.unit,'');
+ assert.equal(conflict.source,'P1_UNIT_AUTHORITIES_CONFLICT');
+});
+
+test('missing P1 unit with class master OD: show verified factor and OD, but no calculation',()=>{
+ const cfg=config(), r={...row(),p1Unit:''};
+ const ref=buildPreviewB313ScreeningReference({
+  row:r,config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(ref.ok,true);
+ assert.equal(ref.outsideDiameterReferenceOnly,true);
+ assert(ref.holdReasons.includes('P1 pressure unit unresolved'));
+ assert.equal(ref.scenarios.length,0);
+ const html=renderPreviewB313WallAuditHtml({
+  summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
+  rows:[{branchName:r.branchName,lineKey:r.lineKey,status:'NOT_UPDATED',code:'TEST',
+    screeningReference:ref}],
+ });
+ assert.match(html,/Select the actual documented P unit/);
+ assert.match(html,/exact-DN dimensional master/);
+ assert.doesNotMatch(html,/data-b313-screening-scenario=/);
+});
+
+test('no physical OD and no exact-DN class identity must not invent screening geometry',()=>{
+ const r={...row(),pipingClassPipeDnMm:200};
+ const ref=buildPreviewB313ScreeningReference({
+  row:r,config:config(),previewNodeRows:[],rowIndex:0});
+ assert.equal(ref.outsideDiameterMm,null);
+ assert.equal(ref.outsideDiameterReferenceOnly,false);
+ assert.equal(ref.scenarios.length,0);
+ assert(ref.holdReasons.some(msg=>/Neither a unique source-node OD/.test(msg)));
 });
 
 test('saved physical P1 unit absent yields factor reference but NO wall arithmetic',()=>{

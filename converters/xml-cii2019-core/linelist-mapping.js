@@ -178,7 +178,7 @@ export const DETECTION_ORDER = [
 export const LINE_LIST_PROCESS_VALUE_ALIASES = Object.freeze({
   p1: Object.freeze(['p1', 'P1', 'Pressure1', 'Design Pressure', 'Design Pres', 'DesignPressure', 'Pressure Design', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure', 'P1 / Design Pres', 'P1 Design Pressure', 'P1 Design Pres']),
   hydroPressure: Object.freeze(['hydroPressure', 'HydroPressure', 'hydro_pressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Hydro Pr', 'Hyd Test Pr', 'Hyd. Test Pressure', 'Test Pressure', 'TEST_PRESSURE', 'HYDRO_TEST_PRESSURE', 'Pressure Test', 'Proof Pressure', 'Hydro/Test Pressure', 'Pressure2']),
-  t1: Object.freeze(['t1', 'T1', 'Temperature1', 'Design Temp', 'Design Temperature', 'Temp Max C', 'Temp Max', 'T1 (C)', 'T1 C']),
+  t1: Object.freeze(['t1', 'T1', 'Temperature1', 'Design Temp', 'Design Temperature', 'Temp Max C', 'Temp Max', 'T1 (C)', 'T1 C', 'Temp. Max °C', 'Temp. Max ºC', 'Temp Max °C', 'Temp Max ºC', 'T1 (°C)', 'T1 (ºC)', 'Design Temperature °C']),
   t2: Object.freeze(['t2', 'T2', 'Temperature2', 'Temperature 2', 'Operating Temp', 'Operating Temperature', 'Temp. C', 'Temp C', 'T2 (C)', 'T2 C']),
   t3: Object.freeze(['t3', 'T3', 'Temperature3', 'Temperature 3', 'Temp Min C', 'Temp Min', 'Minimum Temp', 'Min Temp', 'T3 (C)', 'T3 C']),
   density: Object.freeze(['density', 'Density', 'DENSITY', 'FluidDensity', 'Fluid Density', 'Density kg/m3', 'kg/m3']),

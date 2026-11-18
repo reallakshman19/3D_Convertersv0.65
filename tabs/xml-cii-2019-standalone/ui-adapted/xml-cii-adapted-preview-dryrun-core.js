@@ -63,7 +63,10 @@ export function _xmlCiiNormalizeLineKey(value) { return _toText(value).trim().to
 function _xmlCiiLineKeyAliases(value) {
   const compact = _xmlCiiNormalizeLineKey(value);
   if (!compact) return [];
-  const withoutServicePrefix = compact.replace(/^[A-Z](?=\d{5,}$)/, '');
+  // Match native BM2 semantics: only a P-prefixed pipe line may consume
+  // an otherwise unique bare numeric line sequence. B/X family keys must
+  // never borrow that pipe pressure/temperature record.
+  const withoutServicePrefix = compact.replace(/^P(?=\d{5,}$)/, '');
   return _uniqueKeys([compact, withoutServicePrefix]);
 }
 
@@ -79,24 +82,49 @@ export function _lineListRowKey(row, config) {
   return _rowText(row, ['lineKey', 'LineNo', 'Line No', 'Line Number', 'PipelineReference']);
 }
 
-export function _xmlCiiFindLineListRow(branchLineKey, config) {
-  const rows = Array.isArray(config.linelist?.masterRows) ? config.linelist.masterRows : [];
+/**
+ * Unambiguous source-line classifier for the SAME exact/unique-alias lookup
+ * used to populate 4 Preview. Diagnostic only: fuzzy or nearest-similar
+ * line keys must never become design P1/T1 evidence.
+ */
+export function _xmlCiiDiagnoseLineListMatch(branchLineKey, config = {}) {
+  const rows = Array.isArray(config?.linelist?.masterRows) ? config.linelist.masterRows : [];
   const lookupKey = _xmlCiiNormalizeLineKey(branchLineKey);
   const lookupAliases = new Set(_xmlCiiLineKeyAliases(branchLineKey));
-  const columnRegex = config.linelist?.linelistColumnRegex || '';
-  const columnGroup = config.linelist?.linelistColumnGroup || 1;
-  const aliasMatches = [], exactMatches = [];
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index];
-    const rawKey = _lineListRowKey(row, config);
-    const cleanKey = _xmlCiiNormalizeLineKey(_xmlCiiLineKeyRegexValue(rawKey, columnRegex, columnGroup));
-    if (cleanKey && cleanKey === lookupKey) exactMatches.push({ row, index });
-    if (_xmlCiiLineKeyAliases(cleanKey).some((key) => lookupAliases.has(key))) aliasMatches.push({ row, index });
+  const columnRegex = config?.linelist?.linelistColumnRegex || '';
+  const columnGroup = config?.linelist?.linelistColumnGroup || 1;
+  const exactMatches = [], aliasMatches = [];
+  if (!lookupKey) return { code:'LINE_KEY_REQUIRED',matchIndex:null,
+    matchMethod:'none',exactCount:0,aliasCount:0,loadedRows:rows.length };
+  for (let index=0;index<rows.length;index++) {
+    const rawKey = _lineListRowKey(rows[index],config);
+    const cleanKey = _xmlCiiNormalizeLineKey(
+      _xmlCiiLineKeyRegexValue(rawKey,columnRegex,columnGroup));
+    if (!cleanKey) continue;
+    if (cleanKey===lookupKey) exactMatches.push(index);
+    if (_xmlCiiLineKeyAliases(cleanKey).some(key=>lookupAliases.has(key)))
+      aliasMatches.push(index);
   }
-  if (exactMatches.length === 1) return exactMatches[0];
-  if (exactMatches.length > 1) return null;
-  if (aliasMatches.length === 1) return aliasMatches[0];
-  return null;
+  const common={
+    lineKey:lookupKey,loadedRows:rows.length,exactCount:exactMatches.length,
+    aliasCount:aliasMatches.length,
+  };
+  if (exactMatches.length===1) return {...common,code:'EXACT_UNIQUE',
+    matchMethod:'exact',matchIndex:exactMatches[0]};
+  if (exactMatches.length>1) return {...common,code:'DUPLICATE_EXACT',
+    matchMethod:'none',matchIndex:null};
+  if (aliasMatches.length===1) return {...common,code:'ALIAS_UNIQUE',
+    matchMethod:'unique-alias',matchIndex:aliasMatches[0]};
+  if (aliasMatches.length>1) return {...common,code:'DUPLICATE_ALIAS',
+    matchMethod:'none',matchIndex:null};
+  return {...common,code:'NO_MATCH',matchMethod:'none',matchIndex:null};
+}
+
+export function _xmlCiiFindLineListRow(branchLineKey, config) {
+  const diagnostic=_xmlCiiDiagnoseLineListMatch(branchLineKey,config);
+  if (diagnostic.matchIndex === null) return null;
+  return {row:config.linelist.masterRows[diagnostic.matchIndex],
+    index:diagnostic.matchIndex};
 }
 
 // --- Similar Linekey (fuzzy) fallback ---------------------------------------
@@ -476,6 +504,18 @@ function previewP1Unit(lineRow, p1) {
   const p = numbers(p1);
   if (p === null) return { unit: '', source: 'unresolved' };
   const found = [];
+  // Source XLSX multi-row W5/W6/W8 design-pressure header, independently
+  // tied to this selected normalized line cell in the import worker.
+  // Any rounded/edited or override P1 must NOT inherit its old unit.
+  const original=numbers(lineRow?._sourceP1OriginalValue);
+  const mapped=numbers(lineRow?.p1);
+  const bandUnit=String(lineRow?._sourceP1Unit||'').toUpperCase();
+  const bandSource=String(lineRow?._sourceP1HeaderSource||'');
+  if (bandSource.startsWith('line-list-header-band:') && bandUnit
+      && original!==null && mapped!==null
+      && Math.abs(original-p)<=Math.max(1,Math.abs(p))*1e-9
+      && Math.abs(mapped-p)<=Math.max(1,Math.abs(p))*1e-9)
+    found.push({unit:bandUnit,source:bandSource});
   for (const row of [lineRow?._raw, lineRow]) {
     for (const [header, value] of Object.entries(row || {})) {
       const h = String(header).toUpperCase();
@@ -496,8 +536,15 @@ function previewP1Unit(lineRow, p1) {
   return distinct.length === 1 ? found[0] : { unit: '', source: distinct.length ? 'conflicting-line-list-units' : 'unresolved' };
 }
 
-    const p1 = _xmlCiiProcessValue(pdOverride, lineListMatch, 'p1', ['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'], config);
-    const p1UnitBasis = previewP1Unit(lineListMatch, p1);
+    const p1Keys=['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'];
+    const p1 = _xmlCiiProcessValue(pdOverride, lineListMatch, 'p1', p1Keys, config);
+    const p1SourceFinal = _xmlCiiProcessSource(pdOverride, lineListMatch, 'p1', p1Keys, config);
+    // Override/default P1 is not the original source-cell value, even if
+    // numerically equal. It must have its own controlled unit authority.
+    const p1UnitBasis = p1SourceFinal === 'linelist'
+      ? previewP1Unit(lineListMatch, p1)
+      : {unit:'',source:p1SourceFinal==='override'
+        ?'OVERRIDE_P1_UNIT_REQUIRED':'P1_NOT_FROM_LINE_LIST'};
     const hydroPressure = _xmlCiiProcessValue(pdOverride, lineListMatch, 'hydroPressure', ['hydroPressure', 'hydro_pressure', 'HydroPressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Test Pressure', 'Pressure2', 'Hydro/Test Pressure'], config);
     const _hydroPressureSrcRaw = _xmlCiiProcessSource(pdOverride, lineListMatch, 'hydroPressure', ['hydroPressure', 'hydro_pressure', 'HydroPressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Test Pressure', 'Pressure2', 'Hydro/Test Pressure'], config);
     const hydroPressureFinal = hydroPressure || '0';
@@ -620,7 +667,7 @@ function previewP1Unit(lineRow, p1) {
       t2RangeOrig,
       t3RangeOrig,
       density,
-      p1Source: _xmlCiiProcessSource(pdOverride, lineListMatch, 'p1', ['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'], config),
+      p1Source: p1SourceFinal,
       hydroPressureSource: hydroPressureSourceFinal,
       t1Source: _xmlCiiProcessSource(pdOverride, lineListMatch, 't1', ['t1', 'T1', 'Temperature1', 'Design Temp', 'Design Temperature', 'Temp Max ºC', 'Temp Max °C', 'Temp Max', 'T1 (ºC)'], config),
       t2Source: _xmlCiiProcessSource(pdOverride, lineListMatch, 't2', ['t2', 'T2', 'Temperature2', 'Temp. ºC', 'Temp. °C', 'Operating Temp', 'Operating Temperature', 'T2 (ºC)'], config),

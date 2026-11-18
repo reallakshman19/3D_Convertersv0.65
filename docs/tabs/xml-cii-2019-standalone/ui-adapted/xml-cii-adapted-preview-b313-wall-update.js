@@ -6,9 +6,10 @@ import {
 } from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20261116-b313-pull-v065';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { listPipeWallsForSize } from '../../../converters/pipe-wall-master/index.js';
+import { normalizeLineListRow } from '../../../converters/xml-cii2019-core/linelist-mapping.js';
 import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import { markAdaptedPreviewOverrideManual } from './xml-cii-adapted-preview-filldown.js';
-import { _xmlCiiFindLineListRow } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
+import { _xmlCiiFindLineListRow, _xmlCiiDiagnoseLineListMatch, _resolveTemperatureRangeToMax } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 export const B313_PREVIEW_ACTION_LABEL = 'Update wall thickness as per B31.3 Sec II';
@@ -59,8 +60,9 @@ function temperatureText(row) {
 
 /**
  * A loaded Line List is not proof it covers the active physical branch set.
- * This diagnostic consumes the ACTUAL current Preview snapshot; it never
- * assigns or copies material, design pressure, or design temperature.
+ * Diagnostics check every unique/ambiguous exact or alias master match against
+ * the live 4 Preview, without copying missing process fields or authorizing
+ * engineering Pull. They also flag stale Preview/master mismatches.
  */
 export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
   const actual = Array.isArray(rows) ? rows.filter(r => r && typeof r === 'object') : [];
@@ -71,8 +73,85 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
   const missingP1 = actual.filter(r => !text(r.p1));
   const loadedLineListRows = Array.isArray(config?.linelist?.masterRows)
     ? config.linelist.masterRows.length : null;
+  const sameSourceNumber=(a,b)=>{
+    const parse=(value)=>{
+      const s=text(value).replace(/,/g,'');
+      if (!s) return null;
+      const match=s.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/);
+      return match&&Number.isFinite(Number(match[0]))?Number(match[0]):null;
+    };
+    const aa=parse(a),bb=parse(b);
+    return aa!==null&&bb!==null&&Math.abs(aa-bb)<=Math.max(1,Math.abs(aa),Math.abs(bb))*1e-9;
+  };
+  const sourceReceipts=actual.map((row,ordinal)=>{
+    const match=_xmlCiiDiagnoseLineListMatch(row?.lineKey,config);
+    const explicitInput=text(row?.p1Source).toLowerCase()==='override'
+      && text(row?.t1Source).toLowerCase()==='override';
+    const hasP1=Boolean(text(row?.p1));
+    const hasT1=Boolean(temperatureText(row));
+    const rawSelected=match.matchIndex!==null
+      ?config?.linelist?.masterRows?.[match.matchIndex]:null;
+    const normalizedSelected=rawSelected
+      ?normalizeLineListRow(rawSelected,config?.linelist?.fieldMap||{},match.matchIndex):null;
+    const sourceP1=text(normalizedSelected?.p1);
+    const sourceT1Raw=text(normalizedSelected?.t1);
+    const sourceT1Range=_resolveTemperatureRangeToMax(sourceT1Raw);
+    const sourceT1=sourceT1Range===null?sourceT1Raw:String(sourceT1Range);
+    const p1FromSource=normalizedToken(row?.p1Source)==='LINELIST';
+    const t1FromSource=normalizedToken(row?.t1Source)==='LINELIST';
+    const p1MatchesSource=!p1FromSource ||
+      (Boolean(sourceP1)&&sameSourceNumber(row.p1,sourceP1));
+    const t1MatchesSource=!t1FromSource ||
+      (Boolean(sourceT1)&&sameSourceNumber(temperatureText(row),sourceT1));
+    const sourceUnit=resolvePreviewP1LineListHeaderUnit(row,config);
+    const sourceMatch=match.matchIndex!==null;
+    let code;
+    if (match.code==='DUPLICATE_EXACT'||match.code==='DUPLICATE_ALIAS')
+      code='AMBIGUOUS_SELECTED_MASTER';
+    else if (!sourceMatch && explicitInput && hasP1 && hasT1)
+      code='EXPLICIT_OVERRIDE_NO_LINE_LIST_MATCH';
+    else if (!sourceMatch && row?.lineMiss===false)
+      code='PREVIEW_MASTER_OUT_OF_SYNC';
+    else if (!sourceMatch)
+      code='NO_SELECTED_MASTER_LINE';
+    else if (row?.lineMiss===true)
+      code='PREVIEW_REBUILD_REQUIRED';
+    else if (!p1MatchesSource)
+      code='PREVIEW_SOURCE_P1_CONFLICT';
+    else if (!t1MatchesSource)
+      code='PREVIEW_SOURCE_T1_CONFLICT';
+    else if (!hasP1||!hasT1)
+      code='MATCHED_SOURCE_PROCESS_FIELDS_MISSING';
+    else if (!text(row?.p1Unit) && !sourceUnit.unit)
+      code='P1_UNIT_SOURCE_UNRESOLVED';
+    else code='MATCHED_PROCESS_INPUTS_PRESENT';
+    return Object.freeze({
+      rowOrdinal:ordinal+1,
+      branchName:text(row?.branchName),
+      lineKey:text(row?.lineKey),
+      code,
+      previewLineMatched:row?.lineMiss===false,
+      selectedMasterMatch:match.code,
+      selectedMasterRowOrdinal:sourceMatch?match.matchIndex+1:null,
+      selectedMasterExactMatches:match.exactCount,
+      selectedMasterAliasMatches:match.aliasCount,
+      p1:text(row?.p1),p1Source:text(row?.p1Source),
+      sourceP1,sourceP1MatchesPreview:p1MatchesSource,
+      p1Unit:text(row?.p1Unit||sourceUnit.unit),
+      p1UnitSource:text(row?.p1Unit
+        ?(row?.p1UnitSource||'preview'):sourceUnit.source),
+      t1:temperatureText(row),t1Source:text(row?.t1Source),
+      sourceT1,sourceT1Raw,sourceT1MatchesPreview:t1MatchesSource,
+      material:materialText(row),
+      overrideComplete:explicitInput,
+    });
+  });
+  const codeCounts={};
+  for(const receipt of sourceReceipts) codeCounts[receipt.code]=(codeCounts[receipt.code]||0)+1;
+  const masterConfirmed=sourceReceipts.filter(r=>r.selectedMasterRowOrdinal!==null
+    && r.previewLineMatched).length;
   return {
-    schema: 'b313-preview-linelist-coverage/v1',
+    schema: 'b313-preview-linelist-coverage/v2',
     physicalRows: actual.length,
     loadedLineListRows,
     matchedPhysicalRows: matched.length,
@@ -81,10 +160,20 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
     missingP1Rows: missingP1.length,
     missingProcessRows: missingProcess.length,
     missingLineKeys: [...new Set(missingProcess.map(r => text(r.lineKey)).filter(Boolean))].sort(),
-    // Explicit physical line match is required; neither class-specific
-    // material lookup nor a service-consensus candidate is design authority.
+    sourceReceipts,
+    sourceCodeCounts:codeCounts,
+    selectedMasterConfirmedPhysicalRows:masterConfirmed,
+    selectedMasterAmbiguousPhysicalRows:sourceReceipts.filter(
+      r=>r.code==='AMBIGUOUS_SELECTED_MASTER').length,
+    previewMasterOutOfSyncPhysicalRows:sourceReceipts.filter(
+      r=>r.code==='PREVIEW_MASTER_OUT_OF_SYNC'||r.code==='PREVIEW_REBUILD_REQUIRED').length,
+    sourceWorkbookIdentity: 'NOT_AVAILABLE_IN_PREVIEW_CONFIG',
+    // Original user-visible process coverage is unchanged; source/master
+    // identity remains separately classified for truly provenance-safe use.
     sourceEvidenceComplete: missingProcess.length === 0 && missingT1.length === 0
       && missingP1.length === 0,
+    selectedMasterIdentityComplete:sourceReceipts.every(r=>
+      r.selectedMasterRowOrdinal!==null && r.previewLineMatched),
   };
 }
 
@@ -383,6 +472,21 @@ export function resolvePreviewP1LineListHeaderUnit(row = {}, config = {}) {
   const raw = selected?.row;
   if (!raw || typeof raw !== 'object') return { unit: '', source: 'NO_SELECTED_LINE_LIST_ROW' };
   const matches = [];
+  // Imported Excel may put DESIGN CONDITIONS, Pressure Max and kPa(g)
+  // on different rows in a single source column. Only the stored
+  // same-column normalized source receipt can provide this unit.
+  const headerBandSource=text(raw._sourceP1HeaderSource);
+  if (headerBandSource.startsWith('line-list-header-band:')) {
+    const fields=Array.isArray(raw._sourceP1HeaderTexts)
+      ?raw._sourceP1HeaderTexts.map(normalizedToken):[];
+    const validDesign=fields.some(x=>/\bPRESSURE\s+(MAX|MAXIMUM)\b|\bDESIGN\s+PRESSURE\b/.test(x))
+      && !fields.some(x=>/AT\s+WORKING\s+CONDITIONS|OPERATING\s+CONDITIONS/.test(x));
+    const bandUnit=normalizePressureUnit(raw._sourceP1Unit);
+    if (validDesign && bandUnit && sameNumeric(raw._sourceP1OriginalValue,row.p1)
+        && sameNumeric(raw.p1,row.p1))
+      matches.push({unit:bandUnit,source:headerBandSource});
+    else return {unit:'',source:'LINE_LIST_P1_HEADER_BAND_STALE_OR_INCOMPLETE'};
+  }
   for (const [key, value] of Object.entries(raw)) {
     const header = normalizedToken(key);
     if (!( /\bP1\b/.test(header) || (/\bPRESSURE\b/.test(header) && /\b(?:DESIGN|MAX|MAXIMUM)\b/.test(header)) )
@@ -410,12 +514,31 @@ export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, pre
   if (explicit) return { unit: explicit, source: 'design-basis' };
   if (fromPreview) return { unit: fromPreview, source: row?.p1UnitSource || 'preview' };
   if (fromHeader.unit) return fromHeader;
-  if (previewOnly) return { unit: '', source: 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' };
-  if (normalizedToken(row?.p1Source).includes('XML')) {
-    const unit = normalizePressureUnit(sourceXml?.pressureUnit);
-    if (unit) return { unit, source: 'source-xml-units' };
-  }
-  return { unit: '', source: 'unresolved' };
+  // Wall calculation has ONE user-visible input authority: the effective
+  // 4 Preview P1 unit (or its explicitly selected B31.3 basis). An XML
+  // document's declared unit never supplies a design-pressure unit here.
+  // sourceXml is kept as a deprecated positional argument solely for
+  // compatibility with existing third-party callers.
+  return { unit: '', source: previewOnly
+    ? 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' : 'unresolved' };
+}
+
+/**
+ * Strict 4 Preview calculation input contract.
+ * Importing a Line List may have populated row.p1Unit during Build Preview,
+ * but the B31.3 button MUST NOT re-read the workbook or original XML to
+ * resolve a missing design-pressure unit.
+ */
+export function resolveB313EffectivePreviewPressureUnit(row = {}, basis = {}) {
+  const visible=normalizePressureUnit(row?.p1Unit);
+  const chosen=normalizePressureUnit(basis?.pressureUnit);
+  if (visible && chosen && visible!==chosen) return {
+    unit:'',source:'P1_UNIT_AUTHORITIES_CONFLICT',
+    previewUnit:visible,basisUnit:chosen,
+  };
+  if (visible) return {unit:visible,source:text(row?.p1UnitSource)||'4-preview'};
+  if (chosen) return {unit:chosen,source:'4-preview-b313-basis'};
+  return {unit:'',source:'PREVIEW_PRESSURE_UNIT_UNRESOLVED'};
 }
 
 export function inferPreviewDimensionStandard(row, basis = {}, materialIdentity = null) {
@@ -726,8 +849,7 @@ export function buildPreviewB313ScreeningReference({
   const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
   if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
     holdReasons.push('Positive source P1 is missing or default-only');
-  const pressureBasis = inferPreviewPressureUnit(row,config,
-    {pressureUnit:'',byBranch:new Map()},manualBasis,true);
+  const pressureBasis = resolveB313EffectivePreviewPressureUnit(row,manualBasis);
   if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
   const corrosion=nonNegative(row?.corrosion);
   if (corrosion===null) holdReasons.push('Corrosion allowance missing');
@@ -738,11 +860,25 @@ export function buildPreviewB313ScreeningReference({
   const scoped=previewNodeRows.filter(n=>Number(n.branchOccurrenceIndex)===rowIndex
     && positive(n.outsideDiameterMm));
   const ods=[...new Set(scoped.map(n=>positive(n.outsideDiameterMm)).filter(Boolean))];
-  const od=ods.length===1?ods[0]:null;
-  if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
-    :'Source node outside diameter missing');
+  const effectiveDn=positive(row?.sizeMm??row?.boreMm);
+  const classDn=positive(row?.pipingClassPipeDnMm);
   const referenceOd=dimension.standard
-    ? masterOutsideDiameterMm(row?.sizeMm??row?.boreMm,dimension.standard):null;
+    ? masterOutsideDiameterMm(effectiveDn,dimension.standard):null;
+  // A conditional SCREENING-only calculation can use the dimension
+  // master if the effective 4 Preview has no unique row/node OD and its
+  // class product confirms the same nominal DN. This does not authorize Pull.
+  const exactDnClassReference=Boolean(effectiveDn && classDn
+    && Math.abs(effectiveDn-classDn)<1e-6
+    && positive(row?.pipingClassPipeWallMm)
+    && text(row?.pipingClassPipeSchedule)
+    && text(row?.pipingClassPipeMaterial)
+    && text(row?.pipingClassPipeSourceRow));
+  const referenceOnlyOd=ods.length===0 && exactDnClassReference && referenceOd;
+  const od=ods.length===1?ods[0]:(referenceOnlyOd?referenceOd:null);
+  const outsideDiameterSource=ods.length===1?'step4-preview-node-ledger'
+    :referenceOnlyOd?'pipe-wall-master-exact-DN-SCREENING-ONLY':'unresolved';
+  if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
+    :'Neither a unique source-node OD nor an exact-DN class/dimension reference is available');
   if (od && (!referenceOd || Math.abs(od-referenceOd)>Math.max(1.5,referenceOd*0.02)))
     holdReasons.push('Source OD and size-master reference do not agree');
   // Each route is a WHAT-IF scenario if the source did not establish a route.
@@ -810,7 +946,11 @@ export function buildPreviewB313ScreeningReference({
     materialSource:text(row?.materialSource),
     pressure:pressure||null,pressureUnit:pressureBasis.unit||null,
     pressureUnitSource:pressureBasis.source||null,
-    outsideDiameterMm:od,corrosionAllowanceMm:corrosion,
+    outsideDiameterMm:od,outsideDiameterSource,
+    outsideDiameterReferenceOnly:outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY',
+    outsideDiameterSourceMatched:outsideDiameterSource==='step4-preview-node-ledger',
+    outsideDiameterReferenceMm:referenceOd,
+    corrosionAllowanceMm:corrosion,
     negativeMillTolerance:manualBasis.negativeMillTolerance
       || basisConfig.millTolerance || {basis:'percent',value:12.5},
     declaredRoute:declaredRoute||null,
@@ -820,7 +960,7 @@ export function buildPreviewB313ScreeningReference({
   };
 }
 
-export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
+export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
   const lineListCoverage = buildPreviewB313LineListCoverage(branchRows, config);
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
@@ -834,7 +974,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
   // Source XML and master matching are upstream responsibilities of Build Preview.
   const previewNodeRows = Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
     ? host.__xmlCiiPreviewResult.nodeBoreWallRows : [];
-  const sourceXml = { pressureUnit: '', byBranch: new Map() };
+  // No XML read/parse/pressure or temperature fallback. All rows are the
+  // effective 4 Preview snapshot captured by Build Preview.
   const basisConfig = ensureBasisConfig(config || {});
   const results = [];
   let updated = 0;
@@ -924,7 +1065,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
       results.push(failureRow(row, 'B313_PREVIEW_CORROSION_REQUIRED', 'Preview corrosion allowance is unavailable.', { materialIdentity, factorBasis }));
       return;
     }
-    const pressureBasis = inferPreviewPressureUnit(row, config, sourceXml, basis, true);
+    const pressureBasis = resolveB313EffectivePreviewPressureUnit(row, basis);
     if (!pressureBasis.unit) {
       results.push(failureRow(row, 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED', 'Pressure unit could not be resolved. Set P unit explicitly in the B31.3 design basis.', { materialIdentity, factorBasis }));
       return;
@@ -951,7 +1092,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
             : { ok: true, outsideDiameterMm: selectedOd, source: 'step4-preview-node-ledger',
                 referenceOdMm: referenceOd, parityDeltaMm: Math.abs(selectedOd - referenceOd), toleranceMm };
     if (!odBasis.ok) {
-      results.push(failureRow(row, odBasis.code, 'A reliable row outside diameter could not be established from source XML against the DN master reference.', { ...odBasis, materialIdentity, factorBasis }));
+      results.push(failureRow(row, odBasis.code, 'A unique 4 Preview row outside diameter could not be confirmed against the DN master reference.', { ...odBasis, materialIdentity, factorBasis }));
       return;
     }
 
@@ -1055,6 +1196,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
     materialFactorPolicy: 'PREVIEW_MATERIAL_TO_ACTIVE_B313_STRICT_THEN_MANUAL_FALLBACK',
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
+    calculationInputAuthority:'EFFECTIVE_4_PREVIEW_ONLY',
+    rawXmlDesignInputsConsumed:false,
     lineListCoverage,
     summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
     rows: results.map((result, rowIndex) => {
@@ -1072,6 +1215,91 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
         };
     }),
   };
+}
+
+
+/** Machine-readable per-occurrence B31.3 evidence from the just-evaluated
+ * effective 4 Preview. SCREENING and qualified proposals remain separate.
+ * No source values, calculated walls, config or Pull state are mutated.
+ */
+export function buildPreviewB313SourceToWallLedger(report = {}) {
+  const sourceReceipts=Array.isArray(report?.lineListCoverage?.sourceReceipts)
+    ? report.lineListCoverage.sourceReceipts:[];
+  const calcRows=Array.isArray(report?.rows)?report.rows:[];
+  const count=Math.max(sourceReceipts.length,calcRows.length);
+  const rows=Array.from({length:count},(_,i)=>{
+    const receipt=sourceReceipts[i]||{};
+    const evaluated=calcRows[i]||{};
+    const reference=evaluated.screeningReference||{};
+    const scenario=reference.conditionalScenario||null;
+    return {
+      ordinal:i+1,branchName:text(receipt.branchName||evaluated.branchName),
+      lineKey:text(receipt.lineKey||evaluated.lineKey),
+      selectedMasterMatch:text(receipt.selectedMasterMatch||'UNAVAILABLE'),
+      selectedMasterRowOrdinal:receipt.selectedMasterRowOrdinal??null,
+      sourceCoverageStatus:text(receipt.code||'UNAVAILABLE'),
+      previewLineMatched:receipt.previewLineMatched===true,
+      p1:text(receipt.p1),p1Source:text(receipt.p1Source),
+      selectedMasterP1:text(receipt.sourceP1),
+      selectedMasterP1MatchesPreview:receipt.sourceP1MatchesPreview??null,
+      p1Unit:text(receipt.p1Unit||reference.pressureUnit),
+      p1UnitSource:text(receipt.p1UnitSource||reference.pressureUnitSource),
+      t1:text(receipt.t1),t1Source:text(receipt.t1Source),
+      selectedMasterT1:text(receipt.sourceT1),
+      selectedMasterT1Raw:text(receipt.sourceT1Raw),
+      selectedMasterT1MatchesPreview:receipt.sourceT1MatchesPreview??null,
+      material:text(receipt.material),
+      masterBasisId:text(reference.basisId),
+      stressLookupMethod:text(reference.S?.method),
+      stressBracket:JSON.stringify(reference.S?.bracket||[]),
+      screeningS_MPa:reference.S?.MPa??null,
+      conditionalManufacturing:text(reference.conditionalManufacturing),
+      screeningE:reference.conditionalE??null,
+      screeningW:reference.W??null,
+      screeningY:reference.Y??null,
+      outsideDiameterMm:reference.outsideDiameterMm??null,
+      outsideDiameterSource:text(reference.outsideDiameterSource),
+      corrosionAllowanceMm:reference.corrosionAllowanceMm??null,
+      screeningPressureWallMm:scenario?.calculationOk
+        ?scenario.pressureDesignThicknessMm:null,
+      screeningRequiredNominalMm:scenario?.calculationOk
+        ?scenario.requiredNominalThicknessMm:null,
+      pipingClassNominalWallMm:scenario?.classNominalWallMm??null,
+      pipingClassSchedule:text(scenario?.classSchedule),
+      screeningClassPass:scenario?.calculationOk?scenario.classPass:null,
+      screeningAuthority:reference.ok?'SCREENING_REFERENCE_ONLY':'NO_REFERENCE_RESULT',
+      qualifiedStatus:text(evaluated.status||'NOT_EVALUATED'),
+      qualifiedCode:text(evaluated.code),
+      pullEligible:evaluated.status==='CALCULATED'
+        && evaluated.result?.pullEligible!==false,
+      holdReasons:(Array.isArray(reference.holdReasons)?reference.holdReasons:[])
+        .concat(evaluated.status==='CALCULATED'?[]:[text(evaluated.message||evaluated.code)])
+        .filter(Boolean).join(' | '),
+    };
+  });
+  return {
+    schema:'b313-preview-source-to-wall-ledger/v1',
+    source:'EFFECTIVE_4_PREVIEW_SNAPSHOT',
+    projectWorkbookIdentity:report?.lineListCoverage?.sourceWorkbookIdentity
+      || 'NOT_AVAILABLE_IN_PREVIEW_CONFIG',
+    engineeringApproval:'NOT_IMPLIED_BY_SCREENING',
+    inputRows:count,rows,
+  };
+}
+
+/** CSV formula-injection protection: source labels are never executable
+ * spreadsheet expressions. Preserve original text in the JSON ledger.
+ */
+export function previewB313LedgerCsv(ledger = {}) {
+  const rows=Array.isArray(ledger?.rows)?ledger.rows:[];
+  const headers=rows.length?Object.keys(rows[0]):['ordinal','branchName','lineKey'];
+  const quote=(value)=>{
+    let s=value===null||value===undefined?'':String(value);
+    if (/^\s*[=+@-]/.test(s)) s="'"+s;
+    return '"'+s.replaceAll('"','""')+'"';
+  };
+  return [headers.map(quote).join(','),...rows.map(row=>
+    headers.map(key=>quote(row[key])).join(','))].join('\r\n')+'\r\n';
 }
 
 function installAction(host, config, xmlText, options, suppliedRows) {
@@ -1093,7 +1321,7 @@ function installAction(host, config, xmlText, options, suppliedRows) {
     button.disabled = true;
     const currentRows = currentPreviewB313Rows(host, suppliedRows);
     try {
-      const report = buildPreviewB313WallUpdateReport({ rows: currentRows, config, xmlText, host });
+      const report = buildPreviewB313WallUpdateReport({ rows: currentRows, config, host });
       await options?.onSaveConfig?.(config);
       await options?.onB313WallUpdateReport?.(report);
       host.querySelector('[data-mc-b313-report]')?.remove?.();

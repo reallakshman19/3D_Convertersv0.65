@@ -1,5 +1,16 @@
 # Phase 4 Preview — B31.3 wall update
 
+## 2026-11-18 — Owner correction: B31.3 reads 4 Preview only
+
+**Calculation input contract:** the existing **XML→CII 2019 Standalone → 4 Preview** branch-row snapshot is the sole process-design input for this B31.3 calculation. Use the row's effective Material, T1, P1, P1 unit (or its explicit B31.3 basis), DN, corrosion allowance and Piping Class data. S is looked up/interpolated by Material + T1 in the coefficient master; the conditional manufacture display defaults to Seamless / E=1. The Preview node ledger or exact-DN dimensional master provides geometry according to documented provenance.
+
+**Do not** read or infer design pressure, pressure units or T1 from source XML, parse XML during a wall calculation, substitute 0 or −100000 sentinel fields, or extrapolate from another branch. Explicitly changing XML metadata must have no effect on the calculation or audit. In particular the source document's `PressureUnits` is not authority for the Preview row's design P1.
+
+The audit distinguishes complete and incomplete **4 Preview** rows. If a row has no effective P1/T1 or no resolved design-pressure unit, display the missing 4 Preview input and keep the qualified Pull on HOLD; do not fill a blank from any earlier source. The separate workbook Line List matching diagnostic explains where Preview values originated; it never replaces displayed Preview P1/T1 during calculation. The user can correct the current 4 Preview row/basis and rebuild.
+
+**Acceptance witness:** `tests/xml-cii-b313-preview-screening-reference.test.mjs` passes two different contradictory `xmlText` values with identical effective 4 Preview rows; B31.3 screening thickness, coefficient lookup and HOLD status remain identical. `tests/xml-cii-b313-preview-pressure-unit.test.mjs` confirms XML pressure units cannot supply a missing 4 Preview unit. Neither test is proof of engineering-approved factors or native CII output.
+
+
 ## Action
 
 Phase 4 Preview exposes the explicit action:
@@ -243,6 +254,121 @@ Merging this Preview adoption does not complete B31.3 design-authority qualifica
 ## CS fallback policy
 
 When the effective Preview material is blank or genuinely unmapped, the B31.3 basis panel may offer the configured **CS** family fallback. It does not rewrite the Preview Material cell, does not override known non-CS identities (for example stainless), and requires explicit user confirmation before Pull. The CS family is not itself an allowable-stress record: a controlled exact material identity and qualified S/E/W/Y or independently reviewed manual basis are required for engineering acceptance. The default may be disabled in project settings.
+
+## 2026-11-18 — Source-to-wall receipt / Line List recovery (PR #12)
+
+The existing **4 Preview → Calculate B31.3 pressure-design wall** now
+records the selected Line List matching result for *each physical branch
+occurrence*, using the exact source matcher already used for Preview
+population. Every row is independently classified as:
+
+- `MATCHED_PROCESS_INPUTS_PRESENT`: one unique exact or P-only numeric
+  alias match, with source P1/T1 and unit provenance visible;
+- `P1_UNIT_SOURCE_UNRESOLVED`: P1 and T1 exist, but the selected
+  same-line source has no verifiable unit-bearing design-pressure header;
+- `NO_SELECTED_MASTER_LINE`: no matching row in the actually loaded master;
+- `AMBIGUOUS_SELECTED_MASTER`: multiple exact or alias source candidates;
+- `PREVIEW_MASTER_OUT_OF_SYNC` or `PREVIEW_REBUILD_REQUIRED`: the
+  current Preview and selected master no longer describe the same source;
+- `PREVIEW_SOURCE_P1_CONFLICT` or `PREVIEW_SOURCE_T1_CONFLICT`:
+  a unique source row exists but its source-design value no longer agrees
+  with the Preview field;
+- `EXPLICIT_OVERRIDE_NO_LINE_LIST_MATCH`: independently entered P1/T1
+  require engineering review; not a source Line List match.
+
+The bare numeric workbook sequence `4110001` may match a unique
+**P4110001** pipe line, but must never match **B4110001** or another
+unrelated service-family line. Both the Preview resolver and the Pull-time
+source-pressure receipt now use this same P-only alias rule.
+
+The audit now has **Download source → wall CSV** and **Download JSON
+evidence**. These contain one row per physical Preview occurrence, with
+branch/line identity, selected source row/status, matched P1/T1 and source
+units, S lookup method and interpolation brackets, conditional E/W/Y,
+OD/provenance, CA, screening pressure wall, required nominal/class wall,
+actual strict/qualified status, Pull eligibility, and explicit HOLD reasons.
+CSV labels are formula-injection-safe. It changes no source values,
+approved factors, physical walls, or config.
+
+**Source availability boundary:** the owner-saved PSI-02 Preview had
+16 loaded master rows, 7 populated physical rows and 23 missing P1/T1,
+on 18 distinct keys. The historically pinned BM2 `LL_BM2.xlsx`
+`Linelist` sheet contained only two unscoped numeric sequence matches
+against the target PSI-02 branch keys (not two verified design matches).
+The separately accessible `ImportedRawLineListLL.xlsx` does not contain
+the 18 missing PSI-02 line keys either. It would be incorrect to choose
+either as a complete PSI-02 master on the user's behalf. Re-import the
+actual governed PSI-02 master and worksheet if available, verify its
+source mapping, then **Rebuild Preview**. If no authoritative source row
+exists, record that line-specific engineering input or reviewed override;
+never extrapolate another line's 120°C or 13001 pressure.
+
+The existing master P unit control can be set to the documented unit.
+A pressure unit is automatically accepted only from the same selected
+source Line List row with a unit-bearing design P1 header and equal
+numeric cell. Neither the 13001 magnitude nor a hydro/test pressure
+header identifies that unit.
+
+Reproduction:
+```sh
+node --test tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs
+node --test tests/xml-cii-b313-preview-screening-reference.test.mjs
+node scripts/run-xml-cii-b313-live-preview-e2e.mjs
+```
+
+The browser test verifies real downloadable CSV/JSON data from the
+current Preview row population; it is *software proof*, not a signed
+30/30 PSI-02 engineering input receipt or native emitted CII acceptance.
+
+## 2026-11-18 screenshot RCA: screening dimensional OD and missing design-unit evidence
+
+Owner's deployed **4 Preview** screenshot after R3 merge: 30 GLRD physical
+rows, only 16 loaded Line List master records and 7/30 physically matched,
+23 lacking effective P1/T1 input evidence. A matched DSS row shows source
+P1=13001, T1=120°C, screening S=29.5 ksi and conditional Seamless E=1,
+but no pressure wall because P1 **unit is unresolved** and the source-node
+OD is not present in the report's node ledger.
+
+A read-only screening calculation may now use the **exact-DN dimensional
+master outside diameter** when the source node ledger has no OD and the
+effective Preview row has an exact matching Piping Class DN, positive
+nominal wall, a pipe material, schedule and source-row identity. This
+screening-only dimensional OD is labelled
+`pipe-wall-master-exact-DN-SCREENING-ONLY`; it has
+`outsideDiameterReferenceOnly=true` and **does not certify the physical
+XML OD, alter strict factor eligibility, create an accepted wall, or
+authorize Pull**. Conflicting/mixed positive node ODs continue to HOLD;
+the master cannot override a known physical mismatch.
+
+Source precision note: the project's pinned
+`docs/Masters/NPS_OD_BORE_SCHEDULE_MASTER.tsv` lists **DN150 OD(mm)=168**
+and **OD(in)=6.625**, equivalent to 168.275 mm. The screening-only
+fallback consumes the master **as published** (168 mm), rather than
+silently rewriting it to an external dimensional value or the source-node
+fixture's 168.3 mm. A real positive physical-node OD remains preferred.
+With the conditional synthetic P1=13001 kPa, DSS S=29.5 ksi at 120°C,
+Seamless E=1, CA=0, the master-only fallback calculates
+**t=5.235409 mm** and required nominal wall **5.983324 mm** (12.5%
+negative tolerance). This numerical difference from the physical-source
+168.3-mm witness is kept visible; the master itself is not changed.
+
+The code **does not assume pressure units** from P1 magnitude or simply
+infer that `13001` means kPa. Source-verified same-line P1 units may
+resolve automatically from unit-bearing Line List columns; otherwise the
+user must select the actual documented P unit in the existing B31.3
+basis. Missing P1/T1 for 23 unmatched rows cannot be fixed by master-OD
+logic and must be sourced from the correct project Line List and matched
+to the physical branch. Unresolved restraints and native CII engineering
+HOLD are independent and not modified by this change.
+
+Proof:
+```
+node --test tests/xml-cii-b313-preview-screening-reference.test.mjs
+node scripts/run-xml-cii-b313-live-preview-e2e.mjs
+```
+New tests assert master-OD provenance, numerical wall parity for an
+explicit-kPa **synthetic** scenario, absence of any Pull mutation, missing
+unit HOLD, mismatched class DN HOLD, and actual rendered browser text.
 
 ## Read-only screening reference from the existing material master
 

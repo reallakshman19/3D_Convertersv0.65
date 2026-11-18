@@ -2,6 +2,8 @@ import {
   B313_PREVIEW_ACTION_LABEL,
   B313_PREVIEW_REPORT_SCHEMA,
   buildPreviewB313WallUpdateReport,
+  buildPreviewB313SourceToWallLedger,
+  previewB313LedgerCsv,
   installPreviewB313WallUpdateController,
   selectPreviewB313ActionRows,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-source-unit-class-1';
@@ -187,10 +189,19 @@ function screeningFactorHtml(reference) {
 function screeningWallHtml(reference) {
   if (!reference?.ok) return '';
   const scenarios=Array.isArray(reference.scenarios)?reference.scenarios:[];
-  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;"><strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}</div>`;
+  const odProvenance=reference.outsideDiameterReferenceOnly
+    ? `<div data-b313-screening-od-source style="font-size:10px;font-weight:700;color:#92400e;">OD ${fixed(reference.outsideDiameterMm,3)} mm from exact-DN dimensional master (screening assumption; 4 Preview node OD unavailable)</div>`
+    :reference.outsideDiameterSourceMatched
+      ? `<div data-b313-screening-od-source style="font-size:10px;">OD ${fixed(reference.outsideDiameterMm,3)} mm from actual Preview node ledger</div>`
+      :'';
+  if (!scenarios.length) return `<div style="margin-top:7px;color:#92400e;"><strong>Screening wall not calculated:</strong> ${esc((reference.holdReasons||[]).join(' · ')||'Route or dimensional inputs unavailable')}
+    ${odProvenance}
+    ${(reference.holdReasons||[]).includes('P1 pressure unit unresolved')?'<div>Select the actual documented P unit in the existing B31.3 basis; no unit is inferred from P1 magnitude.</div>':''}
+  </div>`;
   return `<div data-b313-screening-wall style="margin-top:7px;padding:6px;border:1px solid #f59e0b;border-radius:5px;background:#fffbeb;color:#7c2d12;">
     <strong>CONDITIONAL REFERENCE ONLY — not design approved</strong>
     <div>P1 ${compact(reference.pressure)} ${esc(reference.pressureUnit)} · OD ${fixed(reference.outsideDiameterMm,3)} mm · CA ${compact(reference.corrosionAllowanceMm)} mm</div>
+    ${odProvenance}
     ${scenarios.map(s=>`<div data-b313-screening-scenario="${esc(s.manufacturingRoute)}" style="border-top:1px solid #fde68a;padding-top:4px;margin-top:4px;${s.manufacturingRoute===reference.conditionalManufacturing?'':'display:none;'}">
       Conditional manufacturing: ${esc(s.manufacturingRoute==='SEAMLESS'?'Seamless':s.manufacturingRoute.replaceAll('_',' '))}${s.routeAssumed?' (what-if; not verified)':''} · E = ${compact(s.E)}:
       ${s.calculationOk
@@ -284,10 +295,14 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
   const coverage = report?.lineListCoverage;
   const missingSource = coverage?.missingProcessRows > 0;
   const missingLineKeys = Array.isArray(coverage?.missingLineKeys) ? coverage.missingLineKeys : [];
+  const sourceStatuses=Object.entries(coverage?.sourceCodeCounts||{})
+    .map(([code,count])=>`${esc(code)}: ${count}`).join(' · ');
+
   const sourceCoverageHtml = missingSource
     ? `<div data-b313-linelist-coverage role="alert" style="margin:9px 0;padding:9px 10px;border:1px solid #c2410c;border-radius:7px;background:#fff7ed;color:#7c2d12;font-size:11px;">
         <strong>UPSTREAM LINE LIST COVERAGE HOLD — ${coverage.missingProcessRows} physical branches lack P1/T1 source evidence</strong>
         <div style="margin-top:4px;">Loaded Line List: <strong>${coverage.loadedLineListRows === null ? 'unavailable' : coverage.loadedLineListRows} rows</strong> · Line List matches ${coverage.matchedPhysicalRows} / ${coverage.physicalRows} physical branches · unmatched ${coverage.unmatchedPhysicalRows} · missing T1 ${coverage.missingT1Rows} · missing P1 ${coverage.missingP1Rows}.</div>
+        <div style="margin-top:4px;"><strong>Independent selected-master cross-check:</strong> ${coverage.selectedMasterConfirmedPhysicalRows||0}/${coverage.physicalRows||0} physical matches; ${coverage.selectedMasterAmbiguousPhysicalRows||0} ambiguous, ${coverage.previewMasterOutOfSyncPhysicalRows||0} Preview/master mismatches. ${sourceStatuses}</div>
         <div style="margin-top:4px;">Check that the real <strong>Linelist</strong> worksheet—not Coversheet/summary—was selected in <strong>1 Source &amp; Masters</strong>. Then verify the missing line keys against the selected <strong>PSI-02</strong> model. If the workbook is BM2-specific or lacks those lines, import the correct governed PSI-02 Line List rather than borrowing neighboring values. Finally <strong>Rebuild Preview</strong>. No automatic 120°C/pressure values are assigned.</div>
         <div style="margin-top:4px;overflow-wrap:anywhere;"><strong>Missing line keys (${missingLineKeys.length}):</strong> ${esc(missingLineKeys.join(', ') || '(source keys unavailable)')}</div>
         <button type="button" data-b313-open-linelist-source style="margin-top:7px;padding:5px 9px;border:1px solid #c2410c;border-radius:5px;background:#fff;color:#7c2d12;cursor:pointer;font-weight:700;">Open 1 Source &amp; Masters</button>
@@ -315,6 +330,7 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
 
   return `<details data-mc-b313-report open style="margin:10px 0;border:1px solid ${border};border-radius:8px;background:#ffffff;padding:10px;box-shadow:0 1px 2px rgba(15,23,42,.06);">
     <summary style="cursor:pointer;font-weight:800;color:${titleColor};">B31.3 wall update audit · Evaluated ${summary.evaluatedRows} · ${countsLabel}</summary>
+    <div style="font-size:11px;font-weight:700;color:#334155;margin-top:7px;">Calculation inputs: effective 4 Preview rows only · Material / T1 / P1 / pressure unit / DN / CA · Raw XML values are not used.</div>
     <div style="font-size:11px;color:#475569;margin:8px 0;">Line-list and Piping Class data may resolve the governed material identity. They do not invent numeric S/E/W/Y. Automatic factors must still come from strict VERIFIED / PROJECT_APPROVED B31.3 factor records at the row T1 and, where applicable, the manufacturing route. Factor lookups from the existing screening master are shown below as numerical references (including temperature interpolation). These results are <strong>not approved for Pull</strong>. Only qualified B31.3 S/E/W/Y or explicitly reviewed controlled manual factors can produce eligible Pull proposals.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       <span style="padding:4px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-size:10px;"><strong>Code basis</strong> ASME B31.3-2024 §304.1.2 Eq. (3a)</span>
@@ -322,6 +338,11 @@ export function renderPreviewB313WallAuditHtml(report = {}) {
       <span style="padding:4px 8px;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;"><strong>Fallback</strong> manual S/E/W/Y only when active master is incomplete; controlled source required</span>
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Excluded</strong> BENCHMARK_ONLY / SCREENING factors from Pull; shown as reference only</span>
       <span style="padding:4px 8px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px;"><strong>Mill tolerance</strong> ${esc(text(rows.find((row) => row.result?.calculation?.manufacturingTolerance)?.result?.calculation?.manufacturingTolerance?.inputValue ?? 12.5))}${rows.some((row) => row.result?.calculation?.manufacturingTolerance?.basis === 'absolute') ? ' mm absolute' : '% negative'}</span>
+    </div>
+    <div style="margin:9px 0;display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" data-b313-evidence-download="csv" style="padding:6px 10px;border:1px solid #94a3b8;border-radius:5px;">Download source → wall CSV (${rows.length} rows)</button>
+      <button type="button" data-b313-evidence-download="json" style="padding:6px 10px;border:1px solid #94a3b8;border-radius:5px;">Download JSON evidence</button>
+      <span style="font-size:10px;color:#475569;">Screening references and physical source HOLDs are separate from approved Pull.</span>
     </div>
     ${warning}
     ${sourceCoverageHtml}
@@ -365,6 +386,32 @@ function bindSourceNavigation(host) {
   });
 }
 
+
+function bindB313EvidenceDownload(host, report) {
+  for(const button of host?.querySelectorAll?.('[data-b313-evidence-download]')||[]) {
+    if(button.dataset.b313ExportBound==='true')continue;
+    button.dataset.b313ExportBound='true';
+    button.addEventListener('click',()=>{
+      const ledger=buildPreviewB313SourceToWallLedger(report);
+      const mode=button.dataset.b313EvidenceDownload;
+      const isCsv=mode==='csv';
+      const payload=isCsv?previewB313LedgerCsv(ledger):JSON.stringify(ledger,null,2);
+      const blob=new Blob([payload],{type:isCsv?'text/csv;charset=utf-8'
+        :'application/json;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const anchor=document.createElement('a');
+      anchor.href=url;
+      anchor.download='GLRD-4Preview-B313-Source-to-Wall.'+(isCsv?'csv':'json');
+      anchor.style.display='none';
+      document.body.appendChild(anchor);
+      try {anchor.click();} finally {
+        anchor.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }
+    });
+  }
+}
+
 function renderReport(host, report) {
   host?.querySelector?.('[data-mc-b313-report]')?.remove?.();
   const sharedSlot = host?.querySelector?.('[data-mc-b313-unified-audit-slot]');
@@ -372,6 +419,7 @@ function renderReport(host, report) {
     sharedSlot.innerHTML = renderPreviewB313WallAuditHtml(report);
     bindSourceNavigation(host);
     bindPreviewB313ConditionalManufacturing(host);
+    bindB313EvidenceDownload(host, report);
     return;
   }
   const editor = host?.querySelector?.('[data-mc-b313-basis-editor]');
@@ -379,12 +427,14 @@ function renderReport(host, report) {
     editor.insertAdjacentHTML('afterend', renderPreviewB313WallAuditHtml(report));
     bindSourceNavigation(host);
     bindPreviewB313ConditionalManufacturing(host);
+    bindB313EvidenceDownload(host, report);
     return;
   }
   const actionBar = host?.querySelector?.('[data-mc-preview-build]')?.parentElement;
   actionBar?.parentElement?.insertAdjacentHTML?.('afterend', renderPreviewB313WallAuditHtml(report));
   bindSourceNavigation(host);
     bindPreviewB313ConditionalManufacturing(host);
+    bindB313EvidenceDownload(host, report);
 }
 
 function bindAuditButton(host, config, xmlText, options, getSnapshotRows, getLiveRows) {
@@ -399,7 +449,7 @@ function bindAuditButton(host, config, xmlText, options, getSnapshotRows, getLiv
     const rows = selectPreviewB313AuditRows(getSnapshotRows(), liveRows);
     try {
       const report = rows.length
-        ? buildPreviewB313WallUpdateReport({ rows, config, xmlText, host })
+        ? buildPreviewB313WallUpdateReport({ rows, config, host })
         : zeroInputReport();
       await options?.onSaveConfig?.(config);
       await options?.onB313WallUpdateReport?.(report);

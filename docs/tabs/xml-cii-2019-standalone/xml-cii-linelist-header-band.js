@@ -91,3 +91,54 @@ export function refineLineListFieldMap(rows, candidateMap = {}, config = null) {
   return result;
 }
 export { DEFAULT_BAND_ROWS };
+
+/**
+ * Identify a design-P1 pressure unit from the SAME imported Excel column.
+ * A SheetJS flattened multi-row header otherwise loses W5/W6/W8 provenance:
+ * DESIGN CONDITIONS → Pressure Max → kPa(g). Column K (working pressure)
+ * is deliberately rejected even if it also carries kPa(g).
+ *
+ * The result describes input provenance, never ASME factor approval.
+ */
+export function resolveLineListDesignPressureHeaderBand(rawRows = [], fieldMap = {}) {
+  const columnKey=text(fieldMap?.p1);
+  if (!columnKey) return {ok:false,code:'P1_COLUMN_NOT_MAPPED'};
+  const values=[];
+  for(let i=0;i<Math.min(DEFAULT_BAND_ROWS,rawRows.length);i++){
+    const v=text(rawRows[i]?.[columnKey]);
+    if(v) values.push({headerRowOffset:i,text:v});
+  }
+  const keyText=text(columnKey);
+  const labels=[keyText,...values.map(x=>x.text)].map(x=>x.toUpperCase());
+  const hasWorking=labels.some(x=>/\b(?:AT\s+WORKING\s+CONDITIONS|OPERATING\s+CONDITIONS)\b/.test(x));
+  const hasDesign=labels.some(x=>/\bDESIGN\s+CONDITIONS?\b/.test(x));
+  const hasP1=labels.some(x=>/\bP1\b|\bDESIGN\s+PRESSURE\b|\bPRESSURE\s+(?:MAX|MAXIMUM)\b/.test(x));
+  if(hasWorking||!hasP1) return {ok:false,code:hasWorking?'WORKING_PRESSURE_COLUMN_NOT_DESIGN_P1':'DESIGN_P1_HEADER_NOT_ESTABLISHED',columnKey};
+  // A single unambiguous design-pressure header is enough for a flat
+  // CSV table; the source XLSX adds its stronger DESIGN CONDITIONS band.
+  const found=[];
+  for(const raw of labels){
+    const compacted=raw.replace(/\s+/g,'');
+    if(/KPA(?:\(G\)|G\b)?/.test(compacted)) found.push('KPA');
+    else if(/MPA(?:\(G\)|G\b)?/.test(compacted)) found.push('MPA');
+    else if(/PSIG\b/.test(compacted)) found.push('PSIG');
+    else if(/PSIA\b/.test(compacted)) found.push('PSIA');
+    else if(/\bBARG\b/.test(raw)) found.push('BARG');
+    else if(/\bBAR\b/.test(raw)) found.push('BAR');
+  }
+  const units=[...new Set(found)];
+  if(units.length!==1) return {ok:false,code:units.length?'DESIGN_P1_UNIT_CONFLICT':'DESIGN_P1_UNIT_NOT_IN_SOURCE_HEADER',columnKey};
+  const gauge=labels.some(x=>/\(G\)|\bGAUGE\b|\bBARG\b|\bPSIG\b/.test(x));
+  const absolute=labels.some(x=>/\(A\)|\bABSOLUTE\b|\bPSIA\b/.test(x));
+  const pressureBasis=gauge&&!absolute?'GAUGE':absolute&&!gauge?'ABSOLUTE':'UNRESOLVED';
+  const evidence={
+    ok:true,unit:units[0],columnKey,
+    source:'line-list-header-band:'+columnKey,
+    pressureBasis,
+    designBandPresent:hasDesign,
+    headerFragments:values.filter(v=>
+      /DESIGN|PRESSURE|KPA|MPA|\bPSI|\bBAR|\bPA\b/i.test(v.text)),
+    authority:'VERIFIED_COLUMN_HEADER_STRUCTURE_NOT_PROJECT_APPROVAL'
+  };
+  return evidence;
+}
