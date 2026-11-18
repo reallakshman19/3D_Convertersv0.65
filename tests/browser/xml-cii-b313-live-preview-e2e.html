@@ -112,7 +112,7 @@ try {
   assert(proofJson.rows.every((r,i)=>r.ordinal===i+1),'Physical ordinal order changed');
   assert(proofJson.rows.every(r=>!r.pullEligible),'Screening cannot set Pull eligibility');
   const proofCsv=await evidenceBlobs[0].text();
-  assert(proofCsv.split('\\r\\n').filter(Boolean).length===42,
+  assert(proofCsv.split('\r\n').filter(Boolean).length===42,
     'Exporter CSV does not have 41 source-ordered physical rows plus header');
 
   assert(host.querySelectorAll('[data-mc-b313-report]').length === 1,
