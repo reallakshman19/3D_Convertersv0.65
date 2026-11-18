@@ -11,6 +11,11 @@ import {
   b313SourceConfirmsA106Seamless,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261117-b313-source-unit-class-1';
 
+import {
+  buildPreviewB313AutomaticWallColumnReport,
+  renderPreviewB313CalculatedWallCells,
+} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-b313-common-punit';
+
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
 const FACTORS = ['S', 'E', 'W', 'Y'];
@@ -497,6 +502,19 @@ function stressUnitCell(model) {
 function panelHtml(models, config = {}, physicalRowCount = models.length) {
   const tolerance = config?.b313WallUpdate?.millTolerance || { basis: 'percent', value: 12.5 };
   const csFallback = config?.b313WallUpdate?.materialFallback?.enabled !== false;
+  const commonPUnit = text(config?.b313WallUpdate?.commonPressureUnitFallback || 'AUTO').toUpperCase();
+  // A source header is a suggestion for the one shared fallback, not proof
+  // that every effective Preview P1 still matches its original source cell.
+  const sourceUnits = [...new Set((config?.linelist?.masterRows || [])
+    .filter(r => /^line-list-header-band:/i.test(text(r?._sourceP1HeaderSource))
+      && Array.isArray(r?._sourceP1HeaderTexts)
+      && r._sourceP1HeaderTexts.some(h => /PRESSURE\s+(MAX|MAXIMUM)|DESIGN\s+PRESSURE/i.test(text(h))))
+    .map(r => text(r?._sourceP1Unit).toUpperCase()).filter(Boolean))];
+  const lineListHint = sourceUnits.length === 1
+    ? 'Selected Line List design-pressure header: ' + (sourceUnits[0] === 'KPA' ? 'kPa(g)' : sourceUnits[0])
+      + '. This is a shared fallback suggestion, NOT row-level P1 verification.'
+    : sourceUnits.length > 1 ? 'Selected Line List has conflicting design-pressure units; verify before fallback.'
+      : 'No consistent selected Line List design-pressure header receipt is available.';
   const rowsHtml = models.map((model) => {
     const source = model.materialSource ? `source ${esc(model.materialSource)}` : 'source unknown';
     const t1 = model.t1 ? `${esc(model.t1)} °C` : 'unresolved';
@@ -533,9 +551,9 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'W', 'weldStrengthReductionW', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'Y', 'coefficientY', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:260px;">
-        <div style="display:flex;gap:4px;"><select data-b313-auto-field="pressureUnit" aria-label="4 Preview P unit for conditional calculation"><option value="AUTO">P unit AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.pressureUnit)===u?'selected':''}>${u}</option>`).join('')}</select>
+        <div style="display:flex;gap:4px;"><span data-b313-auto-preview-punit style="font-size:10px;">P1 unit ${esc(model.previewP1Unit || (text(model.storedBasis?.pressureUnit) && text(model.storedBasis.pressureUnit).toUpperCase() !== 'AUTO' ? 'legacy basis '+model.storedBasis.pressureUnit : 'unresolved'))}</span>
         <select data-b313-auto-field="dimensionStandard" aria-label="Pipe dimension standard"><option value="AUTO">Dimension AUTO</option>${['ASME B36.10M','ASME B36.19M'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.dimensionStandard)===u?'selected':''}>${u}</option>`).join('')}</select></div>
-        <div style="font-size:9px;color:#fbbf24;margin:3px 0;">P unit changes recalculate screening only; S/E/W/Y remain unapproved.</div>
+        <div style="font-size:9px;color:#fbbf24;margin:3px 0;">Use the common P1-unit fallback above when the Preview source unit is missing; S/E/W/Y remain unapproved.</div>
         <div data-b313-auto-factor-qualification data-b313-qualification="${esc(prefill.qualification)}" style="font-size:10px;color:#fbbf24;font-weight:700;">Qualification: ${esc(prefill.qualification)} · ${prefill.eligibleForPull?'qualified values':'not approved for Pull'}</div>
         <div data-b313-auto-evidence style="font-size:9px;color:#cbd5e1;max-width:360px;overflow-wrap:anywhere;">Evidence: ${esc(evidenceText)}</div>
         <input type="text" data-b313-auto-source-reference aria-label="Factor source reference; replace screening evidence to qualify" placeholder="Qualified source reference (required to approve)" value="${esc(prefill.sourceReference)}" style="margin-top:4px;width:98%;">
@@ -551,6 +569,8 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"><strong>Wall Thickness Review — DTXR evidence, B31.3 basis &amp; results</strong><span style="font-size:10px;color:#94a3b8;">${physicalRowCount} physical Preview row(s) · ${models.length} occurrence-scoped basis entry/entries</span></div>
     <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">Primary path: effective Preview Material → 8 Config material-code mapping and exact-DN Piping Class evidence → qualified S at T1 and governed E/W/Y rules → calculated wall → explicit Pull. The source trace is identification evidence, not ASME factor approval. Unqualified candidates cannot calculate automatically. Manual S/E/W/Y remains a separately reviewed fallback, not strict factor data. Only source-confirmed ASTM A106 pipe may imply seamless manufacturing; generic CS does not.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
+      <label>Common P1 unit fallback <select data-b313-common-pressure-unit aria-label="Shared pressure unit fallback for 4 Preview B31.3 screening"><option value="AUTO" ${commonPUnit==='AUTO'?'selected':''}>None / AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI','PA'].map(u=>`<option value="${u}" ${commonPUnit===u?'selected':''}>${u==='KPA'?'kPa(g)':u}</option>`).join('')}</select></label>
+      <small style="color:#fbbf24;">${esc(lineListHint)} Fallback applies only to missing P1 units, gives a WHAT-IF number and never permits Pull.</small>
       <label>Mill tolerance <select data-b313-mill-basis><option value="percent" ${tolerance.basis==='percent'?'selected':''}>%</option><option value="absolute" ${tolerance.basis==='absolute'?'selected':''}>mm</option></select></label>
       <input type="number" step="any" min="0" data-b313-mill-value value="${esc(tolerance.value ?? 12.5)}" style="width:80px;">
       <label><input type="checkbox" data-b313-cs-fallback ${csFallback?'checked':''}> Use CS fallback for unknown material</label>
@@ -645,7 +665,9 @@ function bindRefresh(panel, host, config, models, options) {
       designApproved: rowEl?.querySelector?.('[data-b313-auto-design-approved]')?.checked === true,
       csFallbackReviewed: rowEl?.querySelector?.('[data-b313-auto-cs-reviewed]')?.checked === true,
       identityReviewed: rowEl?.querySelector?.('[data-b313-auto-identity-reviewed]')?.checked === true,
-      pressureUnit: text(rowEl?.querySelector?.('[data-b313-auto-field="pressureUnit"]')?.value || 'AUTO'),
+      // Preserve any older per-basis unit for compatibility; common fallback
+      // is edited once above and never duplicated into per-row basis records.
+      pressureUnit: text(model.storedBasis?.pressureUnit || 'AUTO'),
       dimensionStandard: text(rowEl?.querySelector?.('[data-b313-auto-field="dimensionStandard"]')?.value || 'AUTO'),
     };
     const status = rowEl.querySelector?.('[data-b313-auto-status]');
@@ -742,20 +764,35 @@ export function setPreviewB313PressureUnitOnly(config, basisKey, pressureUnit) {
     basisKey,pressureUnit:chosen,eligibleForPull:false};
 }
 
+/** One common P1 fallback for all unresolved 4 Preview rows, never a row override. */
+export function setPreviewB313CommonPressureUnitFallback(config, pressureUnit) {
+  const allowed=new Set(['AUTO','PA','KPA','MPA','BAR','BARG','PSI','PSIG']);
+  const chosen=text(pressureUnit).toUpperCase();
+  if(!config || !allowed.has(chosen)) return {ok:false,code:'INVALID_COMMON_P1_UNIT'};
+  if(!config.b313WallUpdate || typeof config.b313WallUpdate!=='object'
+      || Array.isArray(config.b313WallUpdate)) config.b313WallUpdate={};
+  config.b313WallUpdate.commonPressureUnitFallback=chosen;
+  config.b313WallUpdate.commonPressureUnitFallbackSource=chosen==='AUTO'
+    ?'DISABLED':'USER_SELECTED_SHARED_SCREENING_ASSUMPTION';
+  return {ok:true,code:'COMMON_P1_UNIT_SCREENING_ONLY',pressureUnit:chosen,
+    eligibleForPull:false};
+}
+
 function bindScreeningPressureUnit(panel,host,config,models,options) {
-  const byKey=new Map(models.map(model=>[text(model.basisKey),model]));
-  panel?.querySelectorAll?.('select[data-b313-auto-field="pressureUnit"]').forEach(select=>
-    select.addEventListener('change',async()=>{
-      const row=select.closest('[data-b313-auto-key]');
-      const key=text(row?.dataset?.b313AutoKey);
-      if(!byKey.has(key))return;
-      const result=setPreviewB313PressureUnitOnly(config,key,select.value);
-      if(!result.ok)return;
-      // Preserve the user's effective 4 Preview snapshot. Re-evaluate the
-      // separate conditional screening result using the explicit chosen unit.
-      await options?.onSaveConfigPreservePreview?.(config);
-      host?.querySelector?.('[data-mc-b313-wall-update]')?.click?.();
-    }));
+  const select=panel?.querySelector?.('[data-b313-common-pressure-unit]');
+  select?.addEventListener('change',async()=>{
+    const result=setPreviewB313CommonPressureUnitFallback(config,select.value);
+    if(!result.ok)return;
+    await options?.onSaveConfigPreservePreview?.(config);
+    // Refresh only the display cells. Do not invoke the governed B31.3
+    // action, mutate proposalsByBranch or alter saved Wall Thk/CII.
+    const liveRows=Array.isArray(host?.__xmlCiiPreviewResult?.branchRows)
+      ?host.__xmlCiiPreviewResult.branchRows:[];
+    if(liveRows.length) {
+      const report=buildPreviewB313AutomaticWallColumnReport({rows:liveRows,config,host});
+      renderPreviewB313CalculatedWallCells(host,report);
+    }
+  });
 }
 
 function bindMillAndCsControls(panel, host, config, rows, options) {
