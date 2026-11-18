@@ -1004,8 +1004,8 @@ export function buildPreviewB313CalculatedWallDisplay({
   const initial=reference || buildPreviewB313ScreeningReference({
     row,config,previewNodeRows,rowIndex,
   });
-  let chosen=initial;
-  let hypotheticalKpa=false;
+  const chosen=initial;
+  let hypotheticalScenario=null;
   // An unverified P1 unit cannot be promoted to "confirmed kPa". But the
   // OWNER asked to SEE the arithmetic without qualifying factors or Pull.
   // Separately expose an unmistakably HYPOTHETICAL kPa(g) what-if when
@@ -1030,8 +1030,18 @@ export function buildPreviewB313CalculatedWallDisplay({
     });
     if(trial?.ok&&trial?.holdReasons?.length===0
         && trial?.conditionalScenario?.calculationOk===true){
-      chosen=trial;
-      hypotheticalKpa=true;
+      const display=buildPreviewB313CalculatedWallDisplay({
+        row,config:trialConfig,previewNodeRows,rowIndex,reference:trial,
+      });
+      if(display.ok) hypotheticalScenario={
+        ...display,
+        code:'HYPOTHETICAL_KPA_UNIT_UNVERIFIED',
+        hypotheticalKpa:true,
+        sourcePressureUnitUnverified:true,
+        pressureUnitSource:'UNVERIFIED_KPA_GAUGE_DISPLAY_HYPOTHESIS',
+        explanation:'WHAT-IF ONLY: assumes P1 is kPa(g); 4 Preview pressure unit remains unresolved. Not an engineering design result or Pull.',
+        eligibleForPull:false,
+      };
     }
   }
   const pressureUnitAssumed=chosen?.pressureUnitAssumed===true;
@@ -1043,20 +1053,20 @@ export function buildPreviewB313CalculatedWallDisplay({
       ok:false,code:chosen?.code||'PREVIEW_CALC_INPUTS_INCOMPLETE',
       rowIndex,requiredNominalThicknessMm:null,pressureDesignThicknessMm:null,
       reason:errors.length?errors.join('; '):chosen?.code||'Missing 4 Preview calculation inputs',
+      hypotheticalScenario,
       pressureUnitAssumed:false,eligibleForPull:false,
     };
   }
   return {
-    ok:true,code:hypotheticalKpa?'HYPOTHETICAL_KPA_UNIT_UNVERIFIED':'CALCULATED_REFERENCE_WALL',
-    hypotheticalKpa,sourcePressureUnitUnverified:hypotheticalKpa,
-    explanation:hypotheticalKpa?'WHAT-IF ONLY: assumes P1 is kPa(g); current 4 Preview P1 unit is unresolved. Select a documented shared P1 basis before engineering use.':'' ,
+    ok:true,code:'CALCULATED_REFERENCE_WALL',
+    hypotheticalKpa:false,sourcePressureUnitUnverified:false,
     rowIndex,requiredNominalThicknessMm:scenario.requiredNominalThicknessMm,
     pressureDesignThicknessMm:scenario.pressureDesignThicknessMm,
     classNominalWallMm:scenario.classNominalWallMm,
     classSchedule:scenario.classSchedule,
     classPass:scenario.classPass,
     pressureUnit:chosen.pressureUnit,
-    pressureUnitSource:hypotheticalKpa?'UNVERIFIED_KPA_GAUGE_DISPLAY_HYPOTHESIS':chosen.pressureUnitSource,
+    pressureUnitSource:chosen.pressureUnitSource,
     pressureUnitAssumed,
     pressure:chosen.pressure,
     materialId:chosen.materialId,
