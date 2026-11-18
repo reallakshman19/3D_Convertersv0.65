@@ -4,6 +4,7 @@ import {
 import {
   suggestPreviewB313FallbackBasis,
 } from '../../../converters/xml-cii2019-core/b313-preview-fallback-seed.js?v=20260930-issue781-fallback-seed-1';
+import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import {
   previewB313BasisKey,
   resolvePreviewB313MaterialFromRow,
@@ -234,6 +235,14 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     };
   }
 
+  // Independent, read-only master lookup: numerical S interpolation must
+  // remain available even when strict code/route approval is absent.
+  // "Seamless E=1" here is a conditional screening assumption only.
+  const screeningReference = lookupB313ScreeningFactors({
+    materialId, temperatureC: t1, manufacturingRoute: 'SEAMLESS',
+  });
+  const displayedScreening = screeningReference.ok ? screeningReference : null;
+
   const factorBasis = resolvePreviewB313FactorBasis({
     materialIdentity,
     designTemperatureC: t1,
@@ -296,6 +305,7 @@ export function derivePreviewB313AutoBasisRow(row, config = {}) {
     routeSource,
     routeNeedsReview,
     factorBasis,
+    screeningReference: displayedScreening,
     fallback,
     storedBasis,
     sourceTrace: previewB313SourceTrace(row),
@@ -361,6 +371,31 @@ function infoButton(model, factor) {
   return `<span style="position:relative;display:inline-flex;align-items:center;gap:3px;"><button type="button" data-b313-factor-info-button="${factor}" aria-label="${factor} source info" title="${esc(sourceInfo(model, factor))}" style="width:18px;height:18px;padding:0;border:1px solid #64748b;border-radius:50%;background:#111827;color:#93c5fd;cursor:pointer;font-size:11px;line-height:16px;">i</button><span data-b313-factor-info="${factor}" hidden style="position:absolute;z-index:30;left:20px;top:0;min-width:260px;max-width:360px;padding:7px 8px;border:1px solid #475569;border-radius:6px;background:#020617;color:#e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:10px;white-space:normal;">${esc(sourceInfo(model, factor))}</span></span>`;
 }
 
+/**
+ * Explicit numeric SCREENING reference next to the strict factor status.
+ * Never populates the editable controlled S/E/W/Y fallback input fields.
+ * Does not depend on P1/unit, so users can review interpolation separately.
+ */
+export function renderPreviewB313NumericScreeningReference(model = {}) {
+  const r = model.screeningReference;
+  if (!r?.ok) return '';
+  const s = r.S;
+  const range = (Array.isArray(s?.bracket) ? s.bracket : []).map(p =>
+    `${Number(p.temperatureC)}°C: ${Number(p.Sksi)} ksi`).join(' → ');
+  const seamless = (r.routeOptions || []).find(x => x.route === 'SEAMLESS');
+  const e = seamless?.value ?? null;
+  const value = v => v===null||v===undefined ? 'unavailable' : String(Number(v));
+  return `<div data-b313-auto-screening-reference
+    data-b313-screening-method="${esc(s?.method)}"
+    data-b313-screening-basis="${esc(r.basisId)}"
+    style="margin-top:5px;padding:6px;border:1px solid #f59e0b;border-radius:4px;background:#29200b;color:#fef3c7;font-size:10px;">
+    <strong>MASTER SCREENING NUMBERS · reference only, not Pull eligible</strong>
+    <div data-b313-screening-values>S ${Number(s.MPa).toFixed(3)} MPa (${value(s.ksi)} ksi) · E ${value(e)} (conditional Seamless) · W ${value(r.W)} · Y ${value(r.Y)}</div>
+    <div>S lookup: ${esc(s.method)} at T1 ${esc(r.temperatureC)}°C · ${esc(range)}</div>
+    <div>Basis ${esc(r.basisId)} · SCREENING, not a qualified B31.3-2024 source. Editable fallback fields are independent.</div>
+  </div>`;
+}
+
 function fallbackInputCell(model, factor, field, options = {}) {
   const fallback = model.fallback?.ok ? model.fallback : (model.storedBasis || {});
   const value = fallback[field] ?? '';
@@ -396,7 +431,7 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
     const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div><div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${renderPreviewB313NumericScreeningReference(model)}<div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:180px;">
         <strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div>
         <input type="text" data-b313-auto-route aria-label="Actual pipe manufacturing route" placeholder="SEAMLESS / EFW_..." value="${esc(model.storedBasis?.manufacturingRoute || (model.routeSource==='confirmed ASTM A106 product specification'?model.route:''))}" style="margin-top:4px;width:98%;">
