@@ -90,6 +90,10 @@ test('wrong header, wrong line and missing current master fail closed at Pull-ti
  const staleCfg={linelist:{masterRows:prepared.rows.map(x=>({...x,
    ...(String(x.lineNoKey)==='4110003'?{_sourceP1HeaderSource:'line-list-header-band:K'}:{})})),fieldMap}};
  assert.equal(verifyB313PreviewPressureUnitReceipt(row,staleCfg,proof).ok,false);
+ const overridden={...row,p1Source:'override'};
+ assert.equal(resolvePreviewP1LineListHeaderUnit(overridden,cfg).unit,'');
+ assert.equal(inferPreviewPressureUnit(overridden,cfg,null,{},true).unit,'');
+ assert.equal(verifyB313PreviewPressureUnitReceipt(overridden,cfg,proof).ok,false);
  const withoutSource={linelist:{masterRows:[],fieldMap}};
  assert.equal(verifyB313PreviewPressureUnitReceipt(row,withoutSource,proof).ok,false);
 });
