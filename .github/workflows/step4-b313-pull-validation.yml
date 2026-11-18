@@ -27,6 +27,8 @@ on:
       - 'tests/glrd-b313-qualification-readiness.test.mjs'
       - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
+      - 'tabs/xml-cii-2019-standalone/xml-cii-linelist-header-band.js'
+      - 'tabs/xml-cii-2019-standalone/workers/master-dataset-normalize.js'
       - 'tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs'
       - 'tests/xml-cii-glrd-unified-wall-review-approval.test.mjs'
       - 'tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs'
@@ -63,6 +65,8 @@ jobs:
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-dtxr-wall-review.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-bore-wall-authority.js
+          node --check tabs/xml-cii-2019-standalone/xml-cii-linelist-header-band.js
+          node --check tabs/xml-cii-2019-standalone/workers/master-dataset-normalize.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-dryrun-core.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js
@@ -87,6 +91,7 @@ jobs:
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
             tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
+            tests/xml-cii-b313-header-band-source-unit.test.mjs \
             tests/xml-cii-b313-preview-source-pressure-class-wall.test.mjs \
             tests/xml-cii-b313-preview-od-selection.test.mjs \
             tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
