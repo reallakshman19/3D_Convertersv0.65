@@ -29,7 +29,7 @@ const config={linelist:{masterRows:Array.from({length:16},(_,i)=>({lineKey:'ACTU
 
 
 test('30 physical-row source-to-wall ledger is complete, never treats screening as approved',()=>{
- const original=JSON.stringify(config);
+ const beforeRows=JSON.stringify(rows);
  const report=buildPreviewB313WallUpdateReport({rows,config});
  const ledger=buildPreviewB313SourceToWallLedger(report);
  assert.equal(ledger.rows.length,30);
@@ -43,13 +43,13 @@ test('30 physical-row source-to-wall ledger is complete, never treats screening 
  assert.equal(ledger.rows[0].t1,'120');
  assert(ledger.rows[0].qualifiedCode);
  const csv=previewB313LedgerCsv(ledger);
- assert.equal(csv.split('\\r\\n').filter(Boolean).length,31);
+ assert.equal(csv.split('\r\n').filter(Boolean).length,31);
  assert.match(csv,/sourceCoverageStatus/);
  assert.match(csv,/P1_UNIT_SOURCE_UNRESOLVED|PREVIEW_MASTER_OUT_OF_SYNC/);
  const html=renderPreviewB313WallAuditHtml(report);
  assert.match(html,/Download source → wall CSV \(30 rows\)/);
  assert.match(html,/Independent selected-master cross-check/);
- assert.equal(original===JSON.stringify(config),false,'basis creation may be mutable, but source rows never are');
+ assert.equal(JSON.stringify(rows),beforeRows,'source rows were mutated by proof export');
 });
 
 test('CSV export never evaluates workbook-supplied formula-like strings',()=>{
