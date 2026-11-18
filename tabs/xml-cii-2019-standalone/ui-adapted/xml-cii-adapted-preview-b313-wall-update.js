@@ -6,9 +6,10 @@ import {
 } from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20261116-b313-pull-v065';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { listPipeWallsForSize } from '../../../converters/pipe-wall-master/index.js';
+import { normalizeLineListRow } from '../../../converters/xml-cii2019-core/linelist-mapping.js';
 import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import { markAdaptedPreviewOverrideManual } from './xml-cii-adapted-preview-filldown.js';
-import { _xmlCiiFindLineListRow, _xmlCiiDiagnoseLineListMatch } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
+import { _xmlCiiFindLineListRow, _xmlCiiDiagnoseLineListMatch, _resolveTemperatureRangeToMax } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 export const B313_PREVIEW_ACTION_LABEL = 'Update wall thickness as per B31.3 Sec II';
@@ -72,12 +73,36 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
   const missingP1 = actual.filter(r => !text(r.p1));
   const loadedLineListRows = Array.isArray(config?.linelist?.masterRows)
     ? config.linelist.masterRows.length : null;
+  const sameSourceNumber=(a,b)=>{
+    const parse=(value)=>{
+      const s=text(value).replace(/,/g,'');
+      if (!s) return null;
+      const match=s.match(/[-+]?\\d*\\.?\\d+(?:[Ee][-+]?\\d+)?/);
+      return match&&Number.isFinite(Number(match[0]))?Number(match[0]):null;
+    };
+    const aa=parse(a),bb=parse(b);
+    return aa!==null&&bb!==null&&Math.abs(aa-bb)<=Math.max(1,Math.abs(aa),Math.abs(bb))*1e-9;
+  };
   const sourceReceipts=actual.map((row,ordinal)=>{
     const match=_xmlCiiDiagnoseLineListMatch(row?.lineKey,config);
     const explicitInput=text(row?.p1Source).toLowerCase()==='override'
       && text(row?.t1Source).toLowerCase()==='override';
     const hasP1=Boolean(text(row?.p1));
     const hasT1=Boolean(temperatureText(row));
+    const rawSelected=match.matchIndex!==null
+      ?config?.linelist?.masterRows?.[match.matchIndex]:null;
+    const normalizedSelected=rawSelected
+      ?normalizeLineListRow(rawSelected,config?.linelist?.fieldMap||{},match.matchIndex):null;
+    const sourceP1=text(normalizedSelected?.p1);
+    const sourceT1Raw=text(normalizedSelected?.t1);
+    const sourceT1Range=_resolveTemperatureRangeToMax(sourceT1Raw);
+    const sourceT1=sourceT1Range===null?sourceT1Raw:String(sourceT1Range);
+    const p1FromSource=normalizedToken(row?.p1Source)==='LINELIST';
+    const t1FromSource=normalizedToken(row?.t1Source)==='LINELIST';
+    const p1MatchesSource=!p1FromSource ||
+      (Boolean(sourceP1)&&sameSourceNumber(row.p1,sourceP1));
+    const t1MatchesSource=!t1FromSource ||
+      (Boolean(sourceT1)&&sameSourceNumber(temperatureText(row),sourceT1));
     const sourceUnit=resolvePreviewP1LineListHeaderUnit(row,config);
     const sourceMatch=match.matchIndex!==null;
     let code;
@@ -91,6 +116,10 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
       code='NO_SELECTED_MASTER_LINE';
     else if (row?.lineMiss===true)
       code='PREVIEW_REBUILD_REQUIRED';
+    else if (!p1MatchesSource)
+      code='PREVIEW_SOURCE_P1_CONFLICT';
+    else if (!t1MatchesSource)
+      code='PREVIEW_SOURCE_T1_CONFLICT';
     else if (!hasP1||!hasT1)
       code='MATCHED_SOURCE_PROCESS_FIELDS_MISSING';
     else if (!text(row?.p1Unit) && !sourceUnit.unit)
@@ -107,9 +136,12 @@ export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
       selectedMasterExactMatches:match.exactCount,
       selectedMasterAliasMatches:match.aliasCount,
       p1:text(row?.p1),p1Source:text(row?.p1Source),
+      sourceP1,sourceP1MatchesPreview:p1MatchesSource,
       p1Unit:text(row?.p1Unit||sourceUnit.unit),
-      p1UnitSource:text(row?.p1UnitSource||sourceUnit.source),
+      p1UnitSource:text(row?.p1Unit
+        ?(row?.p1UnitSource||'preview'):sourceUnit.source),
       t1:temperatureText(row),t1Source:text(row?.t1Source),
+      sourceT1,sourceT1Raw,sourceT1MatchesPreview:t1MatchesSource,
       material:materialText(row),
       overrideComplete:explicitInput,
     });
