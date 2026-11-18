@@ -1179,6 +1179,8 @@ export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
     negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
     materialFactorPolicy: 'PREVIEW_MATERIAL_TO_ACTIVE_B313_STRICT_THEN_MANUAL_FALLBACK',
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
+    calculationInputAuthority:'EFFECTIVE_4_PREVIEW_ONLY',
+    rawXmlDesignInputsConsumed:false,
     lineListCoverage,
     summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
     rows: results.map((result, rowIndex) => {
@@ -1302,7 +1304,7 @@ function installAction(host, config, xmlText, options, suppliedRows) {
     button.disabled = true;
     const currentRows = currentPreviewB313Rows(host, suppliedRows);
     try {
-      const report = buildPreviewB313WallUpdateReport({ rows: currentRows, config, xmlText, host });
+      const report = buildPreviewB313WallUpdateReport({ rows: currentRows, config, host });
       await options?.onSaveConfig?.(config);
       await options?.onB313WallUpdateReport?.(report);
       host.querySelector('[data-mc-b313-report]')?.remove?.();
