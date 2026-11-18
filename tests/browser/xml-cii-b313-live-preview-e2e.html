@@ -8,7 +8,12 @@ import {
   xmlCiiBuildAndRenderPreview,
   xmlCiiRenderPreviewPhase,
 } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer-v7.js';
-import { installPreviewB313WallUpdateAuditController } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
+import {
+  installPreviewB313WallUpdateAuditController,
+  renderPreviewB313WallAuditHtml,
+  bindPreviewB313ConditionalManufacturing,
+} from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
+import { buildPreviewB313ScreeningReference } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import { installPreviewB313AutoBasisPanel } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { applyStandaloneProcessParity } from '../../tabs/xml-cii-2019-standalone/xml-cii-standalone-run-parity.js';
@@ -84,6 +89,64 @@ try {
     'Unqualified source inputs must remain not updated');
   assert(!Object.keys(config.b313WallUpdate?.acceptedWallByBranch || {}).length,
     'Calculation must never create accepted Pull walls');
+  // Browser-level independent screening witness. Use a GLRD-shaped
+  // physical row with explicit TEST-ONLY pressure units/OD, not the real
+  // EF05 engineering basis. No Pull state or Preview wall may be modified.
+  const conditionalRow = {
+    branchName:'/GLRD-1000-4"-P4110001-93833-01/B6', lineKey:'P4110001',
+    sizeMm:150,pipingClass:'93833',material:'DSS',
+    materialSource:'process-linelist-material',t1:'120',t1Source:'linelist',
+    p1:'13001',p1Unit:'KPA',p1Source:'linelist',corrosion:'0',
+    pipingClassPipeDnMm:150,pipingClassPipeSourceRow:93833,
+    pipingClassPipeSchedule:'40S',pipingClassPipeWallMm:7.112,
+    pipingClassPipeMaterial:'ASTM A790 UNS S31803',
+  };
+  const conditionalConfig={b313WallUpdate:{bases:{},proposalsByBranch:{},
+    acceptedWallByBranch:{},millTolerance:{basis:'percent',value:12.5}}};
+  const conditionalBefore=JSON.stringify(conditionalConfig);
+  const conditionalReference=buildPreviewB313ScreeningReference({
+    row:conditionalRow,config:conditionalConfig,rowIndex:0,
+    previewNodeRows:[{branchOccurrenceIndex:0,nodeOrdinal:0,
+      nodeNumber:'100',componentType:'PIPE',outsideDiameterMm:168.3}],
+  });
+  assert(conditionalReference.ok, 'Master screening reference is unavailable');
+  assert(conditionalReference.conditionalManufacturing==='SEAMLESS',
+    'Default conditional manufacturing must be Seamless');
+  assert(conditionalReference.conditionalE===1,
+    'Default conditional seamless E must be 1');
+  assert(conditionalReference.eligibleForPull===false,
+    'Conditional manufacturing must not authorize Pull');
+  const probe=document.createElement('section');
+  probe.innerHTML=renderPreviewB313WallAuditHtml({
+    summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
+    rows:[{branchName:conditionalRow.branchName,lineKey:conditionalRow.lineKey,
+      status:'NOT_UPDATED',code:'SCREENING_TEST_ONLY',
+      screeningReference:conditionalReference}],
+  });
+  card.appendChild(probe);
+  bindPreviewB313ConditionalManufacturing(probe);
+  const conditionalSelect=probe.querySelector('[data-b313-conditional-manufacturing]');
+  const conditionalE=probe.querySelector('[data-b313-conditional-e-value]');
+  const seamlessScenario=probe.querySelector('[data-b313-screening-scenario="SEAMLESS"]');
+  const weldedScenario=probe.querySelector('[data-b313-screening-scenario="EFW_SINGLE_BUTT"]');
+  assert(conditionalSelect?.value==='SEAMLESS', 'UI did not select Seamless');
+  assert(conditionalSelect.selectedOptions[0].textContent==='Seamless',
+    'Conditional manufacturing default label is not Seamless');
+  assert(conditionalE?.textContent==='1',
+    'UI did not display E=1 from the master');
+  assert(seamlessScenario?.style.display==='' && weldedScenario?.style.display==='none',
+    'Default wall scenario is not Seamless-only');
+  assert(seamlessScenario?.textContent.includes('5.2448 mm'),
+    'Default seamless wall result is not calculated from the master');
+  conditionalSelect.value='EFW_SINGLE_BUTT';
+  conditionalSelect.dispatchEvent(new Event('change',{bubbles:true}));
+  assert(conditionalE.textContent==='0.8', 'Conditional route change did not update E');
+  assert(seamlessScenario.style.display==='none' && weldedScenario.style.display==='',
+    'Conditional route change did not switch reference wall result');
+  assert(JSON.stringify(conditionalConfig)===conditionalBefore,
+    'Selecting screening manufacturing route mutated saved engineering config');
+  probe.remove();
+
   const rows = host.__xmlCiiPreviewResult.branchRows;
   const a106 = rows.find((row) => String(row.material || '').includes('A106'));
   assert(a106, 'The 41-branch Preview did not resolve A106 material');
@@ -185,7 +248,9 @@ try {
       'Accepted Step 4 wall did not propagate to native enriched XML');
   }
 
-  done({ ok: true, syntheticPullAccepted: true, sameOdNodesUpdated: pipeLedger.length,
+  done({ ok: true, conditionalSeamlessDefaultVerified: true,
+    conditionalE: 1, conditionalAlternativeRouteSwitchVerified: true,
+    syntheticPullAccepted: true, sameOdNodesUpdated: pipeLedger.length,
     zeroOdNodesProtected: branchLedger.length - pipeLedger.length,
     nativeParityFields: nativeInput.appliedFields, nativeWallNodesVerified: pipeLedger.length,
     branchCount: rows.length, a106Material: a106?.material || '',
