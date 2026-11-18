@@ -13,6 +13,7 @@ import {
   renderPreviewB313WallAuditHtml,
   bindPreviewB313ConditionalManufacturing,
   renderPreviewB313CalculatedWallCells,
+  buildPreviewB313AutomaticWallColumnReport,
 } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
 import { buildPreviewB313ScreeningReference,buildPreviewB313CalculatedWallDisplay } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import { installPreviewB313AutoBasisPanel } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
@@ -72,6 +73,14 @@ try {
     'Calculated wall column must exist for all physical Preview rows');
   assert(headerElements.some(h=>h.dataset.colId==='wallThickness'),
     'Existing editable Wall Thk column was replaced instead of preserved');
+  await waitFor(()=>[...liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]')]
+    .every(cell=>cell.dataset.mcB313CalculatedStatus),
+    'automatic physical 4 Preview calculated-wall column before clicking Calculate');
+  assert(!host.querySelector('[data-mc-b313-report]'),
+    'Auto-calculating display column must not execute governed audit/Pull button');
+  assert([...liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]')]
+    .some(cell=>cell.dataset.mcB313CalculatedStatus==='INPUT_REQUIRED'),
+    'Rows lacking real P1/T1 must retain a visible incomplete-input status');
   const legacy = host.querySelector('[data-mc-b313-basis-editor]');
   assert(!legacy || legacy.hidden || legacy.style.display === 'none', 'Legacy B31.3 editor is visible');
   const panel = host.querySelector('[data-mc-b313-auto-basis-panel]');
@@ -169,6 +178,46 @@ try {
     +'<td data-mc-b313-calculated-row="0"><strong data-mc-b313-calculated-value>—</strong>'
     +'<small data-mc-b313-calculated-detail>Calculate</small></td></tr></tbody></table>';
   card.appendChild(independentTableHost);
+
+  // Full controller integration: a newly built, source-complete Preview
+  // fills its numerical column WITHOUT ever clicking the Calculate button.
+  const builtPreviewHost=document.createElement('section');
+  builtPreviewHost.innerHTML='<button type="button" data-mc-b313-wall-update>Calculate</button>'
+    +'<table data-resizable-table="branch-preview"><tbody><tr class="mc-preview-row">'
+    +'<td><span data-test-preserved-wall>7.112</span></td>'
+    +'<td data-mc-b313-calculated-row="0"><strong data-mc-b313-calculated-value>—</strong>'
+    +'<small data-mc-b313-calculated-detail>Calculate</small></td></tr></tbody></table>';
+  builtPreviewHost.__xmlCiiPreviewResult={
+    branchRows:[candidateWithUnit],nodeBoreWallRows:[]};
+  card.appendChild(builtPreviewHost);
+  let autoButtonClicks=0;
+  builtPreviewHost.querySelector('[data-mc-b313-wall-update]')
+    .addEventListener('click',()=>{autoButtonClicks++;});
+  installPreviewB313WallUpdateAuditController({
+    host:builtPreviewHost,config:candidateConfig,rows:[candidateWithUnit],
+  });
+  await waitFor(()=>builtPreviewHost.querySelector('[data-mc-b313-calculated-value]')
+    ?.textContent==='5.983','automatically populated GLRD numerical wall on Preview build');
+  assert(autoButtonClicks===0,'Numerical auto-display must not click governed Calculate');
+  assert(!builtPreviewHost.querySelector('[data-mc-b313-report]'),
+    'Numerical auto-display must not open or run approval audit');
+  assert(candidateConfig.b313WallUpdate.bases
+      && !Object.keys(candidateConfig.b313WallUpdate.bases).length,
+    'Auto column must not persist manual factors or pressure-unit assumptions');
+  builtPreviewHost.dataset.mcB313PreviewDirty='true';
+  await waitFor(()=>builtPreviewHost.querySelector('[data-mc-b313-calculated-value]')
+    ?.textContent==='—','edited Preview invalidates displayed B31.3 required wall');
+  assert(builtPreviewHost.querySelector('[data-mc-b313-calculated-detail]')
+    .textContent==='Rebuild Preview');
+  builtPreviewHost.__xmlCiiPreviewResult={branchRows:[candidateWithUnit],
+    nodeBoreWallRows:[]};
+  builtPreviewHost.dataset.mcB313PreviewDirty='false';
+  await waitFor(()=>builtPreviewHost.querySelector('[data-mc-b313-calculated-value]')
+    ?.textContent==='5.983','rebuild recomputes display-only B31.3 wall');
+  assert(autoButtonClicks===0);
+  builtPreviewHost.__xmlCiiB313WallAuditObserver?.disconnect?.();
+  builtPreviewHost.remove();
+
   const updated=renderPreviewB313CalculatedWallCells(independentTableHost,{
     rows:[{status:'NOT_UPDATED',calculatedWallDisplay:displayResult}]});
   assert(updated.calculatedRows===1&&updated.assumedPressureUnitRows===1,
@@ -440,7 +489,10 @@ try {
       'Accepted Step 4 wall did not propagate to native enriched XML');
   }
 
-  done({ ok: true, calculatedWallColumnVerified: true,
+  done({ ok: true, automaticWallOnBuildVerified: true,
+    noAuditButtonNeededForNumericWall: true,
+    editInvalidatesWallAndRebuildRestores: true,
+    calculatedWallColumnVerified: true,
     assumedKpaWhatIfVisibleInColumnVerified: true,
     populatedNumericFactorsAndEvidenceVerified: true,
     screeningApprovalBlockedInBrowser: true,

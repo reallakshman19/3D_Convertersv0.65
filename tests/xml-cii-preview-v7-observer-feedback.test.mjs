@@ -39,6 +39,20 @@ test('real editable table insert/removal and mixed mutations still trigger captu
     mutation([target(true)]),mutation([target(false)]),
   ]),true);
 });
+test('numeric B31.3 wall cells are presentation-only and never cause cache recapture',async()=>{
+  const file=await readFile(new URL(
+    '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer-v7.js',
+    import.meta.url),'utf8');
+  assert.match(file,/\[data-mc-b313-calculated-row\]/);
+  // The actual DOM closest() returns our calculated cell for its
+  // value/detail descendants; their text mutations must not invalidate
+  // Preview or kick off another expensive background cache recapture.
+  const calculatedCell=target(true);
+  const numericText={nodeType:3};
+  assert.equal(previewV7HasRelevantMutation([
+    mutation([numericText],[numericText],calculatedCell),
+  ]),false);
+});
 test('source and docs V7 runtime mirror remain byte identical',async()=>{
   const name='xml-cii-adapted-preview-renderer-v7.js';
   const source=await readFile(new URL('../tabs/xml-cii-2019-standalone/ui-adapted/'+name,import.meta.url),'utf8');

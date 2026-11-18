@@ -1,3 +1,13 @@
+## 2026-11-18 — Required wall now fills automatically when 4 Preview builds
+
+**Post-merge owner HTML witness:** `v0.65error(2).html` contains 30 physical rows and the new `B31.3 Required (mm)` column, but all 30 column cells show `— Calculate`. The B31.3 action/audit was never run in the saved session, so no row was calculated. The input master factor panel already shows DSS allowable stress at 120°C.
+
+**Correction:** When the existing 4 Preview finishes building, automatically evaluate the separate **display-only calculated required nominal wall** for every effective branch row. Use only Preview Material, T1, P1, available pressure unit or explicitly labeled conditional kPa assumption, class/OD provenance, CA, current factor master S interpolation and conditional Seamless E=1. The result appears immediately in the **B31.3 Required (mm)** column, alongside the editable **Wall Thk**, with source/bracket/assumption tooltip. A missing T1/P1/OD is shown as `—` plus its precise missing-input reason. Rebuild recalculates; pending Preview edits invalidate the previous number.
+
+This is **not** automatic approval: no implicit click of the B31.3 audit button, no opening review panels, no updates to manual S/E/W/Y, `overrides.wallThickness`, source pressure units, approved proposal state, Pull, or native CII. The existing Calculate button remains available for the comprehensive independent engineering audit/CSV/JSON.
+
+Acceptance: exactly the same Preview input row and source-owned evidence yields the same numeric display whether calculated automatically on Build or explicitly via Calculate; no edit can retain a stale displayed wall. Browser test must prove a numeric GLRD row fills **before any Calculate click**, survives no approval mutation, resets on dirty edit and recomputes on Rebuild.
+
 # Phase 4 Preview — B31.3 wall update
 
 ## 2026-11-18 — Owner correction: B31.3 reads 4 Preview only
