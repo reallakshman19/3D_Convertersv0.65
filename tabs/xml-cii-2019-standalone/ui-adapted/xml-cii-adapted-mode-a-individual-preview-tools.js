@@ -13,7 +13,7 @@ export function installModeAIndividualPreviewToolVisibility(workspace) {
   let labeled = false;
   for (const details of workspace.querySelectorAll('details[data-mode-a-source-phase]')) {
     const summary = details.querySelector('summary');
-    if (!/Preview\\s*\\/\\s*Review/i.test(text(summary?.textContent))) continue;
+    if (!/Preview\s*\/\s*Review/i.test(text(summary?.textContent))) continue;
     if (details.dataset.modeAPreviewToolsBound === 'true') continue;
     details.dataset.modeAPreviewToolsBound = 'true';
     const span=details.ownerDocument?.createElement?.('span');
