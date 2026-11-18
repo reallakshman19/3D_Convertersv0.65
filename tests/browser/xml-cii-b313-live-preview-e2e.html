@@ -12,8 +12,9 @@ import {
   installPreviewB313WallUpdateAuditController,
   renderPreviewB313WallAuditHtml,
   bindPreviewB313ConditionalManufacturing,
+  renderPreviewB313CalculatedWallCells,
 } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
-import { buildPreviewB313ScreeningReference } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
+import { buildPreviewB313ScreeningReference,buildPreviewB313CalculatedWallDisplay } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import { installPreviewB313AutoBasisPanel } from '../../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { applyStandaloneProcessParity } from '../../tabs/xml-cii-2019-standalone/xml-cii-standalone-run-parity.js';
@@ -58,6 +59,16 @@ try {
   host.querySelector('[data-mc-preview-build]').click();
   await waitFor(() => host.__xmlCiiPreviewResult?.branchRows?.length === 41, '41 live Preview branch rows');
   await waitFor(() => host.querySelector('[data-mc-b313-auto-basis-panel]'), 'auto-basis panel after Build');
+
+  const liveBranchTable=host.querySelector('table[data-resizable-table="branch-preview"]');
+  assert(liveBranchTable,'No effective physical 4 Preview table found');
+  assert(liveBranchTable.querySelector('[data-col-id="b313CalculatedWall"]')
+    ?.textContent.includes('B31.3 Required (mm)'),
+    'Required nominal wall must be its own visible 4 Preview column');
+  assert(liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]').length===41,
+    'Calculated wall column must exist for all physical Preview rows');
+  assert(liveBranchTable.querySelector('[data-col-id="wallThickness"]'),
+    'Existing editable Wall Thk column was replaced instead of preserved');
   const legacy = host.querySelector('[data-mc-b313-basis-editor]');
   assert(!legacy || legacy.hidden || legacy.style.display === 'none', 'Legacy B31.3 editor is visible');
   const panel = host.querySelector('[data-mc-b313-auto-basis-panel]');
@@ -83,6 +94,12 @@ try {
     'Unified B31.3 audit after source build and calculation');
   const audit = unifiedSlot.querySelector('[data-mc-b313-report]');
   assert(audit.textContent.includes('Evaluated 41'), 'Audit did not use 41 physical Preview rows');
+  assert(audit.querySelector('th') && audit.textContent.includes('Calculated required (mm)'),
+    'Calculated millimetres must also appear as an audit table column');
+  const liveCalcCells=liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]');
+  assert(liveCalcCells.length===41 && [...liveCalcCells].every(e=>e.dataset.mcB313CalculatedStatus),
+    'Calculate did not refresh all 41 physical row wall cells');
+
   const csvButton=audit.querySelector('[data-b313-evidence-download="csv"]');
   const jsonButton=audit.querySelector('[data-b313-evidence-download="json"]');
   assert(csvButton&&jsonButton, 'Source-to-wall CSV/JSON evidence controls unavailable');
@@ -133,6 +150,39 @@ try {
     pipingClassPipeSchedule:'40S',pipingClassPipeWallMm:7.112,
     pipingClassPipeMaterial:'ASTM A790 UNS S31803',
   };
+
+  // The new independent table column must print actual computed millimetres
+  // for a GLRD-shaped Preview row even if approved Pull remains unavailable.
+  const candidateWithUnit={...conditionalRow,p1Unit:''};
+  const candidateConfig={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{}}};
+  const wallBefore=JSON.stringify(candidateConfig);
+  const displayResult=buildPreviewB313CalculatedWallDisplay({
+    row:candidateWithUnit,config:candidateConfig,previewNodeRows:[],rowIndex:0});
+  assert(displayResult.ok&&displayResult.pressureUnitAssumed,
+    'An explicitly identified assumed-kPa what-if must compute numerical wall');
+  const independentTableHost=document.createElement('section');
+  independentTableHost.innerHTML='<table data-resizable-table="branch-preview"><tbody><tr class="mc-preview-row">'
+    +'<td><span data-test-preserved-wall>7.112</span></td>'
+    +'<td data-mc-b313-calculated-row="0"><strong data-mc-b313-calculated-value>—</strong>'
+    +'<small data-mc-b313-calculated-detail>Calculate</small></td></tr></tbody></table>';
+  card.appendChild(independentTableHost);
+  const updated=renderPreviewB313CalculatedWallCells(independentTableHost,{
+    rows:[{status:'NOT_UPDATED',calculatedWallDisplay:displayResult}]});
+  assert(updated.calculatedRows===1&&updated.assumedPressureUnitRows===1,
+    'Read-only Preview calculated-wall cell did not receive numerical reference');
+  const calcCell=independentTableHost.querySelector('[data-mc-b313-calculated-row="0"]');
+  assert(calcCell.querySelector('[data-mc-b313-calculated-value]').textContent==='5.983',
+    'Required nominal wall must appear as 5.983 mm next to Wall Thk');
+  assert(calcCell.querySelector('[data-mc-b313-calculated-detail]').textContent.includes('Assumed kPa'),
+    'Hypothetical pressure unit must be visible without opening a tooltip');
+  assert(calcCell.title.includes('Source')||calcCell.title.includes('Evidence'),
+    'Displayed wall must have independent source and interpolation proof');
+  assert(independentTableHost.querySelector('[data-test-preserved-wall]').textContent==='7.112',
+    'Calculated column changed saved editable Wall Thk');
+  assert(JSON.stringify(candidateConfig)===wallBefore,
+    'New table column calculation must not mutate config or Pull');
+  independentTableHost.remove();
+
   // Browser-visible 4 Preview proof: immediately show S/E/W/Y numbers
   // from the master, before any pressure unit, factor approval or Calculate.
   const screenHost=document.createElement('section');
@@ -387,7 +437,9 @@ try {
       'Accepted Step 4 wall did not propagate to native enriched XML');
   }
 
-  done({ ok: true, populatedNumericFactorsAndEvidenceVerified: true,
+  done({ ok: true, calculatedWallColumnVerified: true,
+    assumedKpaWhatIfVisibleInColumnVerified: true,
+    populatedNumericFactorsAndEvidenceVerified: true,
     screeningApprovalBlockedInBrowser: true,
     liveNumericScreeningPanelVerified: true,
     screeningUnitChangeBrowserVerified: true,
