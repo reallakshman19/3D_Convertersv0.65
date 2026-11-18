@@ -1,7 +1,7 @@
 import { MASTER_FIELDS } from '../ui-adapted/xml-cii-adapted-fields-config.js';
 import { fuzzyAutoMapFields } from '../ui-adapted/xml-cii-adapted-fuzzy-mapper.js';
 import { detectLineListFieldMap, normalizeLineListRow } from '../../../converters/xml-cii2019-core/linelist-mapping.js?v=20260930-issue781-weight-liveness-cache-1';
-import { refineLineListFieldMap } from '../xml-cii-linelist-header-band.js?v=20260930-issue781-linelist-integration-2';
+import { refineLineListFieldMap, resolveLineListDesignPressureHeaderBand } from '../xml-cii-linelist-header-band.js?v=20260930-issue781-linelist-integration-2';
 
 function text(value) {
   return String(value ?? '').trim();
@@ -28,7 +28,28 @@ export function resolveMasterFieldMap(masterKey, rawRows, currentMap = {}, confi
 
 export function normalizeMasterRows(rawRows, fieldMap, masterKey) {
   const rows = Array.isArray(rawRows) ? rawRows : [];
-  if (masterKey === 'lineList') return rows.map((row, index) => normalizeLineListRow(row, fieldMap, index));
+  if (masterKey === 'lineList') {
+    const sourceP1Header=resolveLineListDesignPressureHeaderBand(rows,fieldMap);
+    return rows.map((row,index)=>{
+      const normalized=normalizeLineListRow(row,fieldMap,index);
+      const sourceValue=text(row?.[sourceP1Header.columnKey]);
+      // A source unit can travel with a line only if this exact mapped
+      // physical worksheet cell provided the numeric P1; never attach a
+      // header-band unit to defaults, an override, a neighboring row or
+      // unparsed heading entries.
+      if(!sourceP1Header.ok || !/^[-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?$/.test(sourceValue)
+          || text(normalized.p1)!==sourceValue || !text(normalized.lineNoKey))
+        return normalized;
+      return {
+        ...normalized,_sourceP1Unit:sourceP1Header.unit,
+        _sourceP1HeaderSource:sourceP1Header.source,
+        _sourceP1HeaderPressureBasis:sourceP1Header.pressureBasis,
+        _sourceP1HeaderDesignBand:sourceP1Header.designBandPresent,
+        _sourceP1HeaderTexts:sourceP1Header.headerFragments.map(x=>x.text),
+        _sourceP1OriginalValue:sourceValue,
+      };
+    });
+  }
   return rows.map((row, index) => {
     const normalized = { ...row, _rowIndex: row?._rowIndex || index + 1 };
     for (const [fieldName, sourceHeader] of Object.entries(fieldMap || {})) {
