@@ -532,12 +532,14 @@ function wallCellHtml(entries = []) {
       '<strong style="color:#fbbf24;">—</strong>'+
       '<div style="font-size:10px;color:#fbbf24;">'+esc(result?.reason||'Calculation inputs incomplete')+'</div></div>';
     const value=Number(result.requiredNominalThicknessMm);
-    const status=result.pressureUnitAssumed
-      ? 'WHAT-IF · common P1 '+text(result.pressureUnit)
-      : 'Calculated reference · P1 '+text(result.pressureUnit);
+    const status=result.hypotheticalKpa
+      ? 'HYPOTHETICAL kPa(g) ONLY · P1 unit UNKNOWN · no Pull'
+      : result.pressureUnitAssumed
+        ? 'WHAT-IF · selected common P1 '+text(result.pressureUnit)+' · no Pull'
+        : 'Calculated reference · P1 '+text(result.pressureUnit);
     return '<div data-b313-auto-wall-occurrence="'+rowIndex+'" '+
       (i?'style="margin-top:5px;padding-top:5px;border-top:1px solid #334155;"':'')+'>'+
-      identity+'<strong style="font-size:13px;color:#e2e8f0;">'+value.toFixed(3)+' mm</strong>'+
+      identity+'<strong style="font-size:13px;color:#e2e8f0;">'+value.toFixed(3)+' mm</strong>'+      '<div style="font-size:10px;color:#94a3b8;">Pressure t '+Number(result.pressureDesignThicknessMm).toFixed(3)+' mm · class '+esc(result.classNominalWallMm??'?')+' mm</div>'+      (result.outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY'?'<div style="font-size:9px;color:#fbbf24;">OD from dimension master, NOT verified physical OD</div>':'')+
       '<div style="font-size:10px;color:'+(result.pressureUnitAssumed?'#fbbf24':'#94a3b8')+';">'+
       esc(status)+' · not Pull approved</div></div>';
   }).join('');
