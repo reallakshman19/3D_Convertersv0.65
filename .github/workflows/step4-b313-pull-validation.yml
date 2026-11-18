@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - 'converters/b313-material-factors/index.js'
+      - 'converters/b313-material-factors/screening-reference.js'
+      - 'docs/converters/b313-material-factors/screening-reference.js'
       - 'converters/b313-material-factors/code-factor-rule-engine.js'
       - 'converters/b313-material-factors/default-b313-code-rule-data.js'
       - 'docs/Masters/b313-code-factor-rules.json'
@@ -26,6 +28,8 @@ on:
       - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
       - 'tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs'
+      - 'tests/xml-cii-glrd-unified-wall-review-approval.test.mjs'
+      - 'tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs'
       - 'tests/xml-cii-issue-781-b313-*.test.mjs'
       - '.github/workflows/step4-b313-pull-validation.yml'
   workflow_dispatch:
@@ -48,6 +52,7 @@ jobs:
       - name: Verify syntax
         run: |
           node --check converters/b313-material-factors/index.js
+          node --check converters/b313-material-factors/screening-reference.js
           node --check converters/b313-material-factors/code-factor-rule-engine.js
           node --check scripts/generate-b313-code-factor-rules.mjs
           node --check scripts/generate-b313-material-factors.mjs
@@ -56,6 +61,7 @@ jobs:
           node --check converters/xml-cii2019-core/b313-preview-pull-authority.js
           node --check converters/xml-cii2019-core/b313-preview-wall-update.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-dtxr-wall-review.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-bore-wall-authority.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-dryrun-core.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js
@@ -77,6 +83,7 @@ jobs:
             tests/xml-cii-b313-preview-blocker-ui-static.test.mjs \
             tests/xml-cii-b313-preview-pull-v065.test.mjs \
             tests/xml-cii-b313-preview-wall-update.test.mjs \
+            tests/xml-cii-b313-preview-screening-reference.test.mjs \
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
             tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
@@ -85,7 +92,9 @@ jobs:
             tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
             tests/xml-cii-issue-781-b313-live-row-custody.test.js \
             tests/xml-cii-b313-preview-ui-static.test.js \
+            tests/xml-cii-b313-glrd-16-row-linelist-coverage.test.mjs \
             tests/xml-cii-b313-unified-review-rca.test.mjs \
+            tests/xml-cii-glrd-unified-wall-review-approval.test.mjs \
             tests/xml-cii-mode-a-b313-source-wall-safety.test.mjs
   step4-chromium:
     name: Browser Step 4 live Preview

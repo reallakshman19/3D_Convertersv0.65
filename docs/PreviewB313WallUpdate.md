@@ -244,6 +244,56 @@ Merging this Preview adoption does not complete B31.3 design-authority qualifica
 
 When the effective Preview material is blank or genuinely unmapped, the B31.3 basis panel may offer the configured **CS** family fallback. It does not rewrite the Preview Material cell, does not override known non-CS identities (for example stainless), and requires explicit user confirmation before Pull. The CS family is not itself an allowable-stress record: a controlled exact material identity and qualified S/E/W/Y or independently reviewed manual basis are required for engineering acceptance. The default may be disabled in project settings.
 
+## Read-only screening reference from the existing material master
+
+The same **4 Preview → Calculate B31.3 pressure-design wall (review only)**
+action now shows two separate results for each physical row:
+
+- **Qualified calculation:** existing strict S/E/W/Y, controlled manual
+  fallback and explicit Pull. There is no change to acceptance authority.
+- **SCREENING MASTER LOOKUP — NOT PULL ELIGIBLE:** reads the existing
+  `docs/Masters/b313-material-factor-master.json → screeningBases`,
+  resolves the actual 4 Preview material + T1 and reports S, E, W, Y with
+  exact/interpolated source temperatures. If source-bound P1 unit, corrosion,
+  OD and dimensional evidence are present, it displays conditional route-
+  specific pressure wall and required nominal thickness scenarios.
+
+For example, source screening basis `OWNER-B313-SEWY-2026-08-11`
+contains `DSS-A790-S31803` at 120°C with S=29.5 ksi,
+W=1, Y=0.4, and route-dependent E. `LTCS-A333-6` at 82°C
+interpolates S=20 ksi between the 80°C and 120°C master records.
+The displayed provenance and interpolation bracket allow direct review.
+
+For the **conditional screening calculation**, when a physical manufacturing route
+has not been evidenced in 4 Preview the *display default* is now
+**Conditional manufacturing = Seamless; E = 1.0**, read directly from that
+material's existing screening EByRoute entry. This is an explicitly labeled
+assumption, **not** a claim about the physical pipe. A route selector in the
+existing B31.3 audit switches between the other master-supplied E scenarios,
+without changing any source data or approval.
+
+The actual physical route remains unknown until reviewed pipe-product
+evidence establishes it. The screening-default route never sets the strict
+factor basis or a Pull approval. The reference also preserves
+`conditionalRouteSource: 'DEFAULT_SEAMLESS_SCREENING_ONLY'` and
+`conditionalRouteAssumed: true` in its evidence.
+
+ If the P1 pressure unit is unresolved, S/E/W/Y
+can still be displayed but **no numerical pressure wall** is calculated.
+Missing source OD, unsupported temperature, material conflicts and missing
+corrosion likewise remain visible HOLDs.
+
+The reference does not create `proposalsByBranch`, write
+`acceptedWallByBranch`, set `overrides.wallThickness`, or affect
+`summary.calculatedRows`. It is ineligible for Pull by construction;
+the actual strict code/master governance is unchanged. This is deliberately
+not an engineering endorsement of the owner's screening coefficients.
+
+Reproduction:
+```sh
+node --test tests/xml-cii-b313-preview-screening-reference.test.mjs
+```
+
 ## Release boundary
 
 An accepted Pull is recorded as user-accepted and **pending native output verification**. A successful UI calculation is not a verified design or proof of native CII parity. Strict factor master qualification and Owner-supplied actual input/output cases remain required for release.

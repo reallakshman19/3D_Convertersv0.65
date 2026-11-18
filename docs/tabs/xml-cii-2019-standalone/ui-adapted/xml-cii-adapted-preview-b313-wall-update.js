@@ -6,6 +6,7 @@ import {
 } from '../../../converters/xml-cii2019-core/b313-preview-wall-update.js?v=20261116-b313-pull-v065';
 import { b313PreviewInputSignature, b313PreviewNodeSignature } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import { listPipeWallsForSize } from '../../../converters/pipe-wall-master/index.js';
+import { lookupB313ScreeningFactors } from '../../../converters/b313-material-factors/screening-reference.js';
 import { markAdaptedPreviewOverrideManual } from './xml-cii-adapted-preview-filldown.js';
 import { _xmlCiiFindLineListRow } from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v065';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
@@ -54,6 +55,37 @@ function materialText(row) {
 
 function temperatureText(row) {
   return text(row?.t1 ?? row?.designTemperature ?? '');
+}
+
+/**
+ * A loaded Line List is not proof it covers the active physical branch set.
+ * This diagnostic consumes the ACTUAL current Preview snapshot; it never
+ * assigns or copies material, design pressure, or design temperature.
+ */
+export function buildPreviewB313LineListCoverage(rows = [], config = {}) {
+  const actual = Array.isArray(rows) ? rows.filter(r => r && typeof r === 'object') : [];
+  const missing = actual.filter(r => r.lineMiss === true);
+  const matched = actual.filter(r => r.lineMiss === false);
+  const missingProcess = missing.filter(r => !temperatureText(r) || !text(r.p1));
+  const missingT1 = actual.filter(r => !temperatureText(r));
+  const missingP1 = actual.filter(r => !text(r.p1));
+  const loadedLineListRows = Array.isArray(config?.linelist?.masterRows)
+    ? config.linelist.masterRows.length : null;
+  return {
+    schema: 'b313-preview-linelist-coverage/v1',
+    physicalRows: actual.length,
+    loadedLineListRows,
+    matchedPhysicalRows: matched.length,
+    unmatchedPhysicalRows: missing.length,
+    missingT1Rows: missingT1.length,
+    missingP1Rows: missingP1.length,
+    missingProcessRows: missingProcess.length,
+    missingLineKeys: [...new Set(missingProcess.map(r => text(r.lineKey)).filter(Boolean))].sort(),
+    // Explicit physical line match is required; neither class-specific
+    // material lookup nor a service-consensus candidate is design authority.
+    sourceEvidenceComplete: missingProcess.length === 0 && missingT1.length === 0
+      && missingP1.length === 0,
+  };
 }
 
 /**
@@ -542,7 +574,7 @@ function renderBasisEditor(host, config, rows, options) {
     <div style="font-size:10px;color:#94a3b8;margin:4px 0;">The Engineering tab edits candidate data only; Preview reads the published active material-factor master. Publish/review controlled factors before they become the strict automatic basis.</div>
     <div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:1420px;"><thead><tr><th>Preview Material / T1</th><th>B31.3 identity / factor status</th><th>Engineering</th><th>Fallback S</th><th>S unit</th><th>E</th><th>W</th><th>Y</th><th>Route</th><th>P unit</th><th>Dimension std</th><th>Fallback source</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
   </details>`;
-  actionCard.insertAdjacentHTML('afterend', html);
+  (host.querySelector('[data-mc-wall-review]') || actionCard).insertAdjacentHTML('afterend', html);
   editor = host.querySelector('[data-mc-b313-basis-editor]');
 
   editor?.querySelectorAll?.('[data-b313-open-material]').forEach((button) => button.addEventListener('click', () => {
@@ -601,6 +633,10 @@ export function collectPreviewB313IndependentIssues(row = {}, config = {}) {
   if (!unit?.unit) {
     issues.push({ code: 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED',
       message: 'P1 unit unknown or conflicting: confirm source; never infer from numeric P1 or hydro test' });
+  }
+  if (row?.lineMiss === true && (!temperatureText(row) || !text(row?.p1))) {
+    issues.push({ code: 'B313_PREVIEW_LINE_LIST_SOURCE_MISSING',
+      message: 'No matched effective Line List evidence supplies P1/T1 for this physical line. Verify the selected workbook worksheet and exact line key; do not borrow a neighboring line.' });
   }
   const t1 = temperatureText(row);
   if (!t1 || !Number.isFinite(Number(t1)) || Number(t1) <= -273.15 ||
@@ -661,11 +697,136 @@ export function qualifyPreviewB313ClassWall(row = {}, calc = {}) {
     masterCandidateSchedule:calc.selectedSchedule,masterCandidateWallMm:calc.selectedNominalWallMm};
 }
 
+
+/**
+ * Separate, read-only numerical reference generated from the actual 4 Preview
+ * fields and screening master. A result here is NEVER stored in proposalsByBranch,
+ * overrides.wallThickness or acceptedWallByBranch. No Pull authority is granted.
+ */
+export function buildPreviewB313ScreeningReference({
+  row = {}, config = {}, previewNodeRows = [], rowIndex = 0,
+} = {}) {
+  const identity = resolvePreviewB313MaterialFromRow(row, config);
+  if (!identity.ok) return { ok:false,authority:'SCREENING_REFERENCE_ONLY',
+    code:identity.code,holdReasons:['Preview material/class identity unresolved'] };
+  const basisConfig = config?.b313WallUpdate || {};
+  const key = previewB313BasisKey(row, {b313WallUpdate:basisConfig});
+  const manualBasis = basisForRow({bases:basisConfig.bases||{}},row,key).basis || {};
+  const sourceSeamless = b313SourceConfirmsA106Seamless(row,identity);
+  const declaredRoute = text(manualBasis.manufacturingRoute)
+    || (sourceSeamless ? 'SEAMLESS' : '');
+  const reference = lookupB313ScreeningFactors({
+    materialId:identity.material.materialId,
+    temperatureC:temperatureText(row),
+    manufacturingRoute:declaredRoute,
+  });
+  if (!reference.ok) return {...reference,holdReasons:[],materialId:identity.material.materialId};
+  const holdReasons = [];
+  const rawP1=text(row?.p1).replace(/,/g,'');
+  const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
+  if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
+    holdReasons.push('Positive source P1 is missing or default-only');
+  const pressureBasis = inferPreviewPressureUnit(row,config,
+    {pressureUnit:'',byBranch:new Map()},manualBasis,true);
+  if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
+  const corrosion=nonNegative(row?.corrosion);
+  if (corrosion===null) holdReasons.push('Corrosion allowance missing');
+  const t1Source=normalizedToken(row?.t1Source);
+  if (t1Source==='NONE'||t1Source==='DEFAULT') holdReasons.push('T1 source is not established');
+  const dimension=inferPreviewDimensionStandard(row,manualBasis,identity);
+  if (!dimension.standard) holdReasons.push('Pipe dimension standard unresolved');
+  const scoped=previewNodeRows.filter(n=>Number(n.branchOccurrenceIndex)===rowIndex
+    && positive(n.outsideDiameterMm));
+  const ods=[...new Set(scoped.map(n=>positive(n.outsideDiameterMm)).filter(Boolean))];
+  const od=ods.length===1?ods[0]:null;
+  if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
+    :'Source node outside diameter missing');
+  const referenceOd=dimension.standard
+    ? masterOutsideDiameterMm(row?.sizeMm??row?.boreMm,dimension.standard):null;
+  if (od && (!referenceOd || Math.abs(od-referenceOd)>Math.max(1.5,referenceOd*0.02)))
+    holdReasons.push('Source OD and size-master reference do not agree');
+  // Each route is a WHAT-IF scenario if the source did not establish a route.
+  // The route alternatives come from the actual screening master, not guesses.
+  const routes=reference.E!==null
+    ? [{route:reference.selectedRoute,value:reference.E}]
+    : reference.routeOptions;
+  const scenarios=[];
+  if (!holdReasons.length) for(const candidate of routes){
+    const calc=calculateAndSelectPreviewB313Wall({
+      dn:row?.sizeMm??row?.boreMm,
+      outsideDiameterMm:od,
+      designPressure:pressure,
+      pressureUnit:pressureBasis.unit,
+      corrosionAllowanceMm:corrosion,
+      allowableStress:reference.S.MPa,
+      stressUnit:'MPa',
+      qualityFactorE:candidate.value,
+      weldStrengthReductionW:reference.W,
+      coefficientY:reference.Y,
+      dimensionStandard:dimension.standard,
+      negativeMillTolerance:manualBasis.negativeMillTolerance
+        || basisConfig.millTolerance || {basis:'percent',value:12.5},
+      mechanicalAllowanceMm:manualBasis.mechanicalAllowanceMm??0,
+      erosionAllowanceMm:manualBasis.erosionAllowanceMm??0,
+      otherAllowanceMm:manualBasis.otherAllowanceMm??0,
+      edition:'2024',
+    });
+    const classSelection=calc.ok?qualifyPreviewB313ClassWall(row,calc):null;
+    scenarios.push({
+      manufacturingRoute:candidate.route,
+      routeAssumed:!reference.selectedRoute,
+      E:candidate.value,
+      code:calc.code,
+      calculationOk:calc.ok===true,
+      pressureDesignThicknessMm:calc.calculation?.pressureDesignThicknessMm??null,
+      requiredNominalThicknessMm:calc.calculation?.requiredNominalThicknessMm??null,
+      pipeWallMasterSelectedMm:calc.ok?calc.selectedNominalWallMm:null,
+      classNominalWallMm:positive(row?.pipingClassPipeWallMm),
+      classSchedule:text(row?.pipingClassPipeSchedule)||null,
+      classPass:classSelection?.ok===true,
+      classCode:classSelection?.code||null,
+      classMarginMm:classSelection?.ok?classSelection.marginMm:null,
+    });
+  }
+  // Screening-only default: conditional pipe manufacture is SEAMLESS
+  // (E = 1) unless the caller's basis already names a supported route.
+  // This default does NOT establish actual pipe manufacture or give Pull
+  // authority. All alternative E routes remain independently calculated.
+  const conditionalChoice = reference.routeOptions.find(choice =>
+    normalizedToken(choice.route) === normalizedToken(reference.selectedRoute || 'SEAMLESS')) || null;
+  const conditionalRoute = conditionalChoice?.route || null;
+  const conditionalE = conditionalChoice?.value ?? null;
+  const conditionalScenario = scenarios.find(s =>
+    normalizedToken(s.manufacturingRoute) === normalizedToken(conditionalRoute)) || null;
+  return {
+    ...reference,
+    conditionalManufacturing: conditionalRoute,
+    conditionalE,
+    conditionalRouteSource: reference.selectedRoute ? 'DECLARED_ROUTE_SCREENING_ONLY'
+      : conditionalChoice ? 'DEFAULT_SEAMLESS_SCREENING_ONLY' : 'ROUTE_UNRESOLVED',
+    conditionalRouteAssumed: !reference.selectedRoute,
+    conditionalScenario,
+    rowIndex,branchName:text(row?.branchName),lineKey:text(row?.lineKey),
+    materialSource:text(row?.materialSource),
+    pressure:pressure||null,pressureUnit:pressureBasis.unit||null,
+    pressureUnitSource:pressureBasis.source||null,
+    outsideDiameterMm:od,corrosionAllowanceMm:corrosion,
+    negativeMillTolerance:manualBasis.negativeMillTolerance
+      || basisConfig.millTolerance || {basis:'percent',value:12.5},
+    declaredRoute:declaredRoute||null,
+    holdReasons,
+    scenarios,
+    eligibleForPull:false,
+  };
+}
+
 export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host } = {}) {
   const branchRows = Array.isArray(rows) ? rows : [];
+  const lineListCoverage = buildPreviewB313LineListCoverage(branchRows, config);
   if (host?.dataset?.mcB313PreviewDirty === 'true') {
     return { schema: B313_PREVIEW_REPORT_SCHEMA, action: B313_PREVIEW_ACTION_LABEL,
       summary: { inputRows: branchRows.length, calculatedRows: 0, updatedRows: 0, skippedRows: branchRows.length },
+      lineListCoverage,
       rows: branchRows.map((row) => failureRow(row, 'B313_PREVIEW_REBUILD_REQUIRED',
         'Step 4 inputs were edited. Rebuild Preview before B31.3 calculation.')) };
   }
@@ -681,6 +842,18 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
   branchRows.forEach((row, rowIndex) => {
     // A previous proposal must never remain pullable after this row fails revalidation.
     delete basisConfig.proposalsByBranch[String(rowIndex)];
+    // A class/DN material candidate is not the missing physical Line List
+    // design record. Fail on the actual upstream gap before generic T1 or
+    // downstream S/E/W/Y lookup; do not synthesize 120°C or a pressure unit.
+    if (row?.lineMiss === true && (!temperatureText(row) || !text(row?.p1))) {
+      results.push(failureRow(row, 'B313_PREVIEW_LINE_LIST_SOURCE_MISSING',
+        'The selected Line List has no authoritative match for this branch and P1/T1 is missing. Open 1 Source & Masters → Line List; verify the Linelist worksheet, line-key mapping, then Rebuild Preview.',
+        { lineKey: text(row?.lineKey), lineKeyMethod: row?.lineKeyMethod || 'none',
+          loadedLineListRows: lineListCoverage.loadedLineListRows,
+          missingTemperature: !temperatureText(row), missingPressure: !text(row?.p1),
+          nextAction: 'RESELECT_EFFECTIVE_LINE_LIST_WORKSHEET_AND_REBUILD' }));
+      return;
+    }
     const materialIdentity = resolvePreviewB313MaterialFromRow(row, config);
     if (!materialIdentity.ok) {
       results.push(failureRow(row, materialIdentity.code, materialIdentity.message || 'Preview Material could not be linked to B31.3 Material Factors.', { materialIdentity }));
@@ -882,22 +1055,29 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
     negativeMillTolerancePct: B313_PREVIEW_NEGATIVE_MILL_TOLERANCE_PCT,
     materialFactorPolicy: 'PREVIEW_MATERIAL_TO_ACTIVE_B313_STRICT_THEN_MANUAL_FALLBACK',
     authority: 'EXPLICIT_PREVIEW_ACTION_NOT_AUTOMATIC_WALL_AUTHORITY',
+    lineListCoverage,
     summary: { inputRows: branchRows.length, calculatedRows: updated, updatedRows: 0, skippedRows: branchRows.length - updated },
-    rows: results.map((result, rowIndex) => result.status === 'CALCULATED' || result.status === 'UPDATED'
-      ? result : {
-        ...result,
-        details: {
-          ...(result.details || {}),
-          independentInputIssues: collectPreviewB313IndependentIssues(branchRows[rowIndex], config),
-        },
-      }),
+    rows: results.map((result, rowIndex) => {
+      const screeningReference=buildPreviewB313ScreeningReference({
+        row:branchRows[rowIndex],config,previewNodeRows,rowIndex,
+      });
+      return result.status === 'CALCULATED' || result.status === 'UPDATED'
+        ? {...result,screeningReference}
+        : {
+          ...result,screeningReference,
+          details: {
+            ...(result.details || {}),
+            independentInputIssues: collectPreviewB313IndependentIssues(branchRows[rowIndex], config),
+          },
+        };
+    }),
   };
 }
 
 function installAction(host, config, xmlText, options, suppliedRows) {
   const rows = currentPreviewB313Rows(host, suppliedRows);
   const buildButton = host?.querySelector?.('[data-mc-preview-build]');
-  const actionBar = buildButton?.parentElement;
+  const actionBar = host?.querySelector?.('[data-mc-wall-review-actions]') || buildButton?.parentElement;
   if (!actionBar || !rows.length) return;
   renderBasisEditor(host, config, rows, options);
   if (actionBar.querySelector('[data-mc-b313-wall-update]')) return;
@@ -905,7 +1085,7 @@ function installAction(host, config, xmlText, options, suppliedRows) {
   button.type = 'button';
   button.className = 'model-converters-download-btn';
   button.dataset.mcB313WallUpdate = 'true';
-  button.textContent = B313_PREVIEW_ACTION_LABEL;
+  button.textContent = 'Calculate B31.3 pressure-design wall (review only)';
   button.title = 'Use each Preview row Material + T1 to resolve strict active B31.3 Material Factors, then calculate B31.3-2024 straight-pipe required nominal wall from row OD, P1 and corrosion and select the next adequate project-master pipe wall. Manual S/E/W/Y is fallback only. 12.5% negative mill tolerance is fixed.';
   button.style.cssText = 'padding:8px 14px;min-width:300px;';
   actionBar.appendChild(button);
