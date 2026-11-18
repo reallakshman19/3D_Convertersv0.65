@@ -5,6 +5,7 @@ import {lookupB313ScreeningFactors} from '../converters/b313-material-factors/sc
 import {resolveB313DesignFactors} from '../converters/b313-material-factors/index.js';
 import {
   buildPreviewB313ScreeningReference,buildPreviewB313WallUpdateReport,
+  buildPreviewB313CalculatedWallDisplay,
   resolveB313EffectivePreviewPressureUnit,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 import {renderPreviewB313WallAuditHtml} from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js';
@@ -188,6 +189,62 @@ test('missing P1 unit with class master OD: show verified factor and OD, but no 
  assert.doesNotMatch(html,/data-b313-screening-scenario=/);
 });
 
+
+test('new 4 Preview column calculates actual required nominal mm from displayed P1/T1, regardless of Pull approval',()=>{
+ const cfg=config(),before=JSON.stringify(cfg);
+ const calculated=buildPreviewB313CalculatedWallDisplay({
+  row:row(),config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(calculated.ok,true,JSON.stringify(calculated));
+ assert.equal(calculated.code,'CALCULATED_REFERENCE_WALL');
+ assert.equal(calculated.pressureUnitAssumed,false);
+ assert.equal(calculated.pressureUnit,'KPA');
+ near(calculated.pressureDesignThicknessMm,5.235408926,1e-5);
+ near(calculated.requiredNominalThicknessMm,5.983324,0.002);
+ assert.equal(calculated.classNominalWallMm,7.112);
+ assert.equal(calculated.factors.E,1);
+ assert.equal(calculated.factors.W,1);
+ assert.equal(calculated.factors.Y,.4);
+ assert.equal(calculated.stressLookupMethod,'EXACT');
+ assert.equal(calculated.eligibleForPull,false);
+ assert.equal(JSON.stringify(cfg),before,'display calculation must never modify approved config');
+});
+test('missing effective 4 Preview P-unit still shows a numerical explicitly assumed-kPa what-if, not fake approval',()=>{
+ const cfg=config(),before=JSON.stringify(cfg);
+ const visible={...row(),p1Unit:'',p1UnitSource:''};
+ const display=buildPreviewB313CalculatedWallDisplay({
+  row:visible,config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(display.ok,true,JSON.stringify(display));
+ assert.equal(display.pressureUnitAssumed,true);
+ assert.equal(display.pressureUnit,'KPA');
+ near(display.requiredNominalThicknessMm,5.983324,0.002);
+ assert.equal(display.engineeringQualification,
+  'NOT_ESTABLISHED_BY_THIS_REFERENCE_CALCULATION');
+ assert.equal(display.eligibleForPull,false);
+ assert.equal(visible.p1Unit,'','display what-if must not fill the effective source P unit');
+ assert.equal(JSON.stringify(cfg),before,'display what-if must not update the saved P-unit basis');
+ const noT1=buildPreviewB313CalculatedWallDisplay({
+   row:{...visible,t1:'',t1Source:'none'},config:cfg,previewNodeRows:[],rowIndex:0});
+ assert.equal(noT1.ok,false,'missing T1 cannot make a wall number');
+ assert.equal(noT1.requiredNominalThicknessMm,null);
+});
+test('strict governed Pull report independently contains numeric calculated-wall column for factor HOLD rows',()=>{
+ const cfg=config(),beforeOverrides=JSON.stringify(cfg.overrides);
+ const report=buildPreviewB313WallUpdateReport({
+  rows:[{...row(),p1Unit:''}],config:cfg,host:{dataset:{},
+  __xmlCiiPreviewResult:{branchRows:[],nodeBoreWallRows:[]}}});
+ assert.equal(report.rows.length,1);
+ assert.equal(report.rows[0].status,'NOT_UPDATED');
+ assert.equal(report.rows[0].calculatedWallDisplay.ok,true);
+ assert.equal(report.rows[0].calculatedWallDisplay.pressureUnitAssumed,true);
+ assert.equal(report.summary.calculatedRows,0,'reference result is not Pull approved');
+ assert.equal(Object.keys(cfg.b313WallUpdate.proposalsByBranch).length,0);
+ assert.equal(JSON.stringify(cfg.overrides),beforeOverrides);
+ const audit=renderPreviewB313WallAuditHtml(report);
+ assert.match(audit,/Calculated required \(mm\)/);
+ assert.match(audit,/data-b313-calculated-audit/);
+ assert.match(audit,/what-if · assumed kPa/);
+ assert.match(audit,/5\.983/);
+});
 test('no physical OD and no exact-DN class identity must not invent screening geometry',()=>{
  const r={...row(),pipingClassPipeDnMm:200};
  const ref=buildPreviewB313ScreeningReference({
