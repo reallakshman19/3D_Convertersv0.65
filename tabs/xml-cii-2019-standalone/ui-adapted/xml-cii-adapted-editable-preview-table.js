@@ -27,6 +27,7 @@ export const BRANCH_COLUMNS = [
   { id: 't3', label: 'T3 (C)', hint: 'Edit', width: 90, minWidth: 60 },
   { id: 'density', label: 'Density', hint: 'Edit', width: 90, minWidth: 60 },
   { id: 'wallThickness', label: 'Wall Thk', hint: 'Edit', width: 90, minWidth: 60 },
+  { id: 'b313CalculatedWall', label: 'B31.3 Required (mm)', hint: 'Calc', width: 160, minWidth: 112 },
   { id: 'corrosion', label: 'Corrosion', hint: 'Edit', width: 90, minWidth: 60 },
   { id: 'insThk', label: 'Ins. Thk (mm)', hint: 'Edit', width: 165, minWidth: 110 },
   { id: 'insType', label: 'Ins. Type', hint: 'Edit', width: 130, minWidth: 85 }
@@ -179,6 +180,7 @@ export class XmlCiiAdaptedEditablePreviewTable {
         <td class="mc-preview-td mc-preview-pd-td">${renderProcessField('t3', row.t3, row.t3Source)}</td>
         <td class="mc-preview-td mc-preview-pd-td">${renderProcessField('density', row.density, row.densitySource)}</td>
         <td ${tdApprox(false, editAttrs('wallThickness', wallKey, `title="Wall thickness override key: ${this._escapeAttr(wallKey)}"`))}>${editablePlain('wallThickness', row.wallThickness, wallKey, row.wallThicknessSource)}${pullBtn(ri)}${fillDownBtn('wallThickness', ri)}</td>
+        <td class="mc-preview-td" data-mc-b313-calculated-row="${ri}" data-mc-b313-calculated-unit="mm" title="Click Calculate B31.3 pressure-design wall to see the required nominal wall from effective 4 Preview P1/T1 and current factor master. This is independent of Wall Thk edits and Pull."><strong data-mc-b313-calculated-value>—</strong><small data-mc-b313-calculated-detail style="display:block;color:#64748b;">Calculate</small></td>
         <td ${tdApprox(false, editAttrs('corrosion', corrosionKey, `title="Corrosion override key: ${this._escapeAttr(corrosionKey)}"`))}>${editablePlain('corrosion', row.corrosion, corrosionKey, row.corrosionSource)}${fillDownBtn('corrosion', ri)}</td>
         <td class="mc-preview-td mc-preview-pd-td${row.insThkNeedsReview?' mc-preview-approx':''}">${renderProcessField('insThk', row.insThk, row.insThkSource||'none')}${insulationNote('insThk')}${row.insThkNeedsReview?'<small class="mc-preview-badge bad">Review thickness</small>':''}</td>
         <td class="mc-preview-td mc-preview-pd-td${row.insTypeNeedsReview?' mc-preview-approx':''}">${renderProcessField('insType', row.insType, row.insTypeSource||'none')}${insulationNote('insType')}</td>
