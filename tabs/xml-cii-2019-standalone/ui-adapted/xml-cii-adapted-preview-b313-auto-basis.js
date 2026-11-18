@@ -340,6 +340,68 @@ function statusColor(model) {
   return '#fca5a5';
 }
 
+
+/**
+ * Fill the existing S/E/W/Y controls from the best available numeric basis,
+ * without persisting candidates or asserting an engineering qualification.
+ * Strict qualified data has priority; a source-entered manual field is never
+ * overwritten; remaining blanks use exact/interpolated screening master
+ * numbers (not the nearest-temperature fallback seed).
+ */
+export function previewB313FactorPrefill(model = {}) {
+  const strict = model.factorBasis?.ok && model.factorBasis.mode === 'ACTIVE_MASTER_STRICT'
+    ? model.factorBasis : null;
+  const stored = model.storedBasis || {};
+  const screening = model.screeningReference?.ok ? model.screeningReference : null;
+  const seed = model.fallback?.ok ? model.fallback : null;
+  const candidates = {
+    allowableStress:screening?.S?.MPa, qualityFactorE:screening?.E,
+    weldStrengthReductionW:screening?.W, coefficientY:screening?.Y,
+  };
+  const fields=['allowableStress','qualityFactorE','weldStrengthReductionW','coefficientY'];
+  const values={},origins={};
+  for(const field of fields) {
+    if (strict && text(strict[field])!=='') {
+      values[field]=strict[field];origins[field]='QUALIFIED_MASTER';
+    } else if (text(stored[field])!=='') {
+      values[field]=stored[field];origins[field]='EXPLICIT_SAVED';
+    } else if (screening && candidates[field]!==null && candidates[field]!==undefined) {
+      values[field]=candidates[field];origins[field]='SCREENING_MASTER';
+    } else if(seed && text(seed[field])!=='') {
+      values[field]=seed[field];origins[field]='UNQUALIFIED_SEED';
+    } else {
+      values[field]='';origins[field]='MISSING';
+    }
+  }
+  const unit=strict ? text(strict.stressUnit||'MPa')
+    :text(stored.stressUnit)
+      ||(origins.allowableStress==='SCREENING_MASTER'?'MPa':text(seed?.stressUnit||'MPa'));
+  const allStrict=fields.every(field=>origins[field]==='QUALIFIED_MASTER');
+  const allStored=fields.every(field=>origins[field]==='EXPLICIT_SAVED');
+  const hasScreening=fields.some(field=>origins[field]==='SCREENING_MASTER');
+  const basis=screening?.basisId||'';
+  const sourceRef=text(stored.sourceReference) || (hasScreening
+    ?'SCREENING_ONLY:'+basis+' | '+text(screening.sourceReference):'');
+  const qualification=allStrict?'QUALIFIED_ACTIVE_MASTER'
+    :hasScreening?'SCREENING_NOT_QUALIFIED'
+    :allStored?'EXPLICIT_MANUAL_SOURCE_REVIEW'
+    :seed?'UNQUALIFIED_NEAREST_SEED':'SOURCE_OR_FACTOR_MISSING';
+  const evidence=screening ?{
+    materialId:screening.materialId,temperatureC:screening.temperatureC,
+    basisId:basis,basisStatus:screening.basisStatus,
+    sourceAuthority:screening.sourceAuthority,
+    sourceReference:screening.sourceReference,
+    editionBasis:screening.editionBasis,
+    stressLookupMethod:screening.S?.method,
+    stressBrackets:screening.S?.bracket||[],
+    selectedConditionalRoute:'SEAMLESS',
+    qualification:'SCREENING_NOT_VERIFIED_FOR_PROJECT_B313_2024',
+    eligibleForPull:false,
+  }:null;
+  return {values,origins,stressUnit:unit,sourceReference:sourceRef,
+    qualification,evidence,eligibleForPull:allStrict};
+}
+
 function sourceInfo(model, factor) {
   const source = model.fallback?.factorSources?.[factor] || model.factorBasis?.factorSources?.[factor] || null;
   if (!source) {
@@ -392,21 +454,22 @@ export function renderPreviewB313NumericScreeningReference(model = {}) {
     <strong>MASTER SCREENING NUMBERS · reference only, not Pull eligible</strong>
     <div data-b313-screening-values>S ${Number(s.MPa).toFixed(3)} MPa (${value(s.ksi)} ksi) · E ${value(e)} (conditional Seamless) · W ${value(r.W)} · Y ${value(r.Y)}</div>
     <div>S lookup: ${esc(s.method)} at T1 ${esc(r.temperatureC)}°C · ${esc(range)}</div>
-    <div>Basis ${esc(r.basisId)} · SCREENING, not a qualified B31.3-2024 source. Editable fallback fields are independent.</div>
+    <div>Basis ${esc(r.basisId)} · SCREENING, not a qualified B31.3-2024 source. S/E/W/Y controls are prefilled with candidate values and per-factor qualification/evidence; approval stays separate.</div>
   </div>`;
 }
 
 function fallbackInputCell(model, factor, field, options = {}) {
-  const fallback = model.fallback?.ok ? model.fallback : (model.storedBasis || {});
-  const value = fallback[field] ?? '';
+  const resolved=previewB313FactorPrefill(model);
+  const value = resolved.values[field];
+  const origin=resolved.origins[field];
   const min = options.min ?? '';
   const max = options.max ?? '';
   const step = options.step ?? 'any';
-  return `<div style="display:flex;align-items:center;gap:4px;white-space:nowrap;"><input data-b313-auto-field="${field}" type="number" step="${step}" ${min !== '' ? `min="${min}"` : ''} ${max !== '' ? `max="${max}"` : ''} value="${esc(value)}" style="width:${options.width || '68px'};background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${infoButton(model, factor)}</div>`;
+  return `<div style="display:flex;align-items:center;gap:4px;white-space:nowrap;"><input data-b313-auto-field="${field}" data-b313-factor-origin="${esc(origin)}" title="${esc(origin==='SCREENING_MASTER'?'Screening master reference; not qualified for Pull':origin)}" type="number" step="${step}" ${min !== '' ? `min="${min}"` : ''} ${max !== '' ? `max="${max}"` : ''} value="${esc(value)}" style="width:${options.width || '68px'};background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${infoButton(model, factor)}<span data-b313-factor-qualification="${esc(factor)}" style="font-size:9px;color:#fbbf24;">${esc(origin==='SCREENING_MASTER'?'SCREENING':origin==='QUALIFIED_MASTER'?'QUALIFIED':origin==='EXPLICIT_SAVED'?'SAVED':origin==='UNQUALIFIED_SEED'?'SEED':'')}</span></div>`;
 }
 
 function stressUnitCell(model) {
-  const current = text(model.fallback?.stressUnit || model.storedBasis?.stressUnit || 'MPa').toUpperCase();
+  const current = text(previewB313FactorPrefill(model).stressUnit).toUpperCase();
   return `<select data-b313-auto-field="stressUnit" style="background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:3px 4px;">${['MPa','ksi','psi'].map((unit) => `<option value="${unit}" ${current === unit.toUpperCase() ? 'selected' : ''}>${unit}</option>`).join('')}</select>`;
 }
 
@@ -428,6 +491,11 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
     const seedHint = model.fallback?.ok && model.statusCode !== 'CONTROLLED_FALLBACK_READY'
       ? `<div style="font-size:9px;color:#fbbf24;margin-top:2px;">Seed ${esc(model.fallback.seedTemperatureC)} °C · ${esc(model.fallback.selectionDirection || '')} · no interpolation</div>`
       : '';
+    const prefill=previewB313FactorPrefill(model);
+    const sourceEvidence=prefill.evidence;
+    const evidenceText=sourceEvidence
+      ?`Source ${sourceEvidence.basisId} · ${sourceEvidence.sourceReference} · ${sourceEvidence.editionBasis} · S ${sourceEvidence.stressLookupMethod} at ${model.t1}°C`
+      :prefill.qualification==='QUALIFIED_ACTIVE_MASTER'?'Active strict qualified factor master':'No numeric screening master evidence at this Preview T1';
     const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
@@ -447,7 +515,9 @@ function panelHtml(models, config = {}, physicalRowCount = models.length) {
         <div style="display:flex;gap:4px;"><select data-b313-auto-field="pressureUnit" aria-label="4 Preview P unit for conditional calculation"><option value="AUTO">P unit AUTO</option>${['KPA','MPA','BARG','BAR','PSIG','PSI'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.pressureUnit)===u?'selected':''}>${u}</option>`).join('')}</select>
         <select data-b313-auto-field="dimensionStandard" aria-label="Pipe dimension standard"><option value="AUTO">Dimension AUTO</option>${['ASME B36.10M','ASME B36.19M'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.dimensionStandard)===u?'selected':''}>${u}</option>`).join('')}</select></div>
         <div style="font-size:9px;color:#fbbf24;margin:3px 0;">P unit changes recalculate screening only; S/E/W/Y remain unapproved.</div>
-        <input type="text" data-b313-auto-source-reference placeholder="Qualified source reference (required)" value="${esc(model.storedBasis?.sourceReference || '')}" style="margin-top:4px;width:98%;">
+        <div data-b313-auto-factor-qualification data-b313-qualification="${esc(prefill.qualification)}" style="font-size:10px;color:#fbbf24;font-weight:700;">Qualification: ${esc(prefill.qualification)} · ${prefill.eligibleForPull?'qualified values':'not approved for Pull'}</div>
+        <div data-b313-auto-evidence style="font-size:9px;color:#cbd5e1;max-width:360px;overflow-wrap:anywhere;">Evidence: ${esc(evidenceText)}</div>
+        <input type="text" data-b313-auto-source-reference aria-label="Factor source reference; replace screening evidence to qualify" placeholder="Qualified source reference (required to approve)" value="${esc(prefill.sourceReference)}" style="margin-top:4px;width:98%;">
         <label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-design-approved ${model.storedBasis?.designApproved === true ? 'checked' : ''}> Qualified manual basis reviewed</label>
         ${model.materialFallbackApplied ? `<label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-cs-reviewed ${model.storedBasis?.csFallbackReviewed === true ? 'checked' : ''}> Confirm CS fallback applies</label>` : ''}
         ${model.materialIdentityNeedsReview && !model.materialFallbackApplied ? `<label style="display:block;font-size:10px;"><input type="checkbox" data-b313-auto-identity-reviewed ${model.storedBasis?.identityReviewed === true ? 'checked' : ''}> Exact material grade verified against controlled source</label>` : ''}
