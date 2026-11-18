@@ -173,6 +173,15 @@ test('reviewed/manual entered values are preserved; unfilled columns still use i
    'Mixed manual/screening values must not be considered qualified as a whole');
 });
 
+test('screening S in MPa cannot inherit a stale stored ksi dropdown',()=>{
+ const row=physicalRow(models[0]);
+ const key=previewB313BasisKey(row,{});
+ const config={b313WallUpdate:{bases:{[key]:{stressUnit:'ksi'}}}};
+ const prefill=previewB313FactorPrefill(derivePreviewB313AutoBasisRow(row,config));
+ assert.equal(prefill.origins.allowableStress,'SCREENING_MASTER');
+ assert.equal(prefill.stressUnit,'MPa');
+ near(prefill.values.allowableStress,203.395339,0.0001);
+});
 test('missing T1 and absent screening basis never invent qualified factor values',()=>{
  const row=physicalRow(models[0]);row.t1='';
  const prefill=previewB313FactorPrefill(derivePreviewB313AutoBasisRow(row,{}));
