@@ -68,7 +68,28 @@ function isDesignP1Header(header){
 
 /** Pull-time independent custody check; no design factor or source approval implied. */
 export function verifyB313PreviewPressureUnitReceipt(row={},config={},receipt=null){
-  if(!receipt || !txt(receipt.source).startsWith('line-list-column:'))return {ok:true,code:'NOT_LINE_LIST_DERIVED'};
+  if(!receipt)return {ok:true,code:'NOT_LINE_LIST_DERIVED'};
+  const source=txt(receipt.source);
+  if(source.startsWith('line-list-header-band:')){
+    if(!/LINELIST|LINE.LIST/.test(txt(row.p1Source).toUpperCase()))
+      return {ok:false,code:'B313_PULL_P1_UNIT_SOURCE_CHANGED'};
+    const looked=selectedLineListRow(row.lineKey,config);
+    const selected=looked?.row;
+    const texts=Array.isArray(selected?._sourceP1HeaderTexts)
+      ?selected._sourceP1HeaderTexts.map(x=>txt(x).toUpperCase()):[];
+    const design=texts.some(x=>/PRESSURE\s+(MAX|MAXIMUM)|DESIGN\s+PRESSURE/.test(x));
+    const working=texts.some(x=>/AT\s+WORKING\s+CONDITIONS|OPERATING\s+CONDITIONS/.test(x));
+    const sameUnit=txt(selected?._sourceP1Unit).toUpperCase()===txt(receipt.unit).toUpperCase();
+    const sameColumn=txt(selected?._sourceP1HeaderSource)===source;
+    const sameP=selected&&numericSame(selected.p1,row.p1)
+      &&numericSame(selected._sourceP1OriginalValue,row.p1);
+    if(!looked||!design||working||!sameUnit||!sameColumn||!sameP)
+      return {ok:false,code:'B313_PULL_P1_UNIT_SOURCE_CHANGED'};
+    return {ok:true,code:'B313_PULL_P1_SOURCE_CONFIRMED',
+      sourceRowIndex:looked.index,source,unit:receipt.unit,
+      pressureBasis:txt(selected._sourceP1HeaderPressureBasis)};
+  }
+  if(!source.startsWith('line-list-column:'))return {ok:true,code:'NOT_LINE_LIST_DERIVED'};
   if(!/LINELIST|LINE.LIST/.test(txt(row.p1Source).toUpperCase()))
     return {ok:false,code:'B313_PULL_P1_UNIT_SOURCE_CHANGED'};
   const header=txt(receipt.source).slice('line-list-column:'.length);
