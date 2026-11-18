@@ -875,15 +875,28 @@ export function buildPreviewB313ScreeningReference({
   const classDn=positive(row?.pipingClassPipeDnMm);
   const referenceOd=dimension.standard
     ? masterOutsideDiameterMm(effectiveDn,dimension.standard):null;
-  // A conditional SCREENING-only calculation can use the dimension
-  // master if the effective 4 Preview has no unique row/node OD and its
-  // class product confirms the same nominal DN. This does not authorize Pull.
-  const exactDnClassReference=Boolean(effectiveDn && classDn
+  // SCREENING ONLY: the real GLRD 4 Preview can carry exact-DN class
+  // product/SCH/wall but lose its private _sourceRowIndex in dataset
+  // materialization. That index is required for a governed class Pull,
+  // NOT for a separately qualified and visibly hypothetical OD reference.
+  // Prove the class schedule AND nominal wall against the current dimension
+  // master before using its unambiguous OD. No source-node OD is invented.
+  const classSchedule=normalizedToken(row?.pipingClassPipeSchedule)
+    .replace(/^SCHEDULE\s*|^SCH\.?\s*/,'').replace(/\s+/g,'');
+  const classWall=positive(row?.pipingClassPipeWallMm);
+  const sizeMaster=dimension.standard&&effectiveDn
+    ?listPipeWallsForSize({dn:effectiveDn,dimensionStandard:dimension.standard})
+    :{ok:false,rows:[]};
+  const classMatchesDimension=Boolean(classSchedule&&classWall&&sizeMaster.ok
+    && sizeMaster.rows.some(item=>
+      normalizedToken(item.schedule).replace(/\s+/g,'')===classSchedule
+      && Math.abs(Number(item.nominalWallMm)-classWall)<=0.08
+      && Math.abs(Number(item.outsideDiameterMm)-referenceOd)<0.01));
+  const exactDnClassReference=Boolean(effectiveDn&&classDn
+    && text(row?.pipingClass)
     && Math.abs(effectiveDn-classDn)<1e-6
-    && positive(row?.pipingClassPipeWallMm)
-    && text(row?.pipingClassPipeSchedule)
     && text(row?.pipingClassPipeMaterial)
-    && text(row?.pipingClassPipeSourceRow));
+    && classMatchesDimension);
   const referenceOnlyOd=ods.length===0 && exactDnClassReference && referenceOd;
   const od=ods.length===1?ods[0]:(referenceOnlyOd?referenceOd:null);
   const outsideDiameterSource=ods.length===1?'step4-preview-node-ledger'
@@ -991,9 +1004,36 @@ export function buildPreviewB313CalculatedWallDisplay({
   const initial=reference || buildPreviewB313ScreeningReference({
     row,config,previewNodeRows,rowIndex,
   });
-  const chosen=initial;
-  // No implicit hardcoded kPa branch. The shared, user-selected fallback
-  // belongs to config.b313WallUpdate and is labeled WHAT-IF, never source.
+  let chosen=initial;
+  let hypotheticalKpa=false;
+  // An unverified P1 unit cannot be promoted to "confirmed kPa". But the
+  // OWNER asked to SEE the arithmetic without qualifying factors or Pull.
+  // Separately expose an unmistakably HYPOTHETICAL kPa(g) what-if when
+  // precisely the unit is missing and all other physical inputs are usable.
+  // This does NOT set the common fallback, replace 4 Preview P1, infer
+  // engineering source authority or change proposals/overrides/CII.
+  const onlyMissingUnit=initial?.ok===true
+    && initial?.pressureUnitSource==='PREVIEW_PRESSURE_UNIT_UNRESOLVED'
+    && Array.isArray(initial.holdReasons)
+    && initial.holdReasons.length===1
+    && initial.holdReasons[0]==='P1 pressure unit unresolved'
+    && !/CONFLICT|AMBIGUOUS/.test(normalizedToken(row?.p1UnitSource))
+    && !normalizedToken(row?.p1Unit);
+  if(onlyMissingUnit){
+    const trialConfig={...config,b313WallUpdate:{
+      ...(config?.b313WallUpdate||{}),
+      commonPressureUnitFallback:'KPA',
+      commonPressureUnitFallbackSource:'UNVERIFIED_DISPLAY_ONLY_HYPOTHESIS',
+    }};
+    const trial=buildPreviewB313ScreeningReference({
+      row,config:trialConfig,previewNodeRows,rowIndex,
+    });
+    if(trial?.ok&&trial?.holdReasons?.length===0
+        && trial?.conditionalScenario?.calculationOk===true){
+      chosen=trial;
+      hypotheticalKpa=true;
+    }
+  }
   const pressureUnitAssumed=chosen?.pressureUnitAssumed===true;
   const scenario=chosen?.conditionalScenario;
   const errors=Array.isArray(chosen?.holdReasons)?chosen.holdReasons:[];
@@ -1007,14 +1047,16 @@ export function buildPreviewB313CalculatedWallDisplay({
     };
   }
   return {
-    ok:true,code:'CALCULATED_REFERENCE_WALL',
+    ok:true,code:hypotheticalKpa?'HYPOTHETICAL_KPA_UNIT_UNVERIFIED':'CALCULATED_REFERENCE_WALL',
+    hypotheticalKpa,sourcePressureUnitUnverified:hypotheticalKpa,
+    explanation:hypotheticalKpa?'WHAT-IF ONLY: assumes P1 is kPa(g); current 4 Preview P1 unit is unresolved. Select a documented shared P1 basis before engineering use.':'' ,
     rowIndex,requiredNominalThicknessMm:scenario.requiredNominalThicknessMm,
     pressureDesignThicknessMm:scenario.pressureDesignThicknessMm,
     classNominalWallMm:scenario.classNominalWallMm,
     classSchedule:scenario.classSchedule,
     classPass:scenario.classPass,
     pressureUnit:chosen.pressureUnit,
-    pressureUnitSource:chosen.pressureUnitSource,
+    pressureUnitSource:hypotheticalKpa?'UNVERIFIED_KPA_GAUGE_DISPLAY_HYPOTHESIS':chosen.pressureUnitSource,
     pressureUnitAssumed,
     pressure:chosen.pressure,
     materialId:chosen.materialId,
