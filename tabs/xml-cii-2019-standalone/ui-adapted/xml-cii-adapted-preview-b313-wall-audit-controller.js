@@ -117,8 +117,9 @@ function authorityLabel(mode) {
 function calculatedWallAuditCell(row) {
   const r=row?.calculatedWallDisplay;
   const hasValue=r?.ok===true;
-  const note=hasValue?(r.pressureUnitAssumed
-    ?'what-if · common fallback '+text(r.pressureUnit)
+  const note=hasValue?(r.hypotheticalKpa
+    ?'HYPOTHETICAL: if P1 is kPa(g); source unit unresolved · NO Pull'
+    :r.pressureUnitAssumed?'what-if · selected common fallback '+text(r.pressureUnit)
     :'P unit '+text(r.pressureUnit)):(text(r?.reason)||'Input incomplete');
   return `<td data-b313-calculated-audit style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;min-width:145px;">
     <strong data-b313-calculated-audit-value style="color:#0f172a;font-size:13px;">${hasValue?fixed(r.requiredNominalThicknessMm,3):'—'}</strong>
@@ -461,8 +462,9 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
     calculated++;
     if(result.pressureUnitAssumed)assumedUnits++;
     if(value)value.textContent=Number(result.requiredNominalThicknessMm).toFixed(3);
-    if(detail)detail.textContent=result.pressureUnitAssumed
-      ?'Common fallback '+result.pressureUnit+' · WHAT-IF only'
+    if(detail)detail.textContent=result.hypotheticalKpa
+      ?'HYPOTHETICAL kPa(g) · source unit UNKNOWN · no Pull'
+      :result.pressureUnitAssumed?'Selected common fallback '+result.pressureUnit+' · WHAT-IF only'
       :'P unit '+result.pressureUnit+' · t '+Number(result.pressureDesignThicknessMm).toFixed(3);
     const bracket=Array.isArray(result.interpolationBracket)
       ? result.interpolationBracket.map(x=>x.temperatureC+'°C='+x.Sksi+' ksi').join(' → '):'';
@@ -470,7 +472,8 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
       'Calculated B31.3 required nominal: '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
       'Pressure-design wall t: '+Number(result.pressureDesignThicknessMm).toFixed(4)+' mm',
       'P1: '+result.pressure+' '+result.pressureUnit
-        +(result.pressureUnitAssumed?' (WHAT-IF: common fallback, NOT SOURCE VERIFIED)':''),
+        +(result.hypotheticalKpa?' (HYPOTHETICAL kPa(g) ONLY; SOURCE UNIT UNKNOWN; NO Pull)'
+          :result.pressureUnitAssumed?' (WHAT-IF: selected common fallback, NOT SOURCE VERIFIED)':''),
       'P1 unit evidence: '+(result.pressureUnitSource||'unresolved'),
       'T1: '+result.temperatureC+'°C',
       'S '+result.factors.S_MPa+' MPa · E '+result.factors.E
@@ -483,7 +486,8 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
       'Edition/source qualification: '+result.factorCodeEditionBasis,
       'Independent calculation: NOT a saved Wall Thk or approved Pull',
     ].join('\\n');
-    cell.dataset.mcB313CalculatedStatus=result.pressureUnitAssumed?'WHAT_IF_P_UNIT':'CALCULATED';
+    cell.dataset.mcB313CalculatedStatus=result.hypotheticalKpa?'HYPOTHETICAL_KPA_UNIT_UNKNOWN'
+      :result.pressureUnitAssumed?'WHAT_IF_P_UNIT':'CALCULATED';
   }
   return {physicalRows:physical.length,calculatedRows:calculated,assumedPressureUnitRows:assumedUnits};
 }
