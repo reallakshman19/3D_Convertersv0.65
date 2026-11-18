@@ -4,24 +4,29 @@ import { installModeASmartMapSelectAll } from './xml-cii-adapted-mode-a-smart-ma
 import { installModeAProcessFromUi } from './xml-cii-adapted-mode-a-process-from-ui.js?v=20261001-weight-output-2';
 import { repairModeAExactMappedProcessAuthority } from './xml-cii-adapted-mode-a-process-authority.js?v=20261001-weight-output-2';
 import { installModeAConsolidatedDtxrTools } from './xml-cii-adapted-mode-a-consolidated-dtxr.js?v=20261001-weight-output-2';
-import { installModeAIndividualPreviewToolVisibility } from './xml-cii-adapted-mode-a-individual-preview-tools.js?v=20260814-preview-restore-1';
+import { installModeAIndividualPreviewToolVisibility } from './xml-cii-adapted-mode-a-individual-preview-tools.js?v=20261118-manual-preview-1';
 import { modeARawState } from './xml-cii-adapted-mode-a-propagation.js?v=20261001-weight-output-2';
 
-function scheduleRebuild(build) {
-  if (!build || build.dataset.modeAProcessAuthorityRebuild === 'true') return;
-  build.dataset.modeAProcessAuthorityRebuild = 'true';
-  const run = () => build.click();
-  if (typeof queueMicrotask === 'function') queueMicrotask(run);
-  else setTimeout(run, 0);
+function suggestConsolidatedRebuild(panel) {
+  if (!panel?.querySelector) return;
+  let note=panel.querySelector('[data-mode-a-preview-rebuild-note]');
+  if (!note) {
+    note=panel.ownerDocument?.createElement?.('div');
+    if(!note)return;
+    note.dataset.modeAPreviewRebuildNote='true';
+    note.style.cssText='margin:6px 0;padding:7px 9px;border:1px solid #d97706;color:#fbbf24;border-radius:5px;font-size:11px;';
+    panel.prepend(note);
+  }
+  note.setAttribute('role','status');
+  note.textContent='Preview needs rebuilding — process authority changed. Select Build Consolidated Preview to apply the updated Line List mapping. No automatic build was started.';
 }
 
 export function installModeAConsolidatedPreviewEasyUiFromWorkspace(workspace, stateRef) {
   const state = modeARawState(stateRef);
   if (state.activePhaseId !== 'preview') return false;
 
-  // Individual Mode A Preview remains source-specific. Auto-building only when
-  // the engineer explicitly expands it restores the native DTXR Wall, DTXR
-  // Rating and B31.3 actions without changing the single-source Preview policy.
+  // Individual Mode A Preview remains source-specific and manual. Expanding
+  // a review section never clicks Build Preview in the background.
   installModeAIndividualPreviewToolVisibility(workspace);
 
   const result = state.modeAConsolidatedPreviewResult;
@@ -45,6 +50,6 @@ export function installModeAConsolidatedPreviewEasyUiFromWorkspace(workspace, st
   installModeAProcessFromUi(panel, result, stateRef);
   installModeAConsolidatedDtxrTools(panel, stateRef);
 
-  if (repair.changed) scheduleRebuild(build);
+  if (repair.changed) suggestConsolidatedRebuild(panel);
   return installed;
 }
