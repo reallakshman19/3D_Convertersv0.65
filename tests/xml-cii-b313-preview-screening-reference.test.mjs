@@ -96,12 +96,12 @@ test('no source OD: exact-DN class/dimension master supplies read-only screening
  assert.equal(ref.outsideDiameterSource,'pipe-wall-master-exact-DN-SCREENING-ONLY');
  assert.equal(ref.outsideDiameterReferenceOnly,true);
  assert.equal(ref.outsideDiameterSourceMatched,false);
- near(ref.outsideDiameterMm,168.3);
+ near(ref.outsideDiameterMm,168); // project TSV uses rounded OD(mm)=168
  assert.equal(ref.conditionalManufacturing,'SEAMLESS');
  assert.equal(ref.conditionalE,1);
  const s=ref.conditionalScenario;
  assert(s&&s.calculationOk,JSON.stringify(ref));
- near(s.pressureDesignThicknessMm,5.244757871,1e-5);
+ near(s.pressureDesignThicknessMm,5.235408926,1e-5);
  assert.equal(s.classNominalWallMm,7.112);
  assert.equal(s.classPass,true);
  assert.equal(ref.eligibleForPull,false);
@@ -112,7 +112,7 @@ test('no source OD: exact-DN class/dimension master supplies read-only screening
     status:'NOT_UPDATED',screeningReference:ref,code:'TEST_SCREENING_ONLY'}],
  });
  assert.match(html,/exact-DN dimensional master \(screening assumption; source XML OD unavailable\)/);
- assert.match(html,/5\.2448 mm/);
+ assert.match(html,/5\.2354 mm/);
  assert.match(html,/Eligible proposals 0/);
 });
 
