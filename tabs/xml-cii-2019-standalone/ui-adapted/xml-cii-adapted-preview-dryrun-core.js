@@ -536,8 +536,15 @@ function previewP1Unit(lineRow, p1) {
   return distinct.length === 1 ? found[0] : { unit: '', source: distinct.length ? 'conflicting-line-list-units' : 'unresolved' };
 }
 
-    const p1 = _xmlCiiProcessValue(pdOverride, lineListMatch, 'p1', ['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'], config);
-    const p1UnitBasis = previewP1Unit(lineListMatch, p1);
+    const p1Keys=['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'];
+    const p1 = _xmlCiiProcessValue(pdOverride, lineListMatch, 'p1', p1Keys, config);
+    const p1SourceFinal = _xmlCiiProcessSource(pdOverride, lineListMatch, 'p1', p1Keys, config);
+    // Override/default P1 is not the original source-cell value, even if
+    // numerically equal. It must have its own controlled unit authority.
+    const p1UnitBasis = p1SourceFinal === 'linelist'
+      ? previewP1Unit(lineListMatch, p1)
+      : {unit:'',source:p1SourceFinal==='override'
+        ?'OVERRIDE_P1_UNIT_REQUIRED':'P1_NOT_FROM_LINE_LIST'};
     const hydroPressure = _xmlCiiProcessValue(pdOverride, lineListMatch, 'hydroPressure', ['hydroPressure', 'hydro_pressure', 'HydroPressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Test Pressure', 'Pressure2', 'Hydro/Test Pressure'], config);
     const _hydroPressureSrcRaw = _xmlCiiProcessSource(pdOverride, lineListMatch, 'hydroPressure', ['hydroPressure', 'hydro_pressure', 'HydroPressure', 'Hydro Test Pressure', 'Hydrotest Pressure', 'Hydro Pressure', 'Test Pressure', 'Pressure2', 'Hydro/Test Pressure'], config);
     const hydroPressureFinal = hydroPressure || '0';
@@ -660,7 +667,7 @@ function previewP1Unit(lineRow, p1) {
       t2RangeOrig,
       t3RangeOrig,
       density,
-      p1Source: _xmlCiiProcessSource(pdOverride, lineListMatch, 'p1', ['p1', 'P1', 'Pressure1', 'Design Pressure', 'DesignPressure', 'Pressure Max kPa(g)', 'Pressure Max', 'PressureMax', 'P1 / Design Pressure'], config),
+      p1Source: p1SourceFinal,
       hydroPressureSource: hydroPressureSourceFinal,
       t1Source: _xmlCiiProcessSource(pdOverride, lineListMatch, 't1', ['t1', 'T1', 'Temperature1', 'Design Temp', 'Design Temperature', 'Temp Max ºC', 'Temp Max °C', 'Temp Max', 'T1 (ºC)'], config),
       t2Source: _xmlCiiProcessSource(pdOverride, lineListMatch, 't2', ['t2', 'T2', 'Temperature2', 'Temp. ºC', 'Temp. °C', 'Operating Temp', 'Operating Temperature', 'T2 (ºC)'], config),
