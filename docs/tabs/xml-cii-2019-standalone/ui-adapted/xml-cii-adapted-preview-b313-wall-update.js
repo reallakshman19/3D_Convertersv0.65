@@ -1150,6 +1150,86 @@ export function buildPreviewB313WallUpdateReport({ rows, config, xmlText, host }
   };
 }
 
+
+/** Machine-readable per-occurrence B31.3 evidence from the just-evaluated
+ * effective 4 Preview. SCREENING and qualified proposals remain separate.
+ * No source values, calculated walls, config or Pull state are mutated.
+ */
+export function buildPreviewB313SourceToWallLedger(report = {}) {
+  const sourceReceipts=Array.isArray(report?.lineListCoverage?.sourceReceipts)
+    ? report.lineListCoverage.sourceReceipts:[];
+  const calcRows=Array.isArray(report?.rows)?report.rows:[];
+  const count=Math.max(sourceReceipts.length,calcRows.length);
+  const rows=Array.from({length:count},(_,i)=>{
+    const receipt=sourceReceipts[i]||{};
+    const evaluated=calcRows[i]||{};
+    const reference=evaluated.screeningReference||{};
+    const scenario=reference.conditionalScenario||null;
+    return {
+      ordinal:i+1,branchName:text(receipt.branchName||evaluated.branchName),
+      lineKey:text(receipt.lineKey||evaluated.lineKey),
+      selectedMasterMatch:text(receipt.selectedMasterMatch||'UNAVAILABLE'),
+      selectedMasterRowOrdinal:receipt.selectedMasterRowOrdinal??null,
+      sourceCoverageStatus:text(receipt.code||'UNAVAILABLE'),
+      previewLineMatched:receipt.previewLineMatched===true,
+      p1:text(receipt.p1),p1Source:text(receipt.p1Source),
+      p1Unit:text(receipt.p1Unit||reference.pressureUnit),
+      p1UnitSource:text(receipt.p1UnitSource||reference.pressureUnitSource),
+      t1:text(receipt.t1),t1Source:text(receipt.t1Source),
+      material:text(receipt.material),
+      masterBasisId:text(reference.basisId),
+      stressLookupMethod:text(reference.S?.method),
+      stressBracket:JSON.stringify(reference.S?.bracket||[]),
+      screeningS_MPa:reference.S?.MPa??null,
+      conditionalManufacturing:text(reference.conditionalManufacturing),
+      screeningE:reference.conditionalE??null,
+      screeningW:reference.W??null,
+      screeningY:reference.Y??null,
+      outsideDiameterMm:reference.outsideDiameterMm??null,
+      outsideDiameterSource:text(reference.outsideDiameterSource),
+      corrosionAllowanceMm:reference.corrosionAllowanceMm??null,
+      screeningPressureWallMm:scenario?.calculationOk
+        ?scenario.pressureDesignThicknessMm:null,
+      screeningRequiredNominalMm:scenario?.calculationOk
+        ?scenario.requiredNominalThicknessMm:null,
+      pipingClassNominalWallMm:scenario?.classNominalWallMm??null,
+      pipingClassSchedule:text(scenario?.classSchedule),
+      screeningClassPass:scenario?.calculationOk?scenario.classPass:null,
+      screeningAuthority:reference.ok?'SCREENING_REFERENCE_ONLY':'NO_REFERENCE_RESULT',
+      qualifiedStatus:text(evaluated.status||'NOT_EVALUATED'),
+      qualifiedCode:text(evaluated.code),
+      pullEligible:evaluated.status==='CALCULATED'
+        && evaluated.result?.pullEligible!==false,
+      holdReasons:(Array.isArray(reference.holdReasons)?reference.holdReasons:[])
+        .concat(evaluated.status==='CALCULATED'?[]:[text(evaluated.message||evaluated.code)])
+        .filter(Boolean).join(' | '),
+    };
+  });
+  return {
+    schema:'b313-preview-source-to-wall-ledger/v1',
+    source:'EFFECTIVE_4_PREVIEW_SNAPSHOT',
+    projectWorkbookIdentity:report?.lineListCoverage?.sourceWorkbookIdentity
+      || 'NOT_AVAILABLE_IN_PREVIEW_CONFIG',
+    engineeringApproval:'NOT_IMPLIED_BY_SCREENING',
+    inputRows:count,rows,
+  };
+}
+
+/** CSV formula-injection protection: source labels are never executable
+ * spreadsheet expressions. Preserve original text in the JSON ledger.
+ */
+export function previewB313LedgerCsv(ledger = {}) {
+  const rows=Array.isArray(ledger?.rows)?ledger.rows:[];
+  const headers=rows.length?Object.keys(rows[0]):['ordinal','branchName','lineKey'];
+  const quote=(value)=>{
+    let s=value===null||value===undefined?'':String(value);
+    if (/^[\\s]*[=+@\\-\\t\\r]/.test(s)) s="'"+s;
+    return '"'+s.replaceAll('"','""')+'"';
+  };
+  return [headers.map(quote).join(','),...rows.map(row=>
+    headers.map(key=>quote(row[key])).join(','))].join('\\r\\n')+'\\r\\n';
+}
+
 function installAction(host, config, xmlText, options, suppliedRows) {
   const rows = currentPreviewB313Rows(host, suppliedRows);
   const buildButton = host?.querySelector?.('[data-mc-preview-build]');
