@@ -244,6 +244,44 @@ Merging this Preview adoption does not complete B31.3 design-authority qualifica
 
 When the effective Preview material is blank or genuinely unmapped, the B31.3 basis panel may offer the configured **CS** family fallback. It does not rewrite the Preview Material cell, does not override known non-CS identities (for example stainless), and requires explicit user confirmation before Pull. The CS family is not itself an allowable-stress record: a controlled exact material identity and qualified S/E/W/Y or independently reviewed manual basis are required for engineering acceptance. The default may be disabled in project settings.
 
+## 2026-11-18 screenshot RCA: screening dimensional OD and missing design-unit evidence
+
+Owner's deployed **4 Preview** screenshot after R3 merge: 30 GLRD physical
+rows, only 16 loaded Line List master records and 7/30 physically matched,
+23 lacking effective P1/T1 input evidence. A matched DSS row shows source
+P1=13001, T1=120°C, screening S=29.5 ksi and conditional Seamless E=1,
+but no pressure wall because P1 **unit is unresolved** and the source-node
+OD is not present in the report's node ledger.
+
+A read-only screening calculation may now use the **exact-DN dimensional
+master outside diameter** when the source node ledger has no OD and the
+effective Preview row has an exact matching Piping Class DN, positive
+nominal wall, a pipe material, schedule and source-row identity. This
+screening-only dimensional OD is labelled
+`pipe-wall-master-exact-DN-SCREENING-ONLY`; it has
+`outsideDiameterReferenceOnly=true` and **does not certify the physical
+XML OD, alter strict factor eligibility, create an accepted wall, or
+authorize Pull**. Conflicting/mixed positive node ODs continue to HOLD;
+the master cannot override a known physical mismatch.
+
+The code **does not assume pressure units** from P1 magnitude or simply
+infer that `13001` means kPa. Source-verified same-line P1 units may
+resolve automatically from unit-bearing Line List columns; otherwise the
+user must select the actual documented P unit in the existing B31.3
+basis. Missing P1/T1 for 23 unmatched rows cannot be fixed by master-OD
+logic and must be sourced from the correct project Line List and matched
+to the physical branch. Unresolved restraints and native CII engineering
+HOLD are independent and not modified by this change.
+
+Proof:
+```
+node --test tests/xml-cii-b313-preview-screening-reference.test.mjs
+node scripts/run-xml-cii-b313-live-preview-e2e.mjs
+```
+New tests assert master-OD provenance, numerical wall parity for an
+explicit-kPa **synthetic** scenario, absence of any Pull mutation, missing
+unit HOLD, mismatched class DN HOLD, and actual rendered browser text.
+
 ## Read-only screening reference from the existing material master
 
 The same **4 Preview → Calculate B31.3 pressure-design wall (review only)**
