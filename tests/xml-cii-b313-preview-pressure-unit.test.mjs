@@ -61,4 +61,22 @@ const conflictingSource={linelist:{masterRows:[{'Line number':'P4110001',
 assert.equal(inferPreviewPressureUnit(srcRow,conflictingSource,null,{},true).source,
   'LINE_LIST_P1_UNIT_CONFLICT');
 
+// The B31.3 calculation consumes only the visible effective 4 Preview
+// input/basis. The original XML unit must not silently become design P1.
+const rowOnly={lineKey:'MISSING',p1:'13001',p1Source:'preview',t1:'120'};
+const noMaster={linelist:{masterRows:[]}};
+const contradictoryXml={pressureUnit:'pascal',byBranch:new Map()};
+const missingUnit=inferPreviewPressureUnit(rowOnly,noMaster,contradictoryXml,{},true);
+assert.equal(missingUnit.unit,'');
+assert.equal(missingUnit.source,'PREVIEW_PRESSURE_UNIT_UNRESOLVED');
+const visibleUnit=inferPreviewPressureUnit({...rowOnly,p1Unit:'KPA'},noMaster,contradictoryXml,{},true);
+assert.equal(visibleUnit.unit,'KPA');
+assert.equal(visibleUnit.source,'preview');
+const selectedBasis=inferPreviewPressureUnit(rowOnly,noMaster,contradictoryXml,{pressureUnit:'KPA'},true);
+assert.equal(selectedBasis.unit,'KPA');
+assert.equal(selectedBasis.source,'design-basis');
+const changedXml=inferPreviewPressureUnit(rowOnly,noMaster,
+  {pressureUnit:'barg',byBranch:new Map()}, {},true);
+assert.deepEqual(changedXml,missingUnit,'XML pressure metadata cannot change a 4 Preview calculation');
+
 console.log('XML/CII Preview B31.3 pressure-unit custody checks passed.');
