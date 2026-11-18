@@ -2,6 +2,7 @@ import {
   B313_PREVIEW_ACTION_LABEL,
   B313_PREVIEW_REPORT_SCHEMA,
   buildPreviewB313WallUpdateReport,
+  buildPreviewB313CalculatedWallDisplay,
   buildPreviewB313SourceToWallLedger,
   previewB313LedgerCsv,
   installPreviewB313WallUpdateController,
@@ -485,6 +486,41 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
   return {physicalRows:physical.length,calculatedRows:calculated,assumedPressureUnitRows:assumedUnits};
 }
 
+
+/**
+ * Build numerical required-wall values from the already-effective 4 Preview,
+ * WITHOUT running the strict Pull workflow, saving configuration, or reading
+ * XML / earlier Line List values. Result is solely for the new table column.
+ */
+export function buildPreviewB313AutomaticWallColumnReport({rows=[],config={},host}={}) {
+  const branchRows=normalizeRows(rows);
+  const previewNodeRows=Array.isArray(host?.__xmlCiiPreviewResult?.nodeBoreWallRows)
+    ?host.__xmlCiiPreviewResult.nodeBoreWallRows:[];
+  return {
+    schema:'b313-preview-display-only/v1',
+    calculationInputAuthority:'EFFECTIVE_4_PREVIEW_ONLY',
+    rows:branchRows.map((row,rowIndex)=>({
+      branchName:text(row.branchName),
+      lineKey:text(row.lineKey),
+      calculatedWallDisplay:buildPreviewB313CalculatedWallDisplay({
+        row,config,previewNodeRows,rowIndex,
+      }),
+    })),
+  };
+}
+
+function clearAutomaticCalculatedWalls(host) {
+  for(const cell of host?.querySelectorAll?.('[data-mc-b313-calculated-row]')||[]){
+    const value=cell.querySelector('[data-mc-b313-calculated-value]');
+    const detail=cell.querySelector('[data-mc-b313-calculated-detail]');
+    if(value && value.textContent!=='—')value.textContent='—';
+    if(detail && detail.textContent!=='Rebuild Preview')detail.textContent='Rebuild Preview';
+    if(cell.dataset.mcB313CalculatedStatus!=='PREVIEW_DIRTY')
+      cell.dataset.mcB313CalculatedStatus='PREVIEW_DIRTY';
+    cell.title='Effective 4 Preview edited; rebuild before recalculating.';
+  }
+}
+
 function renderReport(host, report) {
   renderPreviewB313CalculatedWallCells(host,report);
   host?.querySelector?.('[data-mc-b313-report]')?.remove?.();
@@ -559,15 +595,51 @@ export function installPreviewB313WallUpdateAuditController({ host, config, xmlT
   host.__xmlCiiB313WallAuditObserver?.disconnect?.();
   let retainedRows = snapshotRows(currentPreviewRows(host, suppliedRows));
   const getLiveRows = () => currentPreviewRows(host, suppliedRows);
+  // Cheap fingerprint prevents observer feedback from our own table text
+  // writes. Every rebuilt Preview row/source, selected B31.3 P unit, and
+  // mill tolerance is included; auto display never invokes the Pull action.
+  let lastAutoSignature='';
   const refresh = () => {
     const liveRows = getLiveRows();
     if (liveRows.length) retainedRows = snapshotRows(liveRows);
     bindAuditButton(host, config, xmlText, options, () => retainedRows, getLiveRows);
+    const table=host.querySelector?.('table[data-resizable-table="branch-preview"]');
+    const cells=table?.querySelectorAll?.('[data-mc-b313-calculated-row]')||[];
+    if(!cells.length)return;
+    if(host.dataset.mcB313PreviewDirty==='true'){
+      lastAutoSignature='';
+      clearAutomaticCalculatedWalls(host);
+      return;
+    }
+    // Do not populate pre-build or stale partially rendered physical rows.
+    const current=Array.isArray(host.__xmlCiiPreviewResult?.branchRows)
+      ?host.__xmlCiiPreviewResult.branchRows:liveRows;
+    if(!current.length || current.length!==cells.length)return;
+    const signature=JSON.stringify({
+      preview:current.map(row=>[
+        row.branchName,row.lineKey,row.material,row.materialSource,
+        row.t1,row.t1Source,row.p1,row.p1Source,row.p1Unit,row.p1UnitSource,
+        row.sizeMm,row.boreMm,row.corrosion,
+        row.pipingClass,row.pipingClassPipeDnMm,row.pipingClassPipeWallMm,
+        row.pipingClassPipeSourceRow,row.pipingClassPipeSchedule,row.pipingClassPipeMaterial,
+      ]),
+      nodeRows:host.__xmlCiiPreviewResult?.nodeBoreWallRows?.length||0,
+      bases:config?.b313WallUpdate?.bases||{},
+      tolerance:config?.b313WallUpdate?.millTolerance||{},
+    });
+    if(lastAutoSignature===signature
+      && [...cells].every(cell=>cell.dataset.mcB313CalculatedStatus))return;
+    lastAutoSignature=signature;
+    const report=buildPreviewB313AutomaticWallColumnReport({rows:current,config,host});
+    renderPreviewB313CalculatedWallCells(host,report);
   };
   refresh();
   if (typeof MutationObserver !== 'undefined') {
     const observer = new MutationObserver(refresh);
-    observer.observe(host, { childList: true, subtree: true });
+    observer.observe(host, {
+      childList:true,subtree:true,attributes:true,
+      attributeFilter:['data-mc-b313-preview-dirty'],
+    });
     host.__xmlCiiB313WallAuditObserver = observer;
   }
 }
