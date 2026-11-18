@@ -16,11 +16,12 @@ test('class transaction rebuild is worker/basis fenced and must propagate failur
   assert.match(s,/skipLegacyCache:\s*true/);
   assert.match(s,/precomputedPreview:\s*result/);
 });
-test('branch-map rebuild cannot fire unobserved synchronous enrichment',async()=>{
+test('branch-map save prompts manual rebuild without launching Worker',async()=>{
   const s=await code();
   const cb=s.match(/onRebuildPreview:\s*\(\)\s*=>\s*\{[\s\S]*?\n\s*\}\n\s*\}\);/);
   assert.ok(cb,'line map callback missing');
-  assert.match(cb[0],/void xmlCiiRebuildPreviewThroughWorker\([\s\S]*?\.catch\(/);
+  assert.match(cb[0],/suggestManualPreviewRebuild\(host/);
+  assert.doesNotMatch(cb[0],/xmlCiiRebuildPreviewThroughWorker\(/);
   assert.doesNotMatch(cb[0],/void xmlCiiBuildAndRenderPreview\(/);
 });
 test('renderer deployment mirror is exact',async()=>{
