@@ -6,7 +6,7 @@ import {
   setPreviewB313PressureUnitOnly,previewB313FactorPrefill,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js';
 import {
-  buildPreviewB313ScreeningReference,previewB313BasisKey,
+  buildPreviewB313ScreeningReference,buildPreviewB313CalculatedWallDisplay,previewB313BasisKey,
 } from '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js';
 
 const class93833=JSON.parse(readFileSync(new URL('../docs/Masters/SpecwisePipingClass/93833.json',import.meta.url)));
@@ -67,6 +67,31 @@ test('exact 4 Preview row numerical coefficient reference is shown BEFORE pressi
   }
 });
 
+
+test('new B31.3 required-wall column computes every fully populated saved GLRD 4 Preview row',()=>{
+ for(const sample of models){
+   const preview=physicalRow(sample);
+   const cfg={b313WallUpdate:{bases:{},proposalsByBranch:{},acceptedWallByBranch:{},
+     millTolerance:{basis:'percent',value:12.5}}};
+   const previous=JSON.stringify(cfg);
+   const required=buildPreviewB313CalculatedWallDisplay({
+     row:preview,config:cfg,previewNodeRows:[],rowIndex:sample.rowNumber-1});
+   assert.equal(required.ok,true,
+     'Row '+sample.rowNumber+': '+JSON.stringify(required));
+   assert(Number(required.requiredNominalThicknessMm)>0,
+     'Row '+sample.rowNumber+' required nominal wall is not numeric');
+   assert(Number(required.pressureDesignThicknessMm)>0);
+   assert.equal(required.pressureUnitAssumed,true,
+     'Missing source P unit must be clearly marked what-if');
+   assert.equal(required.pressureUnit,'KPA');
+   assert.equal(required.factors.E,1);
+   assert.equal(required.factors.W,1);
+   assert.equal(required.factors.Y,0.4);
+   assert.equal(required.stressLookupMethod,sample.lookup);
+   assert.equal(required.eligibleForPull,false);
+   assert.equal(JSON.stringify(cfg),previous);
+ }
+});
 test('missing 4 Preview T1 never invents a screening stress',()=>{
  const noTemp=physicalRow(models[0]);noTemp.t1='';
  const m=derivePreviewB313AutoBasisRow(noTemp,{});
