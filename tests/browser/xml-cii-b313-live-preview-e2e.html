@@ -62,9 +62,11 @@ try {
 
   const liveBranchTable=host.querySelector('table[data-resizable-table="branch-preview"]');
   assert(liveBranchTable,'No effective physical 4 Preview table found');
-  assert(liveBranchTable.querySelector('[data-col-id="b313CalculatedWall"]')
-    ?.textContent.includes('B31.3 Required (mm)'),
-    'Required nominal wall must be its own visible 4 Preview column');
+  const requiredHeader=liveBranchTable.querySelector('[data-col-id="b313CalculatedWall"]');
+  const currentHeaders=[...liveBranchTable.querySelectorAll('thead th')]
+    .map(x=>(x.dataset.colId||'?')+'='+x.textContent.trim().slice(0,38));
+  assert(requiredHeader?.textContent.includes('B31.3 Required (mm)'),
+    'Required nominal wall must be its own visible 4 Preview column. Headers: '+currentHeaders.join(' | '));
   assert(liveBranchTable.querySelectorAll('[data-mc-b313-calculated-row]').length===41,
     'Calculated wall column must exist for all physical Preview rows');
   assert(liveBranchTable.querySelector('[data-col-id="wallThickness"]'),
