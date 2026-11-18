@@ -153,8 +153,34 @@ try {
     '4 Preview does not display exact DSS master S at T1=120°C');
   assert(screeningEl.textContent.includes('E 1 (conditional Seamless) · W 1 · Y 0.4'),
     'Visible screening E/W/Y values are not resolved');
-  assert(screenHost.querySelector('[data-b313-auto-field="allowableStress"]').value==='',
-    'Screening values must NOT be written into controlled manual S field');
+  const manualS=screenHost.querySelector('[data-b313-auto-field="allowableStress"]');
+  const factorInputs=['allowableStress','qualityFactorE','weldStrengthReductionW','coefficientY'];
+  const expectedFactorValues=[203.395339,1,1,0.4];
+  for(let index=0;index<factorInputs.length;index++){
+    const input=screenHost.querySelector('[data-b313-auto-field="'+factorInputs[index]+'"]');
+    assert(input && Math.abs(Number(input.value)-expectedFactorValues[index])<0.0001,
+      'Visible 4 Preview factor '+factorInputs[index]+' was not automatically populated');
+    assert(input.dataset.b313FactorOrigin==='SCREENING_MASTER',
+      'Visible factor source is missing its screening qualification');
+  }
+  assert(screenHost.querySelector('[data-b313-auto-field="stressUnit"]').value==='MPa');
+  const qualification=screenHost.querySelector('[data-b313-auto-factor-qualification]');
+  const evidence=screenHost.querySelector('[data-b313-auto-evidence]');
+  assert(qualification?.dataset.b313Qualification==='SCREENING_NOT_QUALIFIED',
+    'Visible qualification must identify unapproved screening source');
+  assert(evidence?.textContent.includes('OWNER-B313-SEWY-2026-08-11')
+    && evidence?.textContent.includes('2016/2018 user-supplied basis'),
+    'Source/master edition evidence is not shown in visible 4 Preview');
+  assert(screenHost.querySelector('[data-b313-auto-source-reference]').value.startsWith('SCREENING_ONLY:'),
+    'Source reference input should be prepopulated with explicit SCREENING_ONLY evidence');
+  assert(!screenHost.querySelector('[data-b313-auto-design-approved]').checked,
+    'Screening source must not precheck manual qualification');
+  const infoButton=screenHost.querySelector('[data-b313-factor-info-button="S"]');
+  infoButton.click();
+  const info=screenHost.querySelector('[data-b313-factor-info="S"]');
+  assert(info && !info.hidden && info.textContent.includes('29.5 ksi'),
+    'Factor S popup omitted exact temperature lookup and source');
+  infoButton.click();
   const unitChoice=screenHost.querySelector('[data-b313-auto-field="pressureUnit"]');
   assert(unitChoice?.value==='AUTO','Missing unit should remain AUTO until user chooses');
   unitChoice.value='KPA';
@@ -166,6 +192,21 @@ try {
     'Chosen 4 Preview B31.3 P unit was not saved by occurrence');
   assert(screenConfig.b313WallUpdate.bases[unitKey]?.designApproved!==true,
     'Selecting a P unit must not approve screening S/E/W/Y');
+  const refresh=screenHost.querySelector('[data-b313-auto-refresh]');
+  refresh.click();
+  assert(screeningCalculateClicks===2,
+    'Refresh with auto-filled screening basis should recalculate conditionally');
+  assert(screenConfig.b313WallUpdate.bases[unitKey]?.allowableStress===undefined,
+    'Screening factors were incorrectly stored as approved manual factor basis');
+  const review=screenHost.querySelector('[data-b313-auto-design-approved]');
+  review.checked=true;
+  refresh.click();
+  assert(screeningCalculateClicks===2,
+    'Merely checking reviewed must NOT authorize screening evidence');
+  assert(screenHost.querySelector('[data-b313-auto-status]').textContent.includes('SCREENING SOURCE IS NOT QUALIFIED'),
+    'Unqualified screening approval attempt did not display explicit reason');
+  assert(screenConfig.b313WallUpdate.bases[unitKey]?.designApproved!==true,
+    'Screening approval checkbox changed saved engineering authority');
   assert(!Object.keys(screenConfig.b313WallUpdate.proposalsByBranch).length,
     'Changing a screening P unit must not create Pull proposals');
   const screenResult=buildPreviewB313ScreeningReference({row:screeningOnlyRow,
@@ -346,7 +387,9 @@ try {
       'Accepted Step 4 wall did not propagate to native enriched XML');
   }
 
-  done({ ok: true, liveNumericScreeningPanelVerified: true,
+  done({ ok: true, populatedNumericFactorsAndEvidenceVerified: true,
+    screeningApprovalBlockedInBrowser: true,
+    liveNumericScreeningPanelVerified: true,
     screeningUnitChangeBrowserVerified: true,
     perBranchSourceWallLedgerExportVerified: true,
     conditionalSeamlessDefaultVerified: true,

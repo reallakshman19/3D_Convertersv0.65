@@ -243,6 +243,8 @@ function manualFactorValidation(basis = {}) {
   const y = nonNegative(basis.coefficientY);
   if (y === null || y > 1) missing.push('Y coefficientY');
   if (!text(basis.sourceReference)) missing.push('controlled source reference');
+  if (/^SCREENING_ONLY:/i.test(text(basis.sourceReference)))
+    missing.push('SCREENING master evidence is not a qualified manual source');
   return { ok: missing.length === 0, missing };
 }
 

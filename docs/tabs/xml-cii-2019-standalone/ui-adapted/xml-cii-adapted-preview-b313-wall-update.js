@@ -1157,7 +1157,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
     };
     const manualReviewed = factorBasis.mode === 'ACTIVE_MASTER_STRICT'
       || (basis.designApproved === true && text(basis.sourceReference)
-          && !/^USER_ACCEPTED_PREVIEW_FALLBACK|^B313_ACTIVE_MASTER_CANDIDATE_SEED/.test(text(basis.sourceReference)));
+          && !/^USER_ACCEPTED_PREVIEW_FALLBACK|^B313_ACTIVE_MASTER_CANDIDATE_SEED|^SCREENING_ONLY:/i.test(text(basis.sourceReference)));
     const csReviewed = materialIdentity.b313FallbackApplied !== true || basis.csFallbackReviewed === true;
     const identityNeedsReview = materialIdentity.b313IdentityNeedsReview === true;
     const identityReviewed = !identityNeedsReview || basis.identityReviewed === true
@@ -1250,6 +1250,11 @@ export function buildPreviewB313SourceToWallLedger(report = {}) {
       selectedMasterT1MatchesPreview:receipt.sourceT1MatchesPreview??null,
       material:text(receipt.material),
       masterBasisId:text(reference.basisId),
+      screeningQualification:reference.ok?'SCREENING_NOT_QUALIFIED':'NO_SCREENING_BASIS',
+      screeningSourceAuthority:text(reference.sourceAuthority),
+      screeningSourceReference:text(reference.sourceReference),
+      screeningCodeEditionBasis:text(reference.editionBasis),
+      screeningFactorEligibleForPull:false,
       stressLookupMethod:text(reference.S?.method),
       stressBracket:JSON.stringify(reference.S?.bracket||[]),
       screeningS_MPa:reference.S?.MPa??null,
