@@ -523,6 +523,24 @@ export function inferPreviewPressureUnit(row, config, sourceXml, basis = {}, pre
     ? 'PREVIEW_PRESSURE_UNIT_UNRESOLVED' : 'unresolved' };
 }
 
+/**
+ * Strict 4 Preview calculation input contract.
+ * Importing a Line List may have populated row.p1Unit during Build Preview,
+ * but the B31.3 button MUST NOT re-read the workbook or original XML to
+ * resolve a missing design-pressure unit.
+ */
+export function resolveB313EffectivePreviewPressureUnit(row = {}, basis = {}) {
+  const visible=normalizePressureUnit(row?.p1Unit);
+  const chosen=normalizePressureUnit(basis?.pressureUnit);
+  if (visible && chosen && visible!==chosen) return {
+    unit:'',source:'P1_UNIT_AUTHORITIES_CONFLICT',
+    previewUnit:visible,basisUnit:chosen,
+  };
+  if (visible) return {unit:visible,source:text(row?.p1UnitSource)||'4-preview'};
+  if (chosen) return {unit:chosen,source:'4-preview-b313-basis'};
+  return {unit:'',source:'PREVIEW_PRESSURE_UNIT_UNRESOLVED'};
+}
+
 export function inferPreviewDimensionStandard(row, basis = {}, materialIdentity = null) {
   const explicit = text(basis.dimensionStandard);
   if (explicit && normalizedToken(explicit) !== 'AUTO') return { standard: explicit, source: 'design-basis' };
@@ -831,8 +849,7 @@ export function buildPreviewB313ScreeningReference({
   const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
   if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
     holdReasons.push('Positive source P1 is missing or default-only');
-  const pressureBasis = inferPreviewPressureUnit(row,config,
-    null,manualBasis,true);
+  const pressureBasis = resolveB313EffectivePreviewPressureUnit(row,manualBasis);
   if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
   const corrosion=nonNegative(row?.corrosion);
   if (corrosion===null) holdReasons.push('Corrosion allowance missing');
@@ -1048,7 +1065,7 @@ export function buildPreviewB313WallUpdateReport({ rows, config, host } = {}) {
       results.push(failureRow(row, 'B313_PREVIEW_CORROSION_REQUIRED', 'Preview corrosion allowance is unavailable.', { materialIdentity, factorBasis }));
       return;
     }
-    const pressureBasis = inferPreviewPressureUnit(row, config, null, basis, true);
+    const pressureBasis = resolveB313EffectivePreviewPressureUnit(row, basis);
     if (!pressureBasis.unit) {
       results.push(failureRow(row, 'B313_PREVIEW_PRESSURE_UNIT_UNRESOLVED', 'Pressure unit could not be resolved. Set P unit explicitly in the B31.3 design basis.', { materialIdentity, factorBasis }));
       return;
