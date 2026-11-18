@@ -93,6 +93,7 @@ jobs:
             tests/xml-cii-b313-preview-wall-audit-controller.test.mjs \
             tests/xml-cii-b313-preview-blocker-provenance.test.mjs \
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
+            tests/xml-cii-b313-common-pressure-unit-fallback.test.mjs \
             tests/xml-cii-b313-header-band-source-unit.test.mjs \
             tests/xml-cii-b313-preview-source-pressure-class-wall.test.mjs \
             tests/xml-cii-b313-preview-od-selection.test.mjs \
