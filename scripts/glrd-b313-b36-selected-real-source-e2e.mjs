@@ -225,6 +225,8 @@ try{
        acceptedStatus:rows[1]?.b313PullStatus||null,
        pullNote:(host?.innerText||'').includes('manually pulled to Preview only'),
        selectedValue:host?.querySelector('[data-mc-b36-selected-row="1"] [data-mc-b36-selected-value]')?.textContent||'',
+       manualSelectionStatus:host?.querySelector('[data-mc-b36-selected-row="1"]')?.dataset.mcB36SelectedStatus||null,
+       manualSelectionDetail:host?.querySelector('[data-mc-b36-selected-row="1"] [data-mc-b36-selected-detail]')?.textContent||'',
        rowCount:rows.length};
    });
    if(after.rowCount!==30||Math.abs(Number(after.wallValues[1])-7.112)>0.013)
@@ -235,6 +237,10 @@ try{
      throw Error('Manual B36 Pull improperly became B31.3 governed accepted record');
    if(!after.pullNote)
      throw Error('Manual B36 Pull did not record user-visible Preview save receipt');
+   if(after.manualSelectionStatus!=='MANUAL_PULLED'
+      ||!after.manualSelectionDetail.includes('MANUAL PULLED'))
+     throw Error('No distinct persistent unqualified manual-Pull source receipt in selected cell '
+       +JSON.stringify(after));
    return {before,after,sourceRowsUnaffected:29,governedAccepted:false};
  });
 
