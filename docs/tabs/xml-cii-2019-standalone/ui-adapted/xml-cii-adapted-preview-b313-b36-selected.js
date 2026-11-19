@@ -166,6 +166,22 @@ export function planPreviewB36SelectedPull({rows=[],rowIndex,config={},previewNo
     if(!sameClass) return fail('B36_PULL_SHARED_SCOPE_CONFLICT',
       'This wall override key also covers a different product/schedule/wall. Do not overwrite the other branch.',
       {key,affectedRows:group.map(x=>x.index)});
+    // A class+DN override changes every matching occurrence. Same product
+    // dimensions are not enough: each affected occurrence must independently
+    // demonstrate that the selected wall meets ITS effective P1/T1/CA basis.
+    const otherSelection=buildPreviewB36SelectedThickness({
+      row:other,config,previewNodeRows,rowIndex:entry.index,
+    });
+    if(!otherSelection.ok
+      ||otherSelection.eligibleForManualPreviewPull!==true
+      ||otherSelection.dimensionStandard!==selection.dimensionStandard
+      ||token(otherSelection.selectedSchedule)!==token(selection.selectedSchedule)
+      ||Math.abs(otherSelection.selectedNominalWallMm-selection.selectedNominalWallMm)>0.00001
+      ||otherSelection.requiredNominalThicknessMm>selection.selectedNominalWallMm+0.000001)
+      return fail('B36_PULL_SHARED_SCOPE_UNQUALIFIED',
+        'A different occurrence sharing this wall override key lacks an adequate, matching calculated B36 thickness. Do not copy the wall blindly.',
+        {key,conflictingRow:entry.index,affectedRows:group.map(x=>x.index),
+          otherSelectionCode:otherSelection.code});
   }
   const old=config?.overrides?.wallThickness?.[key];
   return {ok:true,code:'B36_MANUAL_PULL_PREPARED',key,rowIndex,
