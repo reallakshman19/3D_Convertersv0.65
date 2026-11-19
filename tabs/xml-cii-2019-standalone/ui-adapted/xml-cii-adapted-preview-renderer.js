@@ -1,6 +1,7 @@
 import {normalizePreviewInsulationThickness,normalizePreviewInsulationType} from '../../../converters/xml-cii2019-core/preview-insulation.js';
 import {runPreviewButtonSession} from './xml-cii-adapted-preview-facts-button-session.js';
 import { b313PullProposal } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
+import {planPreviewB36SelectedPull} from './xml-cii-adapted-preview-b313-b36-selected.js?v=20261119-b36-selected-1';
 import { XmlCiiAdaptedEditablePreviewTable } from './xml-cii-adapted-editable-preview-table.js';
 import { renderBranchLineMapPanel } from './xml-cii-adapted-branch-line-map-panel.js';
 import { _xmlCiiLineListKeys } from './xml-cii-adapted-preview-diagnostics-audit.js?v=20261001-weight-output-2';
@@ -495,6 +496,123 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         const rebuilt=rootEl?.querySelector('#mc-preview-table-host');
         if(error?.rollbackError&&rebuilt)_markPreviewSaved(rebuilt,'Selection failed; rebuild required: '+_toText(error.message));
       });
+    },
+    onB36SelectedPullClick: async ({rowIndex,button})=>{
+      const preview=host.__xmlCiiPreviewResult;
+      if(host.dataset.mcB313PreviewDirty==='true'){
+        window.alert('Preview changed. Rebuild Preview before pulling a B36 selected thickness.');
+        return;
+      }
+      const rows=preview?.branchRows||[];
+      const plan=planPreviewB36SelectedPull({
+        rows,rowIndex,config,previewNodeRows:preview?.nodeBoreWallRows||[],
+      });
+      if(!plan.ok){
+        window.alert('Selected thickness Pull unavailable: '+plan.code+
+          '. '+(plan.message||'Review B36/class data first.'));
+        return;
+      }
+      const selection=plan.selection;
+      const assumption=selection.pressureUnitUnverified
+        ?'WARNING: P1 pressure unit and/or common fallback is UNVERIFIED. This is a WHAT-IF selection, NOT a code-approved design wall.\n'
+        :'WARNING: B31.3 material factors/manufacture are NOT qualified by this selected-thickness action.\n';
+      const affected=plan.affectedRows.map(i=>(i+1)).join(', ');
+      const prior=plan.priorOverride===null?'not set':String(plan.priorOverride)+' mm';
+      const confirmed=window.confirm(
+        'MANUAL Pull — '+plan.dimensionStandard+' '+plan.selectedSchedule+'\n'
+        +'Preview row '+(rowIndex+1)+'; wall override key '+plan.key+'\n'
+        +'Required reference '+plan.requiredNominalThicknessMm.toFixed(3)+' mm\n'
+        +'Selected STANDARD wall '+plan.selectedNominalWallMm.toFixed(3)+' mm\n'
+        +'Existing saved override '+prior+'\n'
+        +'Affected Preview rows: '+affected+'\n\n'
+        +assumption
+        +'This writes an explicitly approved-by-user MANUAL Preview override, NOT '
+        +'an ACCEPTED B31.3 Pull or native CII approval.\nContinue?'
+      );
+      if(!confirmed)return;
+      const revalidated=planPreviewB36SelectedPull({
+        rows:host.__xmlCiiPreviewResult?.branchRows||[],rowIndex,config,
+        previewNodeRows:host.__xmlCiiPreviewResult?.nodeBoreWallRows||[],
+      });
+      if(!revalidated.ok||revalidated.key!==plan.key||
+        Math.abs(Number(revalidated.selectedNominalWallMm)-plan.selectedNominalWallMm)>1e-8||
+        revalidated.affectedRows.join(',')!==plan.affectedRows.join(',')){
+        window.alert('B36 selection changed during confirmation. Rebuild Preview and retry.');
+        return;
+      }
+      const getOverrides=typeof ensureOverrides==='function'
+        ?ensureOverrides:(cfg)=>cfg.overrides||(cfg.overrides={});
+      const overrides=getOverrides(config);
+      overrides.wallThickness ||= {};
+      const hadPrior=Object.hasOwn(overrides.wallThickness,plan.key);
+      const before=overrides.wallThickness[plan.key];
+      const basis=config.b313WallUpdate||(config.b313WallUpdate={});
+      basis.selectedWallManualByOverrideKey ||= {};
+      const hadPriorMeta=Object.hasOwn(basis.selectedWallManualByOverrideKey,plan.key);
+      const beforeMeta=basis.selectedWallManualByOverrideKey[plan.key];
+      const beforeRows=rows.map(r=>String(r.wallThickness??''));
+      button.disabled=true;
+      try{
+        const selectedText=Number(plan.selectedNominalWallMm.toPrecision(9)).toString();
+        overrides.wallThickness[plan.key]=selectedText;
+        basis.selectedWallManualByOverrideKey[plan.key]={
+          schema:'b36-preview-manual-selection/v1',
+          status:'MANUAL_PREVIEW_ONLY_NOT_B313_APPROVED',
+          selectedNominalWallMm:plan.selectedNominalWallMm,
+          requiredReferenceMm:plan.requiredNominalThicknessMm,
+          selectedSchedule:plan.selectedSchedule,
+          dimensionStandard:plan.dimensionStandard,
+          selectionAuthority:selection.selectionAuthority,
+          pressureUnitSource:selection.pressureUnitSource,
+          unverifiedPressureUnit:selection.pressureUnitUnverified,
+          masterSource:selection.masterSourcePath,
+          masterSourceSha:selection.masterSourceBlobSha,
+          pipingClass:selection.pipingClass,
+          affectedRows:plan.affectedRows,
+          sourceBranch:rows[rowIndex]?.branchName||'',
+          timestamp:new Date().toISOString(),
+          factorQualified:false,
+          b313EngineeringApproved:false,
+        };
+        markAdaptedPreviewOverrideManual({
+          config,ensureOverrides:getOverrides,
+          field:'wallThickness',key:plan.key,value:selectedText,
+        });
+        await onSaveConfig?.(config);
+        await xmlCiiRebuildPreviewThroughWorker(rootEl,xmlText,config,options);
+        const latest=rootEl?.querySelector('#mc-preview-table-host');
+        const after=latest?.__xmlCiiPreviewResult?.branchRows;
+        if(!Array.isArray(after)||after.length!==rows.length)
+          throw Error('Physical branch count changed during B36 manual Pull verification.');
+        for(let i=0;i<after.length;i++){
+          const val=Number(after[i]?.wallThickness);
+          if(plan.affectedRows.includes(i)){
+            if(!Number.isFinite(val)||Math.abs(val-plan.selectedNominalWallMm)>0.00001)
+              throw Error('Selected B36 wall did not survive Preview rebuild at row '+(i+1));
+          }else if(String(after[i]?.wallThickness??'')!==beforeRows[i]){
+            throw Error('Unrelated row '+(i+1)+' wall changed during B36 Pull');
+          }
+        }
+        _markPreviewSaved(latest,
+          'B36 '+plan.selectedSchedule+' / '+plan.selectedNominalWallMm
+          +' mm manually pulled to Preview only ('+plan.affectedRows.length+' row(s)).'
+          +' Engineering qualification and native CII remain unapproved.');
+      }catch(error){
+        if(hadPrior)overrides.wallThickness[plan.key]=before;
+        else delete overrides.wallThickness[plan.key];
+        if(hadPriorMeta)basis.selectedWallManualByOverrideKey[plan.key]=beforeMeta;
+        else delete basis.selectedWallManualByOverrideKey[plan.key];
+        markAdaptedPreviewOverrideManual({
+          config,ensureOverrides:getOverrides,field:'wallThickness',
+          key:plan.key,value:hadPrior?before:'',
+        });
+        try{await onSaveConfig?.(config);
+          await xmlCiiRebuildPreviewThroughWorker(rootEl,xmlText,config,options);
+        }catch(rollbackError){console.error('B36 Pull rollback rebuild failed:',rollbackError);}
+        _markPreviewSaved(rootEl?.querySelector('#mc-preview-table-host'),
+          'B36 manual Pull rolled back: '+_toText(error?.message||error));
+        window.alert('B36 manual Pull rolled back: '+_toText(error?.message||error));
+      }finally{button.disabled=false;}
     },
     onB313PullClick: async ({ rowIndex, button }) => {
       const preview = host.__xmlCiiPreviewResult;
