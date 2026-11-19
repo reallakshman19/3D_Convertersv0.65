@@ -206,7 +206,7 @@ try{
    });
    if(Math.abs(Number(previewBefore.row2)-7.112)>0.013)
      throw Error('Unexpected original class wall for GLRD row 2: '+previewBefore.row2);
-   await page.locator('#mc-preview-table-host [data-mc-edit-type="wallThickness"][data-mc-edit-row="1"]').click();
+   await page.locator('#mc-preview-table-host [data-mc-edit-type="wallThickness"][data-mc-edit-row="1"] .mc-preview-editable-val').click();
    await page.locator('#mc-ov-input').fill('8.18');
    await page.locator('#mc-ov-save').click();
    const dirty=await page.evaluate(()=>{
