@@ -220,9 +220,9 @@ try{
    await page.locator('#mc-preview-table-host [data-mc-preview-build]').click();
    await page.waitForFunction(()=>{
      const h=document.querySelector('#mc-preview-table-host');
-     return h?.__xmlCiiPreviewResult!==globalThis.__b36EditedPreviewBefore
-       &&Math.abs(Number(h.__xmlCiiPreviewResult?.branchRows?.[1]?.wallThickness)-8.18)<0.001;
-   },null,{timeout:180000});
+     return h?.__xmlCiiPreviewResult
+       &&h.__xmlCiiPreviewResult!==globalThis.__b36EditedPreviewBefore;
+   },null,{timeout:30000});
    const after=await page.evaluate(()=>{
      const h=document.querySelector('#mc-preview-table-host');
      return {dirty:h.dataset.mcB313PreviewDirty,
@@ -231,6 +231,20 @@ try{
        selected:h.querySelector('[data-mc-b36-selected-row="1"] [data-mc-b36-selected-value]')?.textContent,
        pullDisabled:h.querySelector('[data-mc-b36-selected-pull-row="1"]')?.disabled};
    });
+   if(Math.abs(Number(after.row2)-8.18)>0.001)
+     throw Error('Wall editor override did not reach effective 4 Preview: '+JSON.stringify({
+       before:previewBefore.row2,after:after.row2,
+       overrideUI:await page.evaluate(()=>{
+         const h=document.querySelector('#mc-preview-table-host');
+         const r=h?.__xmlCiiPreviewResult?.branchRows?.[1];
+         return {wallThicknessKey:r?.wallThicknessKey,
+           wallThicknessSource:r?.wallThicknessSource,
+           chosenClass:r?.pipingClass,
+           feedback:h?.querySelector('[data-mc-preview-save-note]')?.textContent,
+           dirty:h?.dataset.mcB313PreviewDirty,
+           rowCell:h?.querySelector('[data-mc-edit-type="wallThickness"][data-mc-edit-row="1"]')?.innerText};
+       }),
+     }));
    if(after.otherWalls.some((v,i)=>i!==1&&v!==previewBefore.otherWalls[i]))
      throw Error('Seed editor affected a different GLRD wall');
    if(after.pullDisabled!==false||Math.abs(Number(after.selected)-7.112)>0.013)
