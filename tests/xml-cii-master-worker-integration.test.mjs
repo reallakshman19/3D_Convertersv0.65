@@ -24,8 +24,8 @@ test('worker import binding preserves atomic dataset commit and sheet selection'
   assert.match(source, /coordinator\.openBuffer/);
   assert.match(source, /xml-cii-adapted-master-persistence-retry\.js/);
   assert.match(source, /nextPersistenceFailures,[\s\S]*persistenceFailureRecord,/);
-  assert.ok(persistence.includes("import { masterPersistenceStatus } from './xml-cii-adapted-master-mapping-events.js?v=20261001-weight-output-2';"));
-  assert.ok(source.includes('xml-cii-adapted-master-persistence-retry.js?v=20261007-integration-b2-dataset-compat-2'));
+  assert.match(persistence, /import \{ masterPersistenceStatus \} from '\.\/xml-cii-adapted-master-mapping-events\.js\?v=[^']+';/,\n    'Retry module must continue importing the shared master mapping authority regardless of cache-bust version');
+  assert.match(source, /xml-cii-adapted-master-persistence-retry\.js\?v=[^']+/,\n    'Worker must continue delegating persistence through the versioned retry module');
   assert.doesNotMatch(source, /masterConfigForState, masterPersistenceStatus/);
   assert.match(persistence, /export function nextPersistenceFailures/);
   assert.match(persistence, /export function persistenceFailureRecord/);
