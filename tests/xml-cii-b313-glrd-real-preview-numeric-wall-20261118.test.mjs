@@ -119,6 +119,33 @@ test('incomplete or contradictory engineering inputs remain blank, even for a kP
   assert.equal(outOfParity.ok,false,'wrong real source-node OD cannot be bypassed by class reference');
 });
 
+test('a mixed-OD physical branch uses only a unique OD matching its exact-DN class product',()=>{
+  const r=fixture(cases[1],1),cfg=config();
+  const physical=[
+    {branchOccurrenceIndex:1,componentType:'REDUCER',outsideDiameterMm:114.3},
+    {branchOccurrenceIndex:1,componentType:'PIPE',outsideDiameterMm:168.3},
+    {branchOccurrenceIndex:1,componentType:'PIPE',outsideDiameterMm:219.1},
+  ];
+  const display=buildPreviewB313CalculatedWallDisplay({
+    row:r,config:cfg,rowIndex:1,previewNodeRows:physical,
+  });
+  assert.equal(display.ok,true,JSON.stringify(display));
+  assert.equal(display.outsideDiameterMm,168.3);
+  assert.equal(display.outsideDiameterSource,'step4-preview-node-ledger-exact-class-DN-match');
+  assert.equal(display.pressureUnit,'KPA');
+  assert(display.requiredNominalThicknessMm>5.98);
+  const ambiguous=buildPreviewB313CalculatedWallDisplay({
+    row:r,config:cfg,rowIndex:1,
+    previewNodeRows:[
+      {branchOccurrenceIndex:1,outsideDiameterMm:168.0},
+      {branchOccurrenceIndex:1,outsideDiameterMm:168.3},
+      {branchOccurrenceIndex:1,outsideDiameterMm:114.3},
+    ],
+  });
+  assert.equal(ambiguous.ok,false,'two distinct matching physical ODs are not unique');
+  assert.match(ambiguous.reason,/Multiple physical ODs/);
+});
+
 test('strict Class Pull still requires real source-row identity; display fallback never qualifies it',()=>{
   const row=fixture(cases[1],1),cfg=config();
   const ref=buildPreviewB313ScreeningReference({row,config:cfg,rowIndex:1});
