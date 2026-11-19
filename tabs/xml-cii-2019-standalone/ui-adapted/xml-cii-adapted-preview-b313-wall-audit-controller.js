@@ -527,6 +527,7 @@ export function renderPreviewB36SelectedThicknessCells(host,report={}){
   let available=0;
   for(let i=0;i<physical.length;i++){
     const cell=physical[i].querySelector?.('[data-mc-b36-selected-row]');
+    const standardCell=physical[i].querySelector?.('[data-mc-b36-schedule-standard-row]');
     if(!cell)continue;
     // Strict governed B31.3 reports do not own this independent display.
     if(rows[i] && !Object.hasOwn(rows[i],'selectedWallDisplay'))continue;
@@ -534,25 +535,37 @@ export function renderPreviewB36SelectedThicknessCells(host,report={}){
     const value=cell.querySelector('[data-mc-b36-selected-value]');
     const detail=cell.querySelector('[data-mc-b36-selected-detail]');
     const button=cell.querySelector('[data-mc-b36-selected-pull-row]');
+    const standardSchedule=standardCell?.querySelector('[data-mc-b36-schedule]');
+    const standardName=standardCell?.querySelector('[data-mc-b36-standard]');
     if(!result?.ok){
       if(value)value.textContent='—';
-      if(detail)detail.textContent=result?.message||'Required wall or B36 dimension evidence unavailable';
+      if(detail)detail.textContent='—';
       if(button)button.disabled=true;
+      if(standardSchedule)standardSchedule.textContent='—';
+      if(standardName)standardName.textContent='—';
+      if(standardCell)standardCell.dataset.mcB36ScheduleStandardStatus='INPUT_REQUIRED';
       cell.dataset.mcB36SelectedStatus='INPUT_REQUIRED';
-      cell.title=result?.message||'Build Preview for B36 selection';
+      cell.title=result?.message||'P1, T1 or dimension inputs required';
+      if(standardCell)standardCell.title=cell.title;
       continue;
     }
     available++;
     if(value)value.textContent=Number(result.selectedNominalWallMm).toFixed(3);
-    if(detail)detail.textContent=result.selectedSchedule+' · '+result.dimensionStandard.replace('ASME ','')
-      +(result.hypothetical?' · WHAT-IF':' · reference')
-      +(result.selectionAuthority.startsWith('EXACT_DN')?' · class schedule':'')
-      +(result.manuallyPulled?' · MANUAL PULLED (not B31.3 approved)':'');
+    if(detail)detail.textContent=result.manuallyPulled?'Pulled'
+      :result.selectionAuthority.startsWith('EXACT_DN')?'Class matched':'B36 minimum';
+    if(standardSchedule)standardSchedule.textContent=result.selectedSchedule||'—';
+    if(standardName)standardName.textContent=result.dimensionStandard.replace('ASME ','');
+    if(standardCell){
+      standardCell.dataset.mcB36ScheduleStandardStatus='SELECTED';
+      standardCell.title='ASME '+result.dimensionStandard.replace('ASME ','')
+        +' · Sch '+result.selectedSchedule+' · nominal wall '
+        +Number(result.selectedNominalWallMm).toFixed(4)+' mm';
+    }
     if(button){
       button.disabled=result.eligibleForManualPreviewPull!==true;
       button.title=result.eligibleForManualPreviewPull
-        ?'Explicit MANUAL Preview wall override; B31.3 engineering approval not implied'
-        :(result.manualPullReason||'Selected pipe wall cannot be manually pulled');
+        ?'Pull '+Number(result.selectedNominalWallMm).toFixed(3)+' mm into editable Wall Thk'
+        :(result.manualPullReason||'Complete the required inputs before Pull');
     }
     cell.dataset.mcB36SelectedStatus=result.manuallyPulled?'MANUAL_PULLED'
       :result.hypothetical?'HYPOTHETICAL_SELECTION':'SELECTED';
@@ -565,11 +578,9 @@ export function renderPreviewB36SelectedThicknessCells(host,report={}){
       'Minimum adequate B36 catalog '+result.catalogMinimumWallMm+' mm / '+result.catalogMinimumSchedule,
       'Authority '+result.selectionAuthority+'; '+(result.classProduct||'class product unavailable'),
       'Source '+(result.masterSourcePath||'pipe-wall-master'),
-      result.hypothetical?'PRESSURE UNIT UNVERIFIED — HYPOTHETICAL KPA, NOT ENGINEERING DESIGN':
-        'SCREENING VALUES DO NOT CERTIFY B31.3 DESIGN',
-      'Pull selected is a separate manual Preview override; governed B31.3 Pull unchanged',
-      result.manuallyPulled?'User manual Pull receipt: '+result.manualPullReceipt?.timestamp
-        +' · B31.3 engineering approval remains false':'Not yet pulled as a manual Preview override',
+      'Pressure basis '+result.pressureUnit+' ('+result.pressureUnitSource+')',
+      result.manuallyPulled?'Manual Preview Pull recorded '+result.manualPullReceipt?.timestamp
+        :'Pull selected applies the nominal wall to editable Preview Wall Thk',
     ].join('\n');
   }
   return {physicalRows:physical.length,selectedRows:available};
@@ -608,6 +619,13 @@ function clearAutomaticCalculatedWalls(host) {
     const value=selected.querySelector('[data-mc-b36-selected-value]');
     const detail=selected.querySelector('[data-mc-b36-selected-detail]');
     const button=selected.querySelector('[data-mc-b36-selected-pull-row]');
+    const standardCell=selected.closest('tr')?.querySelector('[data-mc-b36-schedule-standard-row]');
+    const schedule=standardCell?.querySelector('[data-mc-b36-schedule]');
+    const standard=standardCell?.querySelector('[data-mc-b36-standard]');
+    if(schedule&&schedule.textContent!=='—')schedule.textContent='—';
+    if(standard&&standard.textContent!=='—')standard.textContent='—';
+    if(standardCell&&standardCell.dataset.mcB36ScheduleStandardStatus!=='PREVIEW_DIRTY')
+      standardCell.dataset.mcB36ScheduleStandardStatus='PREVIEW_DIRTY';
     // Idempotent DOM writes are essential: the controller observes this
     // subtree and a redundant textContent assignment can trigger a
     // self-sustaining MutationObserver loop during dirty Preview state.
