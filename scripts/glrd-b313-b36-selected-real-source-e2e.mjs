@@ -209,11 +209,24 @@ try{
    await page.locator('#mc-preview-table-host [data-mc-edit-type="wallThickness"][data-mc-edit-row="1"] .mc-preview-editable-val').click();
    await page.locator('#mc-ov-input').fill('8.18');
    await page.locator('#mc-ov-save').click();
-   const dirty=await page.evaluate(()=>{
+   const dirty=await page.evaluate(async()=>{
      const h=document.querySelector('#mc-preview-table-host');
+     const runtime=await import('/tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-filldown.js');
+     const persisted=runtime.getXmlCiiAdaptedPreviewRuntimeConfig();
+     const key='PC:93833|DN:150';
+     const values=[];
+     for(let i=0;i<localStorage.length;i++){
+       const storageKey=localStorage.key(i);
+       const data=localStorage.getItem(storageKey)||'';
+       if(data.includes(key))values.push({storageKey,length:data.length,
+         has818:data.includes('8.18'),has7112:data.includes('7.112')});
+     }
      return {dirty:h.dataset.mcB313PreviewDirty,
        selected:h.querySelector('[data-mc-b36-selected-row="1"] [data-mc-b36-selected-value]')?.textContent,
-       pullDisabled:h.querySelector('[data-mc-b36-selected-pull-row="1"]')?.disabled};
+       pullDisabled:h.querySelector('[data-mc-b36-selected-pull-row="1"]')?.disabled,
+       displayedWall:h.querySelector('[data-mc-edit-type="wallThickness"][data-mc-edit-row="1"] .mc-preview-editable-val')?.textContent,
+       runtimeOverride:persisted?.overrides?.wallThickness?.[key],
+       configKeys:values};
    });
    if(dirty.dirty!=='true'||dirty.pullDisabled!==true)
      throw Error('Editing Wall Thk must mark Preview dirty and disable selection Pull '+JSON.stringify(dirty));
@@ -234,15 +247,19 @@ try{
    if(Math.abs(Number(after.row2)-8.18)>0.001)
      throw Error('Wall editor override did not reach effective 4 Preview: '+JSON.stringify({
        before:previewBefore.row2,after:after.row2,
+       savedEditReceipt:dirty,
        overrideUI:await page.evaluate(()=>{
          const h=document.querySelector('#mc-preview-table-host');
          const r=h?.__xmlCiiPreviewResult?.branchRows?.[1];
+         const key='PC:93833|DN:150';
+         const runtime=JSON.parse(localStorage.getItem('xmlCii2019.preview.runtimeOverrides.v1')||'{}');
          return {wallThicknessKey:r?.wallThicknessKey,
            wallThicknessSource:r?.wallThicknessSource,
            chosenClass:r?.pipingClass,
            feedback:h?.querySelector('[data-mc-preview-save-note]')?.textContent,
            dirty:h?.dataset.mcB313PreviewDirty,
-           rowCell:h?.querySelector('[data-mc-edit-type="wallThickness"][data-mc-edit-row="1"]')?.innerText};
+           rowCell:h?.querySelector('[data-mc-edit-type="wallThickness"][data-mc-edit-row="1"]')?.innerText,
+           runtimeOverrideAfter:runtime?.overrides?.wallThickness?.[key]};
        }),
      }));
    if(after.otherWalls.some((v,i)=>i!==1&&v!==previewBefore.otherWalls[i]))
