@@ -1,0 +1,61 @@
+name: GLRD PSI-02 30-row deployed Preview authentic source replay (non-releasing)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/glrd-b313-psi02-authentic-source-preview-browser.mjs'
+      - '.github/workflows/glrd-b313-psi02-public-source-browser-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  glrd-source-browser:
+    name: Deployed 4 Preview / original PSI-02 source / manual Rebuild
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Checkout original GLRD PSI-02 XML and Line List at pinned source commit
+        uses: actions/checkout@v5
+        with:
+          repository: reallakshman19/3D_Converters
+          ref: 3377b7f4baeeee5851e72dcc414d6c4a93f5a933
+          path: glrd-source
+          persist-credentials: false
+      - name: Checkout original physical master XLSX/TXT at pinned source commit
+        uses: actions/checkout@v5
+        with:
+          repository: reallakshman19/3D_Converters
+          ref: 25db94769994751bb0fb6e6d83a578efd9ac8162
+          path: glrd-masters
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Syntax-check replay harness before browser install
+        run: node --check scripts/glrd-b313-psi02-authentic-source-preview-browser.mjs
+      - name: Install Chromium runner
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.52.0
+          npx playwright install --with-deps chromium
+      - name: Run original-source PSI-02 deployed Preview and explicit Rebuild
+        env:
+          GLRD_PUBLIC_SOURCE_ROOT: glrd-source
+          GLRD_PUBLIC_MASTER_ROOT: glrd-masters
+          GLRD_BROWSER_TARGET: https://reallakshman19.github.io/3D_Convertersv0.65/index.html
+          GLRD_EVIDENCE_DIR: glrd-replay-evidence
+        run: node scripts/glrd-b313-psi02-authentic-source-preview-browser.mjs
+      - name: Preserve sanitized source-to-display evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glrd-b313-psi02-deployed-source-replay
+          path: |
+            glrd-replay-evidence/GLRD-PSI02-browser-replay.json
+            glrd-replay-evidence/GLRD-PSI02-rebuild.png
+          if-no-files-found: warn
+          retention-days: 14
