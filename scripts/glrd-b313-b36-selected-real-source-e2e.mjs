@@ -272,6 +272,10 @@ try{
    const before=await page.evaluate(()=>{
      const host=document.querySelector('#mc-preview-table-host');
      globalThis.__b36ReplayBeforePreview=host.__xmlCiiPreviewResult;
+     globalThis.__b36BeforePullNodeLedger=(host.__xmlCiiPreviewResult.nodeBoreWallRows||[])
+       .map(n=>({branchOccurrenceIndex:n.branchOccurrenceIndex,nodeOrdinal:n.nodeOrdinal,
+         nodeNumber:n.nodeNumber,outsideDiameterMm:n.outsideDiameterMm,
+         wallThickness:n.wallThickness,wallThicknessSource:n.wallThicknessSource}));
      const rows=host.__xmlCiiPreviewResult.branchRows||[];
      return {wallValues:rows.map(r=>String(r.wallThickness??'')),
        beforeWallSource:rows[1]?.wallThicknessSource||null,
@@ -293,7 +297,33 @@ try{
    const after=await page.evaluate(()=>{
      const host=document.querySelector('#mc-preview-table-host');
      const rows=host?.__xmlCiiPreviewResult?.branchRows||[];
+     const beforeLedger=globalThis.__b36BeforePullNodeLedger||[];
+     const nextLedger=host?.__xmlCiiPreviewResult?.nodeBoreWallRows||[];
+     const changedNodes=[],unintendedNodeChanges=[];
+     if(beforeLedger.length!==nextLedger.length)unintendedNodeChanges.push('node population drift');
+     for(let i=0;i<Math.min(beforeLedger.length,nextLedger.length);i++){
+       const before=beforeLedger[i],after=nextLedger[i];
+       const identityOK=String(before.branchOccurrenceIndex)===String(after.branchOccurrenceIndex)
+         &&String(before.nodeOrdinal)===String(after.nodeOrdinal)
+         &&String(before.nodeNumber)===String(after.nodeNumber);
+       if(!identityOK){unintendedNodeChanges.push('physical occurrence drift at node index '+i);continue;}
+       const manualTarget=Number(before.branchOccurrenceIndex)===1
+         &&before.wallThicknessSource==='manual-override'
+         &&Number(before.outsideDiameterMm)>0
+         &&Math.abs(Number(before.wallThickness)-8.18)<0.001;
+       const changed=String(before.wallThickness)!==String(after.wallThickness);
+       if(manualTarget){
+         if(Math.abs(Number(after.wallThickness)-7.112)>0.001
+           ||after.wallThicknessSource!=='manual-override')
+           unintendedNodeChanges.push('selected pipe node not restored '+i);
+         else changedNodes.push({index:i,nodeNumber:before.nodeNumber,
+           from:before.wallThickness,to:after.wallThickness});
+       }else if(changed||before.wallThicknessSource!==after.wallThicknessSource)
+         unintendedNodeChanges.push('unrelated node wall/source changed '+i);
+     }
      return {wallValues:rows.map(r=>String(r.wallThickness??'')),
+       changedNodes,unintendedNodeChanges,
+       allNodeLedgerRows:nextLedger.length,
        afterWallSource:rows[1]?.wallThicknessSource||null,
        acceptedStatus:rows[1]?.b313PullStatus||null,
        pullNote:(host?.innerText||'').includes('manually pulled to Preview only'),
@@ -308,6 +338,10 @@ try{
      throw Error('Pull selected did not actually replace the distinct existing 8.18 mm Preview wall');
    if(after.wallValues.some((v,i)=>i!==1&&v!==before.wallValues[i]))
      throw Error('Manual Pull modified another source-backed GLRD row '+JSON.stringify(after));
+   if(!after.changedNodes.length||after.unintendedNodeChanges.length)
+     throw Error('Manual B36 Pull failed physical same-DN node propagation or changed unrelated nodes '+JSON.stringify({
+       changedNodes:after.changedNodes,unintended:after.unintendedNodeChanges,
+       nodeCount:after.allNodeLedgerRows}));
    if(after.acceptedStatus==='ACCEPTED')
      throw Error('Manual B36 Pull improperly became B31.3 governed accepted record');
    if(!after.pullNote)
