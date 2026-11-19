@@ -182,7 +182,7 @@ try{
    const actual=matching[0]||null;
    const nominal=Number(actual?.requiredValue);
    const valid=Boolean(actual&&matching.length===1&&
-     /^\\d+(?:\\.\\d+)?$/.test(actual.requiredValue||'')&&
+     /^\d+(?:\.\d+)?$/.test(actual.requiredValue||'')&&
      Math.abs(nominal-w.expected)<=0.03);
    return {...w,actual,nominal:Number.isFinite(nominal)?nominal:null,
      comparison:valid?'MATCH':'NOT_ESTABLISHED'};
