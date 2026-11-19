@@ -159,7 +159,7 @@ function addCacheEvidence(host, { status, authority, reason = '' } = {}) {
 // not a new engineering input. Counting them as inputs creates a self-sustaining
 // MutationObserver -> status DOM -> MutationObserver feedback loop.
 const PREVIEW_V7_PRESENTATION_SELECTOR =
-  '[data-mc-preview-cache-evidence], [data-mc-dtxr-rating-notice], [data-mc-dtxr-rating-fetch], [data-mc-b313-calculated-row], [data-b313-auto-calculated-wall]';
+  '[data-mc-preview-cache-evidence], [data-mc-dtxr-rating-notice], [data-mc-dtxr-rating-fetch], [data-mc-b313-calculated-row], [data-mc-b36-selected-row], [data-b313-auto-calculated-wall]';
 function previewV7OwnedNode(node) {
   return node?.nodeType === 1 && (
     node.matches?.(PREVIEW_V7_PRESENTATION_SELECTOR) ||
