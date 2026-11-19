@@ -40,6 +40,47 @@ function classSizeKey(row, boreMm) {
     : row?.wallThicknessKey;
 }
 
+/**
+ * Source-first B36/Preview manual wall authority.
+ *
+ * The resolver may already have applied a class+DN manual Wall Thk override,
+ * but this later bore/DTXR reconciliation used to overwrite it with a
+ * Piping Class wall without checking the saved decision. Only an explicit
+ * exact-class+DN value is eligible. DTXR-applying overrides are separate,
+ * and verified DIRECT_WALL source evidence is not silently displaced.
+ *
+ * No S/E/W/Y qualification or B31.3 accepted Pull is implied.
+ */
+export function resolvePreviewManualWallForBore({
+  config = {}, pipingClass = '', boreMm = null, outsideDiameterMm = null,
+  dtxr = null,
+} = {}) {
+  const key = classSizeKey({ pipingClass }, boreMm);
+  const bucket = config?.overrides?.wallThickness;
+  if (!key || !bucket || typeof bucket !== 'object' || Array.isArray(bucket)
+      || !Object.hasOwn(bucket, key)
+      || config?.overrides?.__dtxrWallKeys?.[key]) {
+    return { ok: false, code: 'PREVIEW_MANUAL_WALL_NOT_APPLICABLE', key };
+  }
+  const wall = Number(bucket[key]);
+  if (!Number.isFinite(wall) || wall <= 0) {
+    return { ok: false, code: 'PREVIEW_MANUAL_WALL_INVALID', key };
+  }
+  const od = Number(outsideDiameterMm);
+  if (Number.isFinite(od) && od > 0 && wall * 2 >= od) {
+    return { ok: false, code: 'PREVIEW_MANUAL_WALL_GEOMETRY_CONFLICT', key };
+  }
+  if (dtxr?.evidenceKind === 'DIRECT_WALL'
+      && Number.isFinite(Number(dtxr.wallThicknessMm))
+      && Math.abs(wall - Number(dtxr.wallThicknessMm)) > 0.0001) {
+    return { ok: false, code: 'PREVIEW_MANUAL_WALL_DIRECT_SOURCE_CONFLICT',
+      key, manualWallMm: wall, directWallMm: Number(dtxr.wallThicknessMm) };
+  }
+  return { ok: true, code: 'PREVIEW_MANUAL_WALL_EXACT_CLASS_DN',
+    key, wallThicknessMm: wall, source: 'manual-override',
+    engineeringQualified: false };
+}
+
 function branchEvidence(branch, branchName, stagedIndex) {
   return [
     ...stagedBranchWallEvidenceFromIndex(stagedIndex, branchName),
@@ -108,6 +149,10 @@ function correctedRow(row, branch, indexes, config) {
     pipingClass: row.pipingClass || row.pipingClassDerived,
     config,
   });
+  const manual = resolvePreviewManualWallForBore({
+    config, pipingClass: row.pipingClass || row.pipingClassDerived,
+    boreMm, dtxr,
+  });
   const result = {
     ...row,
     sizeMm: boreMm,
@@ -117,9 +162,17 @@ function correctedRow(row, branch, indexes, config) {
     branchNodeNominalBoresMm:localBores,
     wallThicknessKey: classSizeKey(row, boreMm),
   };
-  if (authority) {
+  if (manual.ok) {
+    result.wallThickness = Number(manual.wallThicknessMm.toPrecision(9)).toString();
+    result.wallThicknessSource = manual.source;
+    result.wallManualOverrideKey = manual.key;
+    result.wallManualPreviewOnly = true;
+  } else if (authority) {
     result.wallThickness = Number(authority.wallThicknessMm.toPrecision(6)).toString();
     result.wallThicknessSource = authority.source;
+  }
+  if (manual.code === 'PREVIEW_MANUAL_WALL_DIRECT_SOURCE_CONFLICT') {
+    result.wallManualSourceConflict = manual;
   }
   return withWallEvidenceFields(result, dtxr);
 }
@@ -237,6 +290,16 @@ function buildNodeBoreWallRows({
         pipingClass,
         config,
       });
+      const nodeOd = Number(childText(node, 'OutsideDiameter')
+        || childText(node, 'OuterDiameter') || childText(node, 'OD'));
+      // Manual class+DN pipe wall follows the same physical outside-diameter
+      // test as the B31.3 node-scoped Pull; no zero-OD source components.
+      const manual = Number.isFinite(nodeOd) && nodeOd > 0
+        ? resolvePreviewManualWallForBore({
+          config, pipingClass, boreMm: bore.boreMm,
+          outsideDiameterMm: nodeOd, dtxr,
+        })
+        : { ok: false, code: 'PREVIEW_MANUAL_WALL_NODE_NOT_PIPE_GEOMETRY' };
 
       const row = withWallEvidenceFields({
         key: nodeAuthorityKey({
@@ -262,10 +325,16 @@ function buildNodeBoreWallRows({
         boreValidationTraceMm: bore.validationTraceBoreMm,
         boreTraceStatus: bore.validationTraceStatus || '',
         boreTraceSource: bore.validationTraceSource || '',
-        wallThickness: authority?.wallThicknessMm != null
-          ? Number(authority.wallThicknessMm.toPrecision(6)).toString()
-          : '',
-        wallThicknessSource: authority?.source || '',
+        wallThickness: manual.ok
+          ? Number(manual.wallThicknessMm.toPrecision(9)).toString()
+          : authority?.wallThicknessMm != null
+            ? Number(authority.wallThicknessMm.toPrecision(6)).toString()
+            : '',
+        wallThicknessSource: manual.ok ? manual.source : authority?.source || '',
+        wallManualOverrideKey: manual.ok ? manual.key : '',
+        wallManualPreviewOnly: manual.ok,
+        wallManualSourceConflict: manual.code === 'PREVIEW_MANUAL_WALL_DIRECT_SOURCE_CONFLICT'
+          ? manual : null,
         wallThicknessKey: classSizeKey({ pipingClass }, bore.boreMm),
       }, dtxr);
       rows.push(row);
