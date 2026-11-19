@@ -40,7 +40,7 @@ test('four GLRD populated rows choose physical Piping Class B36 schedule (not au
     const before=JSON.stringify(row);
     const result=buildPreviewB36SelectedThickness({row,config,rowIndex:i,previewNodeRows:[]});
     assert.equal(result.ok,true,'GLRD row '+(i+1)+' '+JSON.stringify(result));
-    assert.equal(result.hypothetical,true,'unverified P1 must remain visibly hypothetical');
+    assert.equal(result.hypothetical,false,'shared project default supplies the display calculation');
     assert.equal(result.pressureUnitUnverified,true);
     assert.equal(result.eligibleForB313GovernedPull,false);
     assert.equal(result.eligibleForManualPreviewPull,true);
