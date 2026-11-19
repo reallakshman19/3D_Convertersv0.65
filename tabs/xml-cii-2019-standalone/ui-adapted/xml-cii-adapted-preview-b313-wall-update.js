@@ -904,8 +904,18 @@ export function buildPreviewB313ScreeningReference({
     && text(row?.pipingClassPipeMaterial)
     && classMatchesDimension);
   const referenceOnlyOd=ods.length===0 && exactDnClassReference && referenceOd;
-  const od=ods.length===1?ods[0]:(referenceOnlyOd?referenceOd:null);
+  // A reducer or mixed-size branch can legitimately contain several
+  // physical OD values. Resolve a *single unique* ledger OD only when it
+  // agrees with the exact-DN Piping Class and B36 schedule/wall product.
+  // Never take the first/maximum/minimum OD or erase a physical conflict.
+  const odMatches=ods.length>1&&exactDnClassReference&&referenceOd
+    ?ods.filter(nodeOd=>Math.abs(nodeOd-referenceOd)<=Math.max(1.5,referenceOd*0.005))
+    :[];
+  const uniquelyMatchedPhysicalOd=odMatches.length===1?odMatches[0]:null;
+  const od=ods.length===1?ods[0]
+    :uniquelyMatchedPhysicalOd||(referenceOnlyOd?referenceOd:null);
   const outsideDiameterSource=ods.length===1?'step4-preview-node-ledger'
+    :uniquelyMatchedPhysicalOd?'step4-preview-node-ledger-exact-class-DN-match'
     :referenceOnlyOd?'pipe-wall-master-exact-DN-SCREENING-ONLY':'unresolved';
   if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
     :'Neither a unique source-node OD nor an exact-DN class/dimension reference is available');
