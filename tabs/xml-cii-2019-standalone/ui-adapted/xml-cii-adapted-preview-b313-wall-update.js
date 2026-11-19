@@ -989,7 +989,7 @@ export function buildPreviewB313ScreeningReference({
     pressureUnitAssumed:pressureBasis.assumed===true,
     outsideDiameterMm:od,outsideDiameterSource,
     outsideDiameterReferenceOnly:outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY',
-    outsideDiameterSourceMatched:outsideDiameterSource==='step4-preview-node-ledger',
+    outsideDiameterSourceMatched:outsideDiameterSource.startsWith('step4-preview-node-ledger'),
     outsideDiameterReferenceMm:referenceOd,
     corrosionAllowanceMm:corrosion,
     negativeMillTolerance:manualBasis.negativeMillTolerance
