@@ -1,5 +1,6 @@
 import { MASTER_FIELDS } from './xml-cii-adapted-fields-config.js';
-import { detectLineListFieldMap, normalizeLineListRow } from '../../../converters/xml-cii2019-core/linelist-mapping.js';
+import { detectLineListFieldMap } from '../../../converters/xml-cii2019-core/linelist-mapping.js';
+import { normalizeMasterRows } from '../workers/master-dataset-normalize.js?v=20261119-b313-line-list-receipt-1';
 import { prepareStandaloneImportMasters } from '../xml-cii-master-context.js';
 import {
   applyStandaloneImportMastersContext, updateWorkflowState, getSavedMappingsForMaster,
@@ -216,7 +217,12 @@ export async function loadImportMastersFromUi(stateRef, render) {
 }
 
 export function mapRowsWithFieldMap(rawRows, fieldMap, masterKey) {
-  if (masterKey === 'lineList') return (rawRows || []).map((row, index) => normalizeLineListRow(row, fieldMap, index));
+  // Use the SAME evidence-preserving normalizer as the worker import path.
+  // Generic normalization drops the design-P1 header-band receipt even when
+  // the selected W-column includes DESIGN CONDITIONS / Pressure Max / kPa(g).
+  // This establishes source-column custody only for exact numeric cell parity;
+  // a rounded/edited Preview P1 still cannot inherit the original unit.
+  if (masterKey === 'lineList') return normalizeMasterRows(rawRows || [], fieldMap, 'lineList');
   return (rawRows || []).map((row, index) => {
     const result = { ...row, _rowIndex: row?._rowIndex || index + 1 };
     for (const [fieldName, sourceHeader] of Object.entries(fieldMap || {})) result[fieldName] = sourceHeader ? (row?.[sourceHeader] ?? '') : '';
