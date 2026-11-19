@@ -608,11 +608,16 @@ function clearAutomaticCalculatedWalls(host) {
     const value=selected.querySelector('[data-mc-b36-selected-value]');
     const detail=selected.querySelector('[data-mc-b36-selected-detail]');
     const button=selected.querySelector('[data-mc-b36-selected-pull-row]');
-    if(value)value.textContent='—';
-    if(detail)detail.textContent='Rebuild Preview';
-    if(button)button.disabled=true;
-    selected.dataset.mcB36SelectedStatus='PREVIEW_DIRTY';
-    selected.title='Effective Preview edits require explicit Rebuild before B36 wall selection/Pull.';
+    // Idempotent DOM writes are essential: the controller observes this
+    // subtree and a redundant textContent assignment can trigger a
+    // self-sustaining MutationObserver loop during dirty Preview state.
+    if(value && value.textContent!=='—')value.textContent='—';
+    if(detail && detail.textContent!=='Rebuild Preview')detail.textContent='Rebuild Preview';
+    if(button && button.disabled!==true)button.disabled=true;
+    if(selected.dataset.mcB36SelectedStatus!=='PREVIEW_DIRTY')
+      selected.dataset.mcB36SelectedStatus='PREVIEW_DIRTY';
+    const dirtyTitle='Effective Preview edits require explicit Rebuild before B36 wall selection/Pull.';
+    if(selected.title!==dirtyTitle)selected.title=dirtyTitle;
   }
   for(const cell of host?.querySelectorAll?.('[data-mc-b313-calculated-row]')||[]){
     const value=cell.querySelector('[data-mc-b313-calculated-value]');
