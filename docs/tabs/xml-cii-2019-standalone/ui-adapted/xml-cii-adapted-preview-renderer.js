@@ -2,7 +2,7 @@ import {normalizePreviewInsulationThickness,normalizePreviewInsulationType} from
 import {runPreviewButtonSession} from './xml-cii-adapted-preview-facts-button-session.js';
 import { b313PullProposal } from '../../../converters/xml-cii2019-core/b313-preview-pull-authority.js';
 import {planPreviewB36SelectedPull} from './xml-cii-adapted-preview-b313-b36-selected.js?v=20261119-b36-selected-1';
-import { XmlCiiAdaptedEditablePreviewTable } from './xml-cii-adapted-editable-preview-table.js';
+import { XmlCiiAdaptedEditablePreviewTable } from './xml-cii-adapted-editable-preview-table.js?v=20261119-b36-selected-pull-1';
 import { renderBranchLineMapPanel } from './xml-cii-adapted-branch-line-map-panel.js';
 import { _xmlCiiLineListKeys } from './xml-cii-adapted-preview-diagnostics-audit.js?v=20261001-weight-output-2';
 import { applyAdaptedPreviewOverrideFillDown, applyAdaptedPreviewProcessFillDown, markAdaptedPreviewOverrideManual, markAdaptedPreviewProcessManual, applyAdaptedPreviewSmartFillByClass, applyAdaptedPreviewSmartProcessFillByClass } from './xml-cii-adapted-preview-filldown.js';
