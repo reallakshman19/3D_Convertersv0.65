@@ -100,7 +100,7 @@ test('missing 4 Preview T1 never invents a screening stress',()=>{
  assert.equal(m.statusCode,'B313_PREVIEW_T1_REQUIRED');
 });
 
-test('unit change independently unlocks conditional wall but never approves screening coefficients',()=>{
+test('kPa(g) project default calculates while explicit P-unit changes never approve coefficients',()=>{
  const sample=models[1];const row=physicalRow(sample);
  const config={b313WallUpdate:{bases:{},proposalsByBranch:{},
   acceptedWallByBranch:{},millTolerance:{basis:'percent',value:12.5}}};
@@ -108,8 +108,10 @@ test('unit change independently unlocks conditional wall but never approves scre
  const initial=buildPreviewB313ScreeningReference({row,config,previewNodeRows:[],
   rowIndex:sample.rowNumber-1});
  assert.equal(initial.ok,true);
- assert.equal(initial.scenarios.length,0,'no P unit should mean no wall result');
- assert(initial.holdReasons.includes('P1 pressure unit unresolved'));
+ assert(initial.scenarios.some(s=>s.calculationOk),
+   'project kPa(g) default should produce a numerical required wall');
+ assert.equal(initial.pressureUnit,'KPA');
+ assert.equal(initial.pressureUnitAssumed,true);
  const basisKey=previewB313BasisKey(row,config);
  const result=setPreviewB313PressureUnitOnly(config,basisKey,'KPA');
  assert.equal(result.ok,true);

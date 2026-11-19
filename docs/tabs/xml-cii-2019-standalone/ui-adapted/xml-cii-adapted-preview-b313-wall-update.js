@@ -860,7 +860,13 @@ export function buildPreviewB313ScreeningReference({
   const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
   if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
     holdReasons.push('Positive source P1 is missing or default-only');
-  const pressureBasis = resolveB313EffectivePreviewPressureUnit(row,manualBasis,basisConfig.commonPressureUnitFallback);
+  // Project-wide normal operating convention: P1 is kPa(g) unless the
+  // effective Preview explicitly supplies another unit. Existing saved AUTO
+  // values migrate to this default without creating 30 per-row unit records.
+  // Conflicting declared units still fail rather than being overwritten.
+  const configuredUnit=normalizedToken(basisConfig.commonPressureUnitFallback);
+  const projectUnit=(!configuredUnit||configuredUnit==='AUTO')?'KPA':configuredUnit;
+  const pressureBasis=resolveB313EffectivePreviewPressureUnit(row,manualBasis,projectUnit);
   if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
   const corrosion=nonNegative(row?.corrosion);
   if (corrosion===null) holdReasons.push('Corrosion allowance missing');
@@ -898,8 +904,18 @@ export function buildPreviewB313ScreeningReference({
     && text(row?.pipingClassPipeMaterial)
     && classMatchesDimension);
   const referenceOnlyOd=ods.length===0 && exactDnClassReference && referenceOd;
-  const od=ods.length===1?ods[0]:(referenceOnlyOd?referenceOd:null);
+  // A reducer or mixed-size branch can legitimately contain several
+  // physical OD values. Resolve a *single unique* ledger OD only when it
+  // agrees with the exact-DN Piping Class and B36 schedule/wall product.
+  // Never take the first/maximum/minimum OD or erase a physical conflict.
+  const odMatches=ods.length>1&&exactDnClassReference&&referenceOd
+    ?ods.filter(nodeOd=>Math.abs(nodeOd-referenceOd)<=Math.max(1.5,referenceOd*0.005))
+    :[];
+  const uniquelyMatchedPhysicalOd=odMatches.length===1?odMatches[0]:null;
+  const od=ods.length===1?ods[0]
+    :uniquelyMatchedPhysicalOd||(referenceOnlyOd?referenceOd:null);
   const outsideDiameterSource=ods.length===1?'step4-preview-node-ledger'
+    :uniquelyMatchedPhysicalOd?'step4-preview-node-ledger-exact-class-DN-match'
     :referenceOnlyOd?'pipe-wall-master-exact-DN-SCREENING-ONLY':'unresolved';
   if (!od) holdReasons.push(ods.length>1?'Multiple physical ODs; scope unresolved'
     :'Neither a unique source-node OD nor an exact-DN class/dimension reference is available');
@@ -973,7 +989,7 @@ export function buildPreviewB313ScreeningReference({
     pressureUnitAssumed:pressureBasis.assumed===true,
     outsideDiameterMm:od,outsideDiameterSource,
     outsideDiameterReferenceOnly:outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY',
-    outsideDiameterSourceMatched:outsideDiameterSource==='step4-preview-node-ledger',
+    outsideDiameterSourceMatched:outsideDiameterSource.startsWith('step4-preview-node-ledger'),
     outsideDiameterReferenceMm:referenceOd,
     corrosionAllowanceMm:corrosion,
     negativeMillTolerance:manualBasis.negativeMillTolerance

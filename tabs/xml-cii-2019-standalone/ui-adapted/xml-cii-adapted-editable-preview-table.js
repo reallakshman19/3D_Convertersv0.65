@@ -28,6 +28,8 @@ export const BRANCH_COLUMNS = [
   { id: 'density', label: 'Density', hint: 'Edit', width: 90, minWidth: 60 },
   { id: 'wallThickness', label: 'Wall Thk', hint: 'Edit', width: 90, minWidth: 60 },
   { id: 'b313CalculatedWall', label: 'B31.3 Required (mm)', hint: 'Calc', width: 160, minWidth: 112 },
+  { id: 'b36SelectedWall', label: 'Selected Thickness (mm)', hint: 'Pull', width: 160, minWidth: 120 },
+  { id: 'b36ScheduleStandard', label: 'Schedule / Standard', hint: 'B36.10M / B36.19M', width: 178, minWidth: 125 },
   { id: 'corrosion', label: 'Corrosion', hint: 'Edit', width: 90, minWidth: 60 },
   { id: 'insThk', label: 'Ins. Thk (mm)', hint: 'Edit', width: 165, minWidth: 110 },
   { id: 'insType', label: 'Ins. Type', hint: 'Edit', width: 130, minWidth: 85 }
@@ -98,7 +100,7 @@ export function previewMaterialCodeSuggestionEvidence(row) {
 }
 
 export class XmlCiiAdaptedEditablePreviewTable {
-  constructor({ branchRows, nodesByBranch, onCellEditClick, onFillDownClick, onProcessInputChange, onProcessFillDownClick, onWeightCandidateSelect, onB313PullClick, processInputHtmlRenderer, matchBadgeHtmlRenderer, onClassSourceSelect }) {
+  constructor({ branchRows, nodesByBranch, onCellEditClick, onFillDownClick, onProcessInputChange, onProcessFillDownClick, onWeightCandidateSelect, onB313PullClick, onB36SelectedPullClick, processInputHtmlRenderer, matchBadgeHtmlRenderer, onClassSourceSelect }) {
     this.branchRows = branchRows;
     this.nodesByBranch = nodesByBranch;
     this.onCellEditClick = onCellEditClick;
@@ -109,6 +111,7 @@ export class XmlCiiAdaptedEditablePreviewTable {
     this.matchBadgeHtmlRenderer = matchBadgeHtmlRenderer;
     this.onWeightCandidateSelect = onWeightCandidateSelect;
     this.onB313PullClick = onB313PullClick;
+    this.onB36SelectedPullClick = onB36SelectedPullClick;
     this.onClassSourceSelect=onClassSourceSelect;
   }
 
@@ -181,6 +184,15 @@ export class XmlCiiAdaptedEditablePreviewTable {
         <td class="mc-preview-td mc-preview-pd-td">${renderProcessField('density', row.density, row.densitySource)}</td>
         <td ${tdApprox(false, editAttrs('wallThickness', wallKey, `title="Wall thickness override key: ${this._escapeAttr(wallKey)}"`))}>${editablePlain('wallThickness', row.wallThickness, wallKey, row.wallThicknessSource)}${pullBtn(ri)}${fillDownBtn('wallThickness', ri)}</td>
         <td class="mc-preview-td" data-mc-b313-calculated-row="${ri}" data-mc-b313-calculated-unit="mm" title="Click Calculate B31.3 pressure-design wall to see the required nominal wall from effective 4 Preview P1/T1 and current factor master. This is independent of Wall Thk edits and Pull."><strong data-mc-b313-calculated-value>—</strong><small data-mc-b313-calculated-detail style="display:block;color:#64748b;">Calculate</small></td>
+        <td class="mc-preview-td" data-mc-b36-selected-row="${ri}" data-mc-b36-selected-unit="mm" title="ASME B36.10M/B36.19M selected nominal pipe wall by DN and schedule. Distinct from B31.3 required wall and approved Pull.">
+          <strong data-mc-b36-selected-value>—</strong>
+          <small data-mc-b36-selected-detail style="display:block;color:#64748b;">—</small>
+          <button type="button" data-mc-b36-selected-pull-row="${ri}" class="mc-preview-filldown-btn mc-preview-b36-pull-btn" disabled style="margin-top:3px;" title="Apply selected B36 nominal wall to Wall Thk">Pull selected</button>
+        </td>
+        <td class="mc-preview-td" data-mc-b36-schedule-standard-row="${ri}" title="Selected pipe schedule and dimensional standard">
+          <strong data-mc-b36-schedule>—</strong>
+          <small data-mc-b36-standard style="display:block;color:#64748b;">—</small>
+        </td>
         <td ${tdApprox(false, editAttrs('corrosion', corrosionKey, `title="Corrosion override key: ${this._escapeAttr(corrosionKey)}"`))}>${editablePlain('corrosion', row.corrosion, corrosionKey, row.corrosionSource)}${fillDownBtn('corrosion', ri)}</td>
         <td class="mc-preview-td mc-preview-pd-td${row.insThkNeedsReview?' mc-preview-approx':''}">${renderProcessField('insThk', row.insThk, row.insThkSource||'none')}${insulationNote('insThk')}${row.insThkNeedsReview?'<small class="mc-preview-badge bad">Review thickness</small>':''}</td>
         <td class="mc-preview-td mc-preview-pd-td${row.insTypeNeedsReview?' mc-preview-approx':''}">${renderProcessField('insType', row.insType, row.insTypeSource||'none')}${insulationNote('insType')}</td>
@@ -192,6 +204,7 @@ export class XmlCiiAdaptedEditablePreviewTable {
     if (branchTable) adaptedAttachColumnResizers(branchTable, BRANCH_COLUMNS, { storageKey: 'xmlCii.preview.branch.columnWidths.v1' });
     hostEl.querySelectorAll('[data-mc-edit-type]').forEach(td => { td.style.cursor = 'pointer'; td.addEventListener('click', (e) => { if (e.target.closest('.mc-preview-filldown-btn, .mc-preview-b313-pull-btn')) return; const editType = td.getAttribute('data-mc-edit-type'); const derivedKey = td.getAttribute('data-mc-edit-derived') || td.getAttribute('data-mc-edit-key') || td.getAttribute('data-mc-edit-mat') || ''; let currentVal = td.getAttribute('data-mc-current-val') || td.querySelector('.mc-preview-editable-val')?.textContent?.trim() || ''; if (currentVal === '—') currentVal = ''; const rowIndex = Number(td.getAttribute('data-mc-edit-row') || 0); if (typeof this.onCellEditClick === 'function') this.onCellEditClick({ editType, derivedKey, currentVal, rowIndex, td }); }); });
     hostEl.querySelectorAll('.mc-preview-b313-pull-btn[data-mc-b313-pull-row]').forEach(btn => btn.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); this.onB313PullClick?.({rowIndex:Number(btn.dataset.mcB313PullRow),button:btn}); }));
+    hostEl.querySelectorAll('.mc-preview-b36-pull-btn[data-mc-b36-selected-pull-row]').forEach(btn => btn.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); this.onB36SelectedPullClick?.({rowIndex:Number(btn.dataset.mcB36SelectedPullRow),button:btn}); }));
     hostEl.querySelectorAll('.mc-preview-filldown-btn[data-mc-fill-field]:not(.mc-pd-filldown)').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const field = btn.getAttribute('data-mc-fill-field') || ''; const fromRow = Number(btn.getAttribute('data-mc-fill-from') || 0); const sourceTd = btn.closest('[data-mc-edit-type]'); const currentVal = sourceTd?.querySelector('.mc-preview-editable-val')?.textContent?.trim() || ''; if (typeof this.onFillDownClick === 'function') this.onFillDownClick({ field, fromRow, currentVal, sourceTd, btn }); }));
     hostEl.querySelectorAll('[data-mc-pc-source]').forEach(input=>input.addEventListener('change',()=>{if(input.checked)this.onClassSourceSelect?.({rowIndex:Number(input.dataset.mcPcRow),source:input.dataset.mcPcSource});}));
     hostEl.querySelectorAll('[data-mc-pd-field]').forEach(input => input.addEventListener('change', () => { const fieldKey = input.dataset.mcPdField; const lineKey = input.dataset.mcPdLinekey; const rowIndex = Number(input.dataset.mcPdRow || input.dataset.mcRow || 0); const value = input.value; if (typeof this.onProcessInputChange === 'function') this.onProcessInputChange({ fieldKey, lineKey, value, rowIndex, input }); }));

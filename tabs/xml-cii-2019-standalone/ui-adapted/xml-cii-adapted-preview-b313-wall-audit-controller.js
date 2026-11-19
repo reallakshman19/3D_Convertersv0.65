@@ -8,6 +8,7 @@ import {
   installPreviewB313WallUpdateController,
   selectPreviewB313ActionRows,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-glrd-numeric-2';
+import {buildPreviewB36SelectedThickness} from './xml-cii-adapted-preview-b313-b36-selected.js?v=20261119-b36-selected-1';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 function text(value) {
@@ -460,7 +461,7 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
         ?result.hypotheticalScenario:null;
       if(hypothetical){
         if(value)value.textContent=Number(hypothetical.requiredNominalThicknessMm).toFixed(3);
-        if(detail)detail.textContent='HYPOTHETICAL kPa(g) ONLY · source P1 unit UNKNOWN · governing wall HELD';
+        if(detail)detail.textContent='kPa(g) default';
         cell.title=[
           'HYPOTHETICAL, NOT ENGINEERING DESIGN / NO Pull',
           'Assume P1 '+hypothetical.pressure+' kPa(g) with UNVERIFIED unit',
@@ -474,7 +475,7 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
         cell.dataset.mcB313CalculatedStatus='HYPOTHETICAL_KPA_UNIT_UNKNOWN';
       }else{
         if(value)value.textContent='—';
-        if(detail)detail.textContent=result?.reason||'Input incomplete';
+        if(detail)detail.textContent='Inputs needed';
         cell.title=result?.reason||'Calculate B31.3 to see result';
         cell.dataset.mcB313CalculatedStatus='INPUT_REQUIRED';
       }
@@ -484,16 +485,15 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
     if(result.pressureUnitAssumed)assumedUnits++;
     if(value)value.textContent=Number(result.requiredNominalThicknessMm).toFixed(3);
     if(detail)detail.textContent=result.pressureUnitAssumed
-      ?'Common fallback '+result.pressureUnit+' · WHAT-IF only'
-      :'P unit '+result.pressureUnit+' · t '+Number(result.pressureDesignThicknessMm).toFixed(3);
+      ?'kPa(g) default'
+      :'P1 '+(result.pressureUnit==='KPA'?'kPa(g)':result.pressureUnit);
     const bracket=Array.isArray(result.interpolationBracket)
       ? result.interpolationBracket.map(x=>x.temperatureC+'°C='+x.Sksi+' ksi').join(' → '):'';
     cell.title=[
       'Calculated B31.3 required nominal: '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
       'Pressure-design wall t: '+Number(result.pressureDesignThicknessMm).toFixed(4)+' mm',
       'P1: '+result.pressure+' '+result.pressureUnit
-        +(result.hypotheticalKpa?' (HYPOTHETICAL kPa(g) ONLY; SOURCE UNIT UNKNOWN; NO Pull)'
-          :result.pressureUnitAssumed?' (WHAT-IF: selected common fallback, NOT SOURCE VERIFIED)':''),
+        +(result.pressureUnitAssumed?' (project default)':''),
       'P1 unit evidence: '+(result.pressureUnitSource||'unresolved'),
       'T1: '+result.temperatureC+'°C',
       'S '+result.factors.S_MPa+' MPa · E '+result.factors.E
@@ -503,15 +503,87 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
       'CA: '+result.corrosionAllowanceMm+' mm',
       'Class wall: '+result.classNominalWallMm+' mm · class pass: '+result.classPass,
       'Evidence: '+result.factorBasisId+' · '+result.factorSourceReference,
-      'Edition/source qualification: '+result.factorCodeEditionBasis,
-      'Independent calculation: NOT a saved Wall Thk or approved Pull',
+      'Master source: '+result.factorCodeEditionBasis,
+      'Required wall is read-only; Pull selected applies a separate B36 nominal wall',
     ].join('\\n');
     cell.dataset.mcB313CalculatedStatus=result.hypotheticalKpa?'HYPOTHETICAL_KPA_UNIT_UNKNOWN'
       :result.pressureUnitAssumed?'WHAT_IF_P_UNIT':'CALCULATED';
   }
+  renderPreviewB36SelectedThicknessCells(host,report);
   return {physicalRows:physical.length,calculatedRows:calculated,assumedPressureUnitRows:assumedUnits};
 }
 
+
+
+/**
+ * Separate ASME B36.10M/B36.19M nominal selection; do not mask required
+ * B31.3 thickness or convert hypothetical pressure into a code approval.
+ */
+export function renderPreviewB36SelectedThicknessCells(host,report={}){
+  const rows=normalizeRows(report?.rows);
+  const physical=host?.querySelectorAll?.(
+    'table[data-resizable-table="branch-preview"] tbody tr.mc-preview-row')||[];
+  let available=0;
+  for(let i=0;i<physical.length;i++){
+    const cell=physical[i].querySelector?.('[data-mc-b36-selected-row]');
+    const standardCell=physical[i].querySelector?.('[data-mc-b36-schedule-standard-row]');
+    if(!cell)continue;
+    // Strict governed B31.3 reports do not own this independent display.
+    if(rows[i] && !Object.hasOwn(rows[i],'selectedWallDisplay'))continue;
+    const result=rows[i]?.selectedWallDisplay;
+    const value=cell.querySelector('[data-mc-b36-selected-value]');
+    const detail=cell.querySelector('[data-mc-b36-selected-detail]');
+    const button=cell.querySelector('[data-mc-b36-selected-pull-row]');
+    const standardSchedule=standardCell?.querySelector('[data-mc-b36-schedule]');
+    const standardName=standardCell?.querySelector('[data-mc-b36-standard]');
+    if(!result?.ok){
+      if(value)value.textContent='—';
+      if(detail)detail.textContent='—';
+      if(button)button.disabled=true;
+      if(standardSchedule)standardSchedule.textContent='—';
+      if(standardName)standardName.textContent='—';
+      if(standardCell)standardCell.dataset.mcB36ScheduleStandardStatus='INPUT_REQUIRED';
+      cell.dataset.mcB36SelectedStatus='INPUT_REQUIRED';
+      cell.title=result?.message||'P1, T1 or dimension inputs required';
+      if(standardCell)standardCell.title=cell.title;
+      continue;
+    }
+    available++;
+    if(value)value.textContent=Number(result.selectedNominalWallMm.toFixed(4)).toString();
+    if(detail)detail.textContent=result.manuallyPulled?'Pulled'
+      :result.selectionAuthority.startsWith('EXACT_DN')?'Class matched':'B36 minimum';
+    if(standardSchedule)standardSchedule.textContent=result.selectedSchedule||'—';
+    if(standardName)standardName.textContent=result.dimensionStandard.replace('ASME ','');
+    if(standardCell){
+      standardCell.dataset.mcB36ScheduleStandardStatus='SELECTED';
+      standardCell.title='ASME '+result.dimensionStandard.replace('ASME ','')
+        +' · Sch '+result.selectedSchedule+' · nominal wall '
+        +Number(result.selectedNominalWallMm).toFixed(4)+' mm';
+    }
+    if(button){
+      button.disabled=result.eligibleForManualPreviewPull!==true;
+      button.title=result.eligibleForManualPreviewPull
+        ?'Pull '+Number(result.selectedNominalWallMm).toFixed(3)+' mm into editable Wall Thk'
+        :(result.manualPullReason||'Complete the required inputs before Pull');
+    }
+    cell.dataset.mcB36SelectedStatus=result.manuallyPulled?'MANUAL_PULLED'
+      :result.hypothetical?'HYPOTHETICAL_SELECTION':'SELECTED';
+    cell.title=[
+      'ASME '+result.dimensionStandard.replace('ASME ','')+' selected nominal wall: '
+        +Number(result.selectedNominalWallMm).toFixed(4)+' mm',
+      'Selected schedule '+result.selectedSchedule,
+      'B31.3 numerical required nominal '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
+      'Margin '+Number(result.marginMm).toFixed(4)+' mm',
+      'Minimum adequate B36 catalog '+result.catalogMinimumWallMm+' mm / '+result.catalogMinimumSchedule,
+      'Authority '+result.selectionAuthority+'; '+(result.classProduct||'class product unavailable'),
+      'Source '+(result.masterSourcePath||'pipe-wall-master'),
+      'Pressure basis '+result.pressureUnit+' ('+result.pressureUnitSource+')',
+      result.manuallyPulled?'Manual Preview Pull recorded '+result.manualPullReceipt?.timestamp
+        :'Pull selected applies the nominal wall to editable Preview Wall Thk',
+    ].join('\n');
+  }
+  return {physicalRows:physical.length,selectedRows:available};
+}
 
 /**
  * Build numerical required-wall values from the already-effective 4 Preview,
@@ -525,17 +597,45 @@ export function buildPreviewB313AutomaticWallColumnReport({rows=[],config={},hos
   return {
     schema:'b313-preview-display-only/v1',
     calculationInputAuthority:'EFFECTIVE_4_PREVIEW_ONLY',
-    rows:branchRows.map((row,rowIndex)=>({
-      branchName:text(row.branchName),
-      lineKey:text(row.lineKey),
-      calculatedWallDisplay:buildPreviewB313CalculatedWallDisplay({
+    rows:branchRows.map((row,rowIndex)=>{
+      const calculatedWallDisplay=buildPreviewB313CalculatedWallDisplay({
         row,config,previewNodeRows,rowIndex,
-      }),
-    })),
+      });
+      return {
+        branchName:text(row.branchName),
+        lineKey:text(row.lineKey),
+        calculatedWallDisplay,
+        selectedWallDisplay:buildPreviewB36SelectedThickness({
+          row,config,previewNodeRows,rowIndex,calculatedWallDisplay,
+        }),
+      };
+    }),
   };
 }
 
 function clearAutomaticCalculatedWalls(host) {
+  for(const selected of host?.querySelectorAll?.('[data-mc-b36-selected-row]')||[]){
+    const value=selected.querySelector('[data-mc-b36-selected-value]');
+    const detail=selected.querySelector('[data-mc-b36-selected-detail]');
+    const button=selected.querySelector('[data-mc-b36-selected-pull-row]');
+    const standardCell=selected.closest('tr')?.querySelector('[data-mc-b36-schedule-standard-row]');
+    const schedule=standardCell?.querySelector('[data-mc-b36-schedule]');
+    const standard=standardCell?.querySelector('[data-mc-b36-standard]');
+    if(schedule&&schedule.textContent!=='—')schedule.textContent='—';
+    if(standard&&standard.textContent!=='—')standard.textContent='—';
+    if(standardCell&&standardCell.dataset.mcB36ScheduleStandardStatus!=='PREVIEW_DIRTY')
+      standardCell.dataset.mcB36ScheduleStandardStatus='PREVIEW_DIRTY';
+    // Idempotent DOM writes are essential: the controller observes this
+    // subtree and a redundant textContent assignment can trigger a
+    // self-sustaining MutationObserver loop during dirty Preview state.
+    if(value && value.textContent!=='—')value.textContent='—';
+    if(detail && detail.textContent!=='Rebuild Preview')detail.textContent='Rebuild Preview';
+    if(button && button.disabled!==true)button.disabled=true;
+    if(selected.dataset.mcB36SelectedStatus!=='PREVIEW_DIRTY')
+      selected.dataset.mcB36SelectedStatus='PREVIEW_DIRTY';
+    const dirtyTitle='Effective Preview edits require explicit Rebuild before B36 wall selection/Pull.';
+    if(selected.title!==dirtyTitle)selected.title=dirtyTitle;
+  }
   for(const cell of host?.querySelectorAll?.('[data-mc-b313-calculated-row]')||[]){
     const value=cell.querySelector('[data-mc-b313-calculated-value]');
     const detail=cell.querySelector('[data-mc-b313-calculated-detail]');
@@ -655,7 +755,11 @@ export function installPreviewB313WallUpdateAuditController({ host, config, xmlT
       tolerance:config?.b313WallUpdate?.millTolerance||{},
     });
     if(lastAutoSignature===signature
-      && [...cells].every(cell=>cell.dataset.mcB313CalculatedStatus))return;
+      && [...cells].every(cell=>cell.dataset.mcB313CalculatedStatus)
+      && [...(table?.querySelectorAll('[data-mc-b36-selected-row]')||[])]
+         .every(cell=>cell.dataset.mcB36SelectedStatus)
+      && [...(table?.querySelectorAll('[data-mc-b36-schedule-standard-row]')||[])]
+         .every(cell=>cell.dataset.mcB36ScheduleStandardStatus))return;
     lastAutoSignature=signature;
     const report=buildPreviewB313AutomaticWallColumnReport({rows:current,config,host});
     renderPreviewB313CalculatedWallCells(host,report);

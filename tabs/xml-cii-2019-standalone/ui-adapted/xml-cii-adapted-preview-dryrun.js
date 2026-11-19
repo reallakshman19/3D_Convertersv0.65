@@ -3,7 +3,7 @@ export * from './xml-cii-adapted-preview-dryrun-core.js?v=20261116-b313-pull-v06
 import './xml-cii-adapted-authority-migration.js';
 import { xmlCiiDryRunPreview as buildCorePreview } from './xml-cii-adapted-preview-dryrun-core.js?v=20261008-p0-mode-b-parity-1';
 import { withXmlCiiEffectiveRigidWeightLegacyView } from '../../../converters/xml-cii2019-core/rigid-weight-authority.js?v=20260928-issue776-authority-2';
-import { applyAcceptedB313PullAuthority, applyPreviewBoreWallAuthority } from './xml-cii-adapted-preview-bore-wall-authority.js?v=20261116-b313-pull-v065';
+import { applyAcceptedB313PullAuthority, applyPreviewBoreWallAuthority } from './xml-cii-adapted-preview-bore-wall-authority.js?v=20261119-b36-manual-wall-authority-1';
 import { applyPreviewMaterialCodeAuthority } from './xml-cii-adapted-preview-material-authority.js';
 import { applyPreviewRatingAuthority, rerankPreviewNodeRows } from './xml-cii-adapted-preview-rating-authority.js?v=20261008-p0-mode-b-parity-1';
 import { buildIncrementalPreview } from './xml-cii-adapted-preview-incremental.js';

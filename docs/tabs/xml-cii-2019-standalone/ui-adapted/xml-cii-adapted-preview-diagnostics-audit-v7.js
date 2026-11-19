@@ -5,10 +5,10 @@ import {
 import {
   xmlCiiBuildAndRenderPreview,
   xmlCiiRenderPreviewPhase,
-} from './xml-cii-adapted-preview-renderer-v7.js?v=20261118-manual-preview-2';
+} from './xml-cii-adapted-preview-renderer-v7.js?v=20261119-b36-selected-pull-1';
 import { clearPreviewCachesV7 } from './xml-cii-adapted-preview-cache-v7.js';
-import { installPreviewB313WallUpdateAuditController } from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-glrd-numeric-2';
-import { installPreviewB313AutoBasisPanel } from './xml-cii-adapted-preview-b313-auto-basis.js?v=20261118-glrd-numeric-2';
+import { installPreviewB313WallUpdateAuditController } from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261119-b36-selected-pull-1';
+import { installPreviewB313AutoBasisPanel } from './xml-cii-adapted-preview-b313-auto-basis.js?v=20261119-b36-selected-pull-1';
 import { materializeXmlCiiDatasetBackedConfig } from '../xml-cii-dataset-backed-config.js?v=20261001-weight-output-2';
 import {openXml229P4VerifiedSession,getXml229CurrentWorkerHeldReview}
  from './xml-cii-adapted-p4-verified-weight-panel.js?v=20261113-x5a-2';

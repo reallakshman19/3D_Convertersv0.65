@@ -28,6 +28,8 @@ on:
       - 'tests/glrd-b313-qualification-readiness.test.mjs'
       - 'scripts/glrd-b313-qualification-readiness.mjs'
       - 'tests/xml-cii-b313-*.test.mjs'
+      - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-editable-preview-table.js'
+      - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-b36-selected.js'
       - 'tests/browser/xml-cii-b313-live-preview-e2e.html'
       - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-mode-a-individual-preview-tools.js'
       - 'tabs/xml-cii-2019-standalone/xml-cii-linelist-header-band.js'
@@ -73,6 +75,10 @@ jobs:
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-dryrun-core.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-update.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-auto-basis.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-b36-selected.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-editable-preview-table.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-renderer.js
+          node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-b313-wall-audit-controller.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-mode-a-individual-preview-tools.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-mode-a-consolidated-easy-ui-hook.js
           node --check tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-facts-worker-entry.js
@@ -100,6 +106,8 @@ jobs:
             tests/xml-cii-b313-common-pressure-unit-fallback.test.mjs \
             tests/xml-cii-b313-review-column-manual-rebuild.test.mjs \
             tests/xml-cii-b313-glrd-real-preview-numeric-wall-20261118.test.mjs \
+            tests/xml-cii-b313-b36-selected-manual-pull.test.mjs \
+            tests/xml229-preview-wall-ledger-proof.test.mjs \
             tests/xml-cii-preview-b2a-worker-rebuild.test.mjs \
             tests/xml-cii-mode-a-preview-restoration.test.mjs \
             tests/xml-cii-b313-header-band-source-unit.test.mjs \

@@ -1,0 +1,67 @@
+name: GLRD PSI-02 B36 selected thickness and manual Pull E2E
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-*.js'
+      - 'tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-editable-preview-table.js'
+      - 'scripts/glrd-b313-b36-selected-real-source-e2e.mjs'
+      - '.github/workflows/glrd-b313-b36-selected-real-source-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  b36-selected-source-e2e:
+    name: Exact-head GLRD PSI-02 30-row B36 selection + real UI Pull
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Checkout pinned original PSI-02 source and Line List
+        uses: actions/checkout@v5
+        with:
+          repository: reallakshman19/3D_Converters
+          ref: 3377b7f4baeeee5851e72dcc414d6c4a93f5a933
+          path: glrd-source
+          persist-credentials: false
+      - name: Checkout pinned original Piping Class and material map
+        uses: actions/checkout@v5
+        with:
+          repository: reallakshman19/3D_Converters
+          ref: 25db94769994751bb0fb6e6d83a578efd9ac8162
+          path: glrd-masters
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Syntax-check exact-head real-source browser replay
+        run: node --check scripts/glrd-b313-b36-selected-real-source-e2e.mjs
+      - name: Install Chromium
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.52.0
+          npx playwright install --only-shell chromium
+      - name: Serve exact-head application (no deployment)
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/glrd-b36-http.log 2>&1 &
+      - name: Real GLRD PSI-02 Preview + B36 selected + manual Pull
+        env:
+          GLRD_PUBLIC_SOURCE_ROOT: glrd-source
+          GLRD_PUBLIC_MASTER_ROOT: glrd-masters
+          GLRD_BROWSER_TARGET: http://127.0.0.1:4173/index.html
+          GLRD_EVIDENCE_DIR: glrd-b36-evidence
+        run: node scripts/glrd-b313-b36-selected-real-source-e2e.mjs
+      - name: Keep source/selected/Pull evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glrd-psi02-b36-selected-manual-pull-e2e
+          path: |
+            glrd-b36-evidence/GLRD-PSI02-B36-selected-pull.json
+            glrd-b36-evidence/GLRD-PSI02-B36-selected-pull.png
+            /tmp/glrd-b36-http.log
+          if-no-files-found: warn
+          retention-days: 14

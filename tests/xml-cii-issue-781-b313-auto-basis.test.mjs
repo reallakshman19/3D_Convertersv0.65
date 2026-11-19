@@ -112,7 +112,9 @@ assert.match(runtimeSource, /legacyEditor\.hidden = true/);
 assert.match(runtimeSource, /legacyEditor\.style\.display = 'none'/);
 assert.match(runtimeSource, /data-b313-auto-open-material/);
 assert.match(runtimeSource, />▦<\/button>/);
-assert.match(runtimeSource, /Only source-confirmed ASTM A106 pipe may imply seamless manufacturing/);
+assert.match(runtimeSource, /S\/E\/W\/Y:/);
+assert.notEqual(genericCs.route,'SEAMLESS',
+  'physical A106 route evidence remains governed by source, not UI warnings');
 assert.match(runtimeSource, /Blank T1 is never treated as 0 °C/);
 assert.match(runtimeSource, /data-b313-auto-field="\$\{field\}"/);
 assert.match(runtimeSource, /fallbackInputCell\(model, 'S', 'allowableStress'/);
