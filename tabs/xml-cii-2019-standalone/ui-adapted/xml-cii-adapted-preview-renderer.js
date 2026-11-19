@@ -513,21 +513,16 @@ export async function xmlCiiBuildAndRenderPreview(rootEl, xmlText, config, optio
         return;
       }
       const selection=plan.selection;
-      const assumption=selection.pressureUnitUnverified
-        ?'WARNING: P1 pressure unit and/or common fallback is UNVERIFIED. This is a WHAT-IF selection, NOT a code-approved design wall.\n'
-        :'WARNING: B31.3 material factors/manufacture are NOT qualified by this selected-thickness action.\n';
       const affected=plan.affectedRows.map(i=>(i+1)).join(', ');
       const prior=plan.priorOverride===null?'not set':String(plan.priorOverride)+' mm';
       const confirmed=window.confirm(
-        'MANUAL Pull — '+plan.dimensionStandard+' '+plan.selectedSchedule+'\n'
-        +'Preview row '+(rowIndex+1)+'; wall override key '+plan.key+'\n'
-        +'Required reference '+plan.requiredNominalThicknessMm.toFixed(3)+' mm\n'
-        +'Selected STANDARD wall '+plan.selectedNominalWallMm.toFixed(3)+' mm\n'
-        +'Existing saved override '+prior+'\n'
-        +'Affected Preview rows: '+affected+'\n\n'
-        +assumption
-        +'This writes an explicitly approved-by-user MANUAL Preview override, NOT '
-        +'an ACCEPTED B31.3 Pull or native CII approval.\nContinue?'
+        'Pull selected thickness into Wall Thk?\n'
+        +'Row '+(rowIndex+1)+' · '+plan.dimensionStandard+' · Sch '+plan.selectedSchedule+'\n'
+        +'Required: '+plan.requiredNominalThicknessMm.toFixed(3)+' mm\n'
+        +'Selected: '+plan.selectedNominalWallMm.toFixed(4)+' mm\n'
+        +'Existing override: '+prior+'\n'
+        +'Affected rows: '+affected+'\n\n'
+        +'Apply to Preview?'
       );
       if(!confirmed)return;
       const revalidated=planPreviewB36SelectedPull({
