@@ -24,11 +24,13 @@ const cfg=unit=>({b313WallUpdate:{commonPressureUnitFallback:unit,bases:{},
   proposalsByBranch:{},acceptedWallByBranch:{},
   millTolerance:{basis:'percent',value:12.5}}});
 
-test('basis wall column is read-only and requires explicit common P1 unit',()=>{
+test('basis wall column is read-only and uses common kPa(g) default',()=>{
   const base=row(0), saved=JSON.stringify(base);
   const missing=buildPreviewB313BasisWallCells([base],cfg('AUTO'));
   const without=[...missing.values()][0][0].result;
-  assert.equal(without.ok,false);
+  assert.equal(without.ok,true);
+  assert.equal(without.pressureUnit,'KPA');
+  assert.equal(without.pressureUnitAssumed,true);
   const c=cfg('KPA');
   const withUnit=buildPreviewB313BasisWallCells([base],c);
   const result=[...withUnit.values()][0][0].result;
@@ -57,7 +59,7 @@ test('same B31.3 panel renders calculated wall column and labels source assumpti
   assert.match(source,/Calculated wall \(mm\)/);
   assert.match(source,/data-b313-auto-calculated-wall/);
   assert.match(source,/read-only|required nominal|Read-only/i);
-  assert.match(source,/WHAT-IF · common P1/);
+  assert.match(source,/P1 kPa\(g\) · project default/);
   assert.match(source,/refreshCalculatedWallPanelCells\(panel,host,config,liveRows\)/);
   assert.doesNotMatch(source,/data-b313-auto-wall-apply/i);
 });
