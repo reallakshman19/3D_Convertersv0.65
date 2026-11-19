@@ -100,9 +100,14 @@ try{
    await btn.click(); // Only explicit Preview rebuild
    await page.waitForFunction(()=>{
      const h=document.querySelector('#mc-preview-table-host');
-     return h?.dataset.mcPreviewJsonSource==='P4_ENGINEERING_VERIFIED'||
+     const rows=h?.__xmlCiiPreviewResult?.branchRows?.length||0;
+     const cells=h?.querySelectorAll('[data-mc-b313-calculated-row]').length||0;
+     // The deployed app's user-visible "Verified original engineering
+     // Preview" has a distinct source-status field in XML-only mode.
+     // Completion is the real 30-row table + physical B31.3 cells.
+     return (rows===30 && cells===rows)||
        /Preview failed|Preview build failed/i.test(h?.innerText||'');
-   },null,{timeout:240000});
+   },null,{timeout:120000});
    await page.waitForTimeout(800);
    const status=await host.evaluate(h=>({
      jsonSource:h.dataset.mcPreviewJsonSource||null,
