@@ -68,6 +68,24 @@ test('each physical occurrence can prepare separate MANUAL wall pull, not an acc
   assert.equal(JSON.stringify(config),before,'planner must not write to config');
 });
 
+test('explicit manual Pull receipt remains visible even when selected nominal equals existing class wall',()=>{
+  const config=cfg(),row=testRows[1],key=row.wallThicknessKey;
+  assert.equal(buildPreviewB36SelectedThickness({row,config,rowIndex:1}).manuallyPulled,false);
+  config.overrides.wallThickness[key]='7.112';
+  config.b313WallUpdate.selectedWallManualByOverrideKey={
+    [key]:{status:'MANUAL_PREVIEW_ONLY_NOT_B313_APPROVED',selectedNominalWallMm:7.112,
+      selectedSchedule:'40S',dimensionStandard:'ASME B36.19M',timestamp:'2026-11-19T01:00:00Z',
+      affectedRows:[1],sourceBranch:row.branchName},
+  };
+  const selected=buildPreviewB36SelectedThickness({row,config,rowIndex:1});
+  assert.equal(selected.manuallyPulled,true);
+  assert.equal(selected.manualPullReceipt?.status,'MANUAL_PREVIEW_ONLY_NOT_B313_APPROVED');
+  assert.equal(selected.eligibleForB313GovernedPull,false);
+  config.overrides.wallThickness[key]='8.18';
+  assert.equal(buildPreviewB36SelectedThickness({row,config,rowIndex:1}).manuallyPulled,false,
+    'changed manual wall must not inherit a stale B36 Pull receipt');
+});
+
 test('incomplete P1/T1 or unavailable schedule cannot enable Pull',()=>{
   const base=testRows[1],config=cfg();
   for(const changed of [
