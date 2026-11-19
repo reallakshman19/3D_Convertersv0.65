@@ -99,6 +99,7 @@ jobs:
             tests/xml-cii-b313-preview-pressure-unit.test.mjs \
             tests/xml-cii-b313-common-pressure-unit-fallback.test.mjs \
             tests/xml-cii-b313-review-column-manual-rebuild.test.mjs \
+            tests/xml-cii-b313-glrd-real-preview-numeric-wall-20261118.test.mjs \
             tests/xml-cii-preview-b2a-worker-rebuild.test.mjs \
             tests/xml-cii-mode-a-preview-restoration.test.mjs \
             tests/xml-cii-b313-header-band-source-unit.test.mjs \

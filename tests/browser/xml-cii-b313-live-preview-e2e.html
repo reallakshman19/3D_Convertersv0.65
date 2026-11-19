@@ -249,6 +249,17 @@ try {
   installPreviewB313AutoBasisPanel({host:screenHost,config:screenConfig,
     rows:[screeningOnlyRow],watchLive:false,
     options:{onSaveConfigPreservePreview:async()=>{basisSaveCount++;}}});
+  // Even with shared P1 AUTO, a clearly labelled diagnostic can show
+  // numerical kPa(g) arithmetic. The governing wall remains INPUT REQUIRED.
+  const initialWhatIf=screenHost.querySelector('[data-b313-auto-calculated-wall]');
+  assert(initialWhatIf?.textContent.includes('5.983') &&
+    initialWhatIf.textContent.includes('HYPOTHETICAL kPa(g) ONLY') &&
+    initialWhatIf.textContent.includes('governing result HELD'),
+    '4 Preview must show a distinct numerical what-if rather than only qualification warnings');
+  assert(screenConfig.b313WallUpdate?.commonPressureUnitFallback==null,
+    'Display-only kPa hypothesis must never save a shared pressure unit');
+  assert(!Object.keys(screenConfig.b313WallUpdate.proposalsByBranch||{}).length,
+    'Display-only kPa hypothesis must never make an approved proposal');
   const screeningEl=screenHost.querySelector('[data-b313-auto-screening-reference]');
   assert(screeningEl && screeningEl.getClientRects().length>0,
     'Numerical material-master screening reference is not visibly rendered in 4 Preview');

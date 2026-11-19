@@ -10,12 +10,12 @@ import {
   buildPreviewB313CalculatedWallDisplay,
   resolvePreviewB313MaterialFromRow,
   b313SourceConfirmsA106Seamless,
-} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-b313-common-punit-1';
+} from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-glrd-numeric-2';
 
 import {
   buildPreviewB313AutomaticWallColumnReport,
   renderPreviewB313CalculatedWallCells,
-} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-b313-common-punit-1';
+} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-glrd-numeric-2';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
@@ -528,17 +528,21 @@ function wallCellHtml(entries = []) {
   return entries.map(({rowIndex,lineKey,branchName,result},i) => {
     const identity=entries.length>1
       ? '<div style="font-size:10px;color:#94a3b8;">Row '+(rowIndex+1)+' · '+esc(lineKey||branchName||'?')+'</div>' : '';
-    if (!result?.ok) return '<div data-b313-auto-wall-occurrence="'+rowIndex+'">'+identity+
+    const hypothetical=!result?.ok && result?.hypotheticalScenario?.ok===true;
+    const displayed=hypothetical?result.hypotheticalScenario:result;
+    if (!displayed?.ok) return '<div data-b313-auto-wall-occurrence="'+rowIndex+'">'+identity+
       '<strong style="color:#fbbf24;">—</strong>'+
       '<div style="font-size:10px;color:#fbbf24;">'+esc(result?.reason||'Calculation inputs incomplete')+'</div></div>';
-    const value=Number(result.requiredNominalThicknessMm);
-    const status=result.pressureUnitAssumed
-      ? 'WHAT-IF · common P1 '+text(result.pressureUnit)
-      : 'Calculated reference · P1 '+text(result.pressureUnit);
+    const value=Number(displayed.requiredNominalThicknessMm);
+    const status=hypothetical
+      ? 'HYPOTHETICAL kPa(g) ONLY · P1 source unit UNKNOWN · governing result HELD'
+      : displayed.pressureUnitAssumed
+        ? 'WHAT-IF · common P1 '+text(displayed.pressureUnit)+' · no Pull'
+        : 'Calculated reference · P1 '+text(displayed.pressureUnit);
     return '<div data-b313-auto-wall-occurrence="'+rowIndex+'" '+
       (i?'style="margin-top:5px;padding-top:5px;border-top:1px solid #334155;"':'')+'>'+
-      identity+'<strong style="font-size:13px;color:#e2e8f0;">'+value.toFixed(3)+' mm</strong>'+
-      '<div style="font-size:10px;color:'+(result.pressureUnitAssumed?'#fbbf24':'#94a3b8')+';">'+
+      identity+'<strong style="font-size:13px;color:#e2e8f0;">'+value.toFixed(3)+' mm</strong>'+      '<div style="font-size:10px;color:#94a3b8;">Pressure t '+Number(displayed.pressureDesignThicknessMm).toFixed(3)+' mm · class '+esc(displayed.classNominalWallMm??'?')+' mm</div>'+      (displayed.outsideDiameterSource==='pipe-wall-master-exact-DN-SCREENING-ONLY'?'<div style="font-size:9px;color:#fbbf24;">OD from dimension master, NOT verified physical OD</div>':'')+
+      '<div style="font-size:10px;color:'+(hypothetical||displayed.pressureUnitAssumed?'#fbbf24':'#94a3b8')+';">'+
       esc(status)+' · not Pull approved</div></div>';
   }).join('');
 }
