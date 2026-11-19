@@ -2,7 +2,7 @@ import {
   xmlCiiBuildAndRenderPreview as buildLegacyPreview,
   xmlCiiRenderPreviewPhase,
   suggestManualPreviewRebuild,
-} from './xml-cii-adapted-preview-renderer.js?v=20261118-b313-review-column-manual-1';
+} from './xml-cii-adapted-preview-renderer.js?v=20261119-b36-selected-pull-1';
 import {
   XML_CII_PREVIEW_CACHE_SCHEMA,
   XML_CII_PREVIEW_LEGACY_CACHE_KEY,
