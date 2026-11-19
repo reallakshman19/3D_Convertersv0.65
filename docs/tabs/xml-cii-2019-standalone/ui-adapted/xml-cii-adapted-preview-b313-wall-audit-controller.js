@@ -8,6 +8,7 @@ import {
   installPreviewB313WallUpdateController,
   selectPreviewB313ActionRows,
 } from './xml-cii-adapted-preview-b313-wall-update.js?v=20261118-glrd-numeric-2';
+import {buildPreviewB36SelectedThickness} from './xml-cii-adapted-preview-b313-b36-selected.js?v=20261119-b36-selected-1';
 import { XML_CII_PREVIEW_LEGACY_CACHE_KEY } from './xml-cii-adapted-preview-cache-v7.js';
 
 function text(value) {
@@ -509,9 +510,66 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
     cell.dataset.mcB313CalculatedStatus=result.hypotheticalKpa?'HYPOTHETICAL_KPA_UNIT_UNKNOWN'
       :result.pressureUnitAssumed?'WHAT_IF_P_UNIT':'CALCULATED';
   }
+  renderPreviewB36SelectedThicknessCells(host,report);
   return {physicalRows:physical.length,calculatedRows:calculated,assumedPressureUnitRows:assumedUnits};
 }
 
+
+
+/**
+ * Separate ASME B36.10M/B36.19M nominal selection; do not mask required
+ * B31.3 thickness or convert hypothetical pressure into a code approval.
+ */
+export function renderPreviewB36SelectedThicknessCells(host,report={}){
+  const rows=normalizeRows(report?.rows);
+  const physical=host?.querySelectorAll?.(
+    'table[data-resizable-table="branch-preview"] tbody tr.mc-preview-row')||[];
+  let available=0;
+  for(let i=0;i<physical.length;i++){
+    const cell=physical[i].querySelector?.('[data-mc-b36-selected-row]');
+    if(!cell)continue;
+    // Strict governed B31.3 reports do not own this independent display.
+    if(rows[i] && !Object.hasOwn(rows[i],'selectedWallDisplay'))continue;
+    const result=rows[i]?.selectedWallDisplay;
+    const value=cell.querySelector('[data-mc-b36-selected-value]');
+    const detail=cell.querySelector('[data-mc-b36-selected-detail]');
+    const button=cell.querySelector('[data-mc-b36-selected-pull-row]');
+    if(!result?.ok){
+      if(value)value.textContent='—';
+      if(detail)detail.textContent=result?.message||'Required wall or B36 dimension evidence unavailable';
+      if(button)button.disabled=true;
+      cell.dataset.mcB36SelectedStatus='INPUT_REQUIRED';
+      cell.title=result?.message||'Build Preview for B36 selection';
+      continue;
+    }
+    available++;
+    if(value)value.textContent=Number(result.selectedNominalWallMm).toFixed(3);
+    if(detail)detail.textContent=result.selectedSchedule+' · '+result.dimensionStandard.replace('ASME ','')
+      +(result.hypothetical?' · WHAT-IF':' · reference')
+      +(result.selectionAuthority.startsWith('EXACT_DN')?' · class schedule':'');
+    if(button){
+      button.disabled=result.eligibleForManualPreviewPull!==true;
+      button.title=result.eligibleForManualPreviewPull
+        ?'Explicit MANUAL Preview wall override; B31.3 engineering approval not implied'
+        :(result.manualPullReason||'Selected pipe wall cannot be manually pulled');
+    }
+    cell.dataset.mcB36SelectedStatus=result.hypothetical?'HYPOTHETICAL_SELECTION':'SELECTED';
+    cell.title=[
+      'ASME '+result.dimensionStandard.replace('ASME ','')+' selected nominal wall: '
+        +Number(result.selectedNominalWallMm).toFixed(4)+' mm',
+      'Selected schedule '+result.selectedSchedule,
+      'B31.3 numerical required nominal '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
+      'Margin '+Number(result.marginMm).toFixed(4)+' mm',
+      'Minimum adequate B36 catalog '+result.catalogMinimumWallMm+' mm / '+result.catalogMinimumSchedule,
+      'Authority '+result.selectionAuthority+'; '+(result.classProduct||'class product unavailable'),
+      'Source '+(result.masterSourcePath||'pipe-wall-master'),
+      result.hypothetical?'PRESSURE UNIT UNVERIFIED — HYPOTHETICAL KPA, NOT ENGINEERING DESIGN':
+        'SCREENING VALUES DO NOT CERTIFY B31.3 DESIGN',
+      'Pull selected is a separate manual Preview override; governed B31.3 Pull unchanged',
+    ].join('\n');
+  }
+  return {physicalRows:physical.length,selectedRows:available};
+}
 
 /**
  * Build numerical required-wall values from the already-effective 4 Preview,
@@ -525,17 +583,33 @@ export function buildPreviewB313AutomaticWallColumnReport({rows=[],config={},hos
   return {
     schema:'b313-preview-display-only/v1',
     calculationInputAuthority:'EFFECTIVE_4_PREVIEW_ONLY',
-    rows:branchRows.map((row,rowIndex)=>({
-      branchName:text(row.branchName),
-      lineKey:text(row.lineKey),
-      calculatedWallDisplay:buildPreviewB313CalculatedWallDisplay({
+    rows:branchRows.map((row,rowIndex)=>{
+      const calculatedWallDisplay=buildPreviewB313CalculatedWallDisplay({
         row,config,previewNodeRows,rowIndex,
-      }),
-    })),
+      });
+      return {
+        branchName:text(row.branchName),
+        lineKey:text(row.lineKey),
+        calculatedWallDisplay,
+        selectedWallDisplay:buildPreviewB36SelectedThickness({
+          row,config,previewNodeRows,rowIndex,calculatedWallDisplay,
+        }),
+      };
+    }),
   };
 }
 
 function clearAutomaticCalculatedWalls(host) {
+  for(const selected of host?.querySelectorAll?.('[data-mc-b36-selected-row]')||[]){
+    const value=selected.querySelector('[data-mc-b36-selected-value]');
+    const detail=selected.querySelector('[data-mc-b36-selected-detail]');
+    const button=selected.querySelector('[data-mc-b36-selected-pull-row]');
+    if(value)value.textContent='—';
+    if(detail)detail.textContent='Rebuild Preview';
+    if(button)button.disabled=true;
+    selected.dataset.mcB36SelectedStatus='PREVIEW_DIRTY';
+    selected.title='Effective Preview edits require explicit Rebuild before B36 wall selection/Pull.';
+  }
   for(const cell of host?.querySelectorAll?.('[data-mc-b313-calculated-row]')||[]){
     const value=cell.querySelector('[data-mc-b313-calculated-value]');
     const detail=cell.querySelector('[data-mc-b313-calculated-detail]');
@@ -655,7 +729,9 @@ export function installPreviewB313WallUpdateAuditController({ host, config, xmlT
       tolerance:config?.b313WallUpdate?.millTolerance||{},
     });
     if(lastAutoSignature===signature
-      && [...cells].every(cell=>cell.dataset.mcB313CalculatedStatus))return;
+      && [...cells].every(cell=>cell.dataset.mcB313CalculatedStatus)
+      && [...(table?.querySelectorAll('[data-mc-b36-selected-row]')||[])]
+         .every(cell=>cell.dataset.mcB36SelectedStatus))return;
     lastAutoSignature=signature;
     const report=buildPreviewB313AutomaticWallColumnReport({rows:current,config,host});
     renderPreviewB313CalculatedWallCells(host,report);
