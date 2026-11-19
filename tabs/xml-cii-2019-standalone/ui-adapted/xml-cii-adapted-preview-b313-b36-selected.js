@@ -90,7 +90,7 @@ export function buildPreviewB36SelectedThickness({
   // already prescribed the same wall). Keep its non-qualified user action
   // visibly distinct from source derivation and governed B31.3 acceptance.
   const overrideKey=t(row?.wallThicknessKey)
-    ||(cls?'PC:'+cls.toUpperCase().replace(/\\s+/g,'')+'|DN:'+Math.round(dn)
+    ||(cls?'PC:'+cls.toUpperCase().replace(/\s+/g,'')+'|DN:'+Math.round(dn)
       :t(row.lineKey||row.branchName));
   const receipt=config?.b313WallUpdate?.selectedWallManualByOverrideKey?.[overrideKey];
   const manuallyPulled=receipt?.status==='MANUAL_PREVIEW_ONLY_NOT_B313_APPROVED'
