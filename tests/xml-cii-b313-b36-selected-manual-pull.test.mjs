@@ -170,6 +170,12 @@ test('rendered column, explicit button and protected Pull callback are present i
     'xml-cii-adapted-preview-renderer.js',
   ]) assert.equal(local(name),pages(name),name+' Pages mirror mismatch');
   assert.match(local('xml-cii-adapted-editable-preview-table.js'),/label: 'Selected Thickness \(mm\)'/);
+  assert.match(local('xml-cii-adapted-editable-preview-table.js'),/label: 'Schedule \/ Standard'/);
+  assert.match(local('xml-cii-adapted-editable-preview-table.js'),/data-mc-b36-schedule-standard-row=/);
+  const controller=local('xml-cii-adapted-preview-b313-wall-audit-controller.js');
+  assert.match(controller,/data-mc-b36-schedule-standard-row/);
+  assert.match(controller,/selectedNominalWallMm.toFixed\(4\)/,
+    'Nominal wall must retain 6.0198 / 7.9248 mm precision');
   assert.match(local('xml-cii-adapted-editable-preview-table.js'),/data-mc-b36-selected-pull-row=/);
   assert.match(local('xml-cii-adapted-preview-renderer.js'),/onB36SelectedPullClick:/);
   assert.match(local('xml-cii-adapted-preview-renderer.js'),/B36 manual Pull rolled back/);
