@@ -15,7 +15,7 @@ import {
 import {
   buildPreviewB313AutomaticWallColumnReport,
   renderPreviewB313CalculatedWallCells,
-} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261118-glrd-numeric-2';
+} from './xml-cii-adapted-preview-b313-wall-audit-controller.js?v=20261119-b36-selected-pull-1';
 
 export const B313_PREVIEW_AUTO_BASIS_SCHEMA = 'xml-cii-b313-preview-auto-basis/v2';
 
