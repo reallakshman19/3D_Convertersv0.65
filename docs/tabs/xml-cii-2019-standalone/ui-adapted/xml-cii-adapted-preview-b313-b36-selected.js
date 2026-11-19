@@ -86,6 +86,19 @@ export function buildPreviewB36SelectedThickness({
   if(!selected||!outsideDiameter||selected*2>=outsideDiameter)
     return fail('B36_MASTER_GEOMETRY_INVALID','Selected nominal wall does not form a valid pipe geometry.');
   const deviation=cls?Math.abs(selected-clsWall):0;
+  // A manual Preview Pull can be a no-op numerically (the Piping Class
+  // already prescribed the same wall). Keep its non-qualified user action
+  // visibly distinct from source derivation and governed B31.3 acceptance.
+  const overrideKey=t(row?.wallThicknessKey)
+    ||(cls?'PC:'+cls.toUpperCase().replace(/\\s+/g,'')+'|DN:'+Math.round(dn)
+      :t(row.lineKey||row.branchName));
+  const receipt=config?.b313WallUpdate?.selectedWallManualByOverrideKey?.[overrideKey];
+  const manuallyPulled=receipt?.status==='MANUAL_PREVIEW_ONLY_NOT_B313_APPROVED'
+    &&Math.abs(Number(receipt.selectedNominalWallMm)-selected)<=0.00001
+    &&t(receipt.selectedSchedule)===t(chosen.schedule)
+    &&t(receipt.dimensionStandard)===t(dimension.standard)
+    &&t(config?.overrides?.wallThickness?.[overrideKey])!=='' 
+    &&Math.abs(Number(config.overrides.wallThickness[overrideKey])-selected)<=0.00001;
   return {
     ok:true,code:hypothetical?'B36_HYPOTHETICAL_SELECTION':'B36_STANDARD_SELECTION',
     rowIndex,dn,dimensionStandard:dimension.standard,dimensionStandardSource:dimension.source,
@@ -99,6 +112,9 @@ export function buildPreviewB36SelectedThickness({
     classSchedule:clsSch||null,classWallMm:clsWall,
     classSourceRow:classSourceRow||null,classProduct:clsProduct||null,
     classMasterDeviationMm:deviation,
+    manuallyPulled,manualPullReceipt:manuallyPulled
+      ?{status:receipt.status,sourceBranch:receipt.sourceBranch,
+        timestamp:receipt.timestamp,affectedRows:receipt.affectedRows}:null,
     masterSourcePath:t(chosen.sourcePath),
     masterSourceBlobSha:t(chosen.sourceBlobSha),
     masterDataStatus:t(chosen.dataStatus),
