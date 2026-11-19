@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {resolvePreviewManualWallForBore} from
+  '../tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-preview-bore-wall-authority.js';
 import {
   buildPreviewB36SelectedThickness,
   planPreviewB36SelectedPull,
@@ -86,6 +88,31 @@ test('explicit manual Pull receipt remains visible even when selected nominal eq
     'changed manual wall must not inherit a stale B36 Pull receipt');
 });
 
+test('exact class+DN explicit manual wall takes precedence over class reference in bore authority',()=>{
+  const cfg={overrides:{wallThickness:{'PC:93833|DN:150':'8.18'}}};
+  const selected=resolvePreviewManualWallForBore({
+    config:cfg,pipingClass:'93833',boreMm:150,outsideDiameterMm:168.3,
+  });
+  assert.equal(selected.ok,true);
+  assert.equal(selected.wallThicknessMm,8.18);
+  assert.equal(selected.source,'manual-override');
+  assert.equal(selected.engineeringQualified,false);
+  assert.equal(resolvePreviewManualWallForBore({
+    config:cfg,pipingClass:'93833',boreMm:200,outsideDiameterMm:219.1,
+  }).ok,false,'Do not leak a DN150 wall into another DN');
+  assert.equal(resolvePreviewManualWallForBore({
+    config:cfg,pipingClass:'93833',boreMm:150,outsideDiameterMm:14,
+  }).code,'PREVIEW_MANUAL_WALL_GEOMETRY_CONFLICT');
+  assert.equal(resolvePreviewManualWallForBore({
+    config:cfg,pipingClass:'93833',boreMm:150,outsideDiameterMm:168.3,
+    dtxr:{evidenceKind:'DIRECT_WALL',wallThicknessMm:7.112},
+  }).code,'PREVIEW_MANUAL_WALL_DIRECT_SOURCE_CONFLICT');
+  cfg.overrides.__dtxrWallKeys={'PC:93833|DN:150':true};
+  assert.equal(resolvePreviewManualWallForBore({
+    config:cfg,pipingClass:'93833',boreMm:150,outsideDiameterMm:168.3,
+  }).ok,false,'DTXR-applied key is not reclassified as a manual Preview override');
+});
+
 test('incomplete P1/T1 or unavailable schedule cannot enable Pull',()=>{
   const base=testRows[1],config=cfg();
   for(const changed of [
@@ -138,6 +165,8 @@ test('rendered column, explicit button and protected Pull callback are present i
     'xml-cii-adapted-preview-b313-b36-selected.js',
     'xml-cii-adapted-editable-preview-table.js',
     'xml-cii-adapted-preview-b313-wall-audit-controller.js',
+    'xml-cii-adapted-preview-bore-wall-authority.js',
+    'xml-cii-adapted-preview-dryrun.js',
     'xml-cii-adapted-preview-renderer.js',
   ]) assert.equal(local(name),pages(name),name+' Pages mirror mismatch');
   assert.match(local('xml-cii-adapted-editable-preview-table.js'),/label: 'Selected Thickness \(mm\)'/);
