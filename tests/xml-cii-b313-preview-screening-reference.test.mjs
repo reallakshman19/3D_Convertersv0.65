@@ -153,9 +153,10 @@ test('4 Preview pressure-unit authority excludes raw Line List relookup at calcu
    fieldMap:{}};
  const unresolved=buildPreviewB313ScreeningReference({
    row:blank,config:cfg,previewNodeRows:[],rowIndex:0});
- assert.equal(unresolved.pressureUnit,null,'display reference uses null for unresolved 4 Preview pressure unit');
- assert(unresolved.holdReasons.includes('P1 pressure unit unresolved'));
- assert.equal(unresolved.scenarios.length,0,'Unresolved Preview P1 unit must block numerical wall');
+ assert.equal(unresolved.pressureUnit,'KPA','project default applies where Preview pressure unit is blank');
+ assert.equal(unresolved.pressureUnitAssumed,true);
+ assert.equal(unresolved.holdReasons.length,0);
+ assert(unresolved.scenarios.some(x=>x.calculationOk),'kPa(g) default must produce visible arithmetic');
  assert.equal(resolveB313EffectivePreviewPressureUnit(blank,{}).unit,'');
  const explicit=resolveB313EffectivePreviewPressureUnit(blank,{pressureUnit:'KPA'});
  assert.equal(explicit.unit,'KPA');
@@ -171,22 +172,22 @@ test('4 Preview pressure-unit authority excludes raw Line List relookup at calcu
  assert.equal(conflict.source,'P1_UNIT_AUTHORITIES_CONFLICT');
 });
 
-test('missing P1 unit with class master OD: show verified factor and OD, but no calculation',()=>{
+test('missing explicit P1 unit uses kPa(g) default with class master OD',()=>{
  const cfg=config(), r={...row(),p1Unit:''};
  const ref=buildPreviewB313ScreeningReference({
   row:r,config:cfg,previewNodeRows:[],rowIndex:0});
  assert.equal(ref.ok,true);
  assert.equal(ref.outsideDiameterReferenceOnly,true);
- assert(ref.holdReasons.includes('P1 pressure unit unresolved'));
- assert.equal(ref.scenarios.length,0);
+ assert.equal(ref.pressureUnit,'KPA');
+ assert.equal(ref.pressureUnitAssumed,true);
+ assert(ref.scenarios.some(x=>x.calculationOk));
  const html=renderPreviewB313WallAuditHtml({
   summary:{inputRows:1,calculatedRows:0,updatedRows:0,skippedRows:1},
   rows:[{branchName:r.branchName,lineKey:r.lineKey,status:'NOT_UPDATED',code:'TEST',
     screeningReference:ref}],
  });
- assert.match(html,/Select the actual documented P unit/);
  assert.match(html,/exact-DN dimensional master/);
- assert.doesNotMatch(html,/data-b313-screening-scenario=/);
+ assert.match(html,/data-b313-screening-scenario=/);
 });
 
 
@@ -257,13 +258,13 @@ test('no physical OD and no exact-DN class identity must not invent screening ge
  assert(ref.holdReasons.some(msg=>/Neither a unique source-node OD/.test(msg)));
 });
 
-test('saved physical P1 unit absent yields factor reference but NO wall arithmetic',()=>{
+test('saved physical P1 unit absent uses project kPa(g) default for independent wall arithmetic',()=>{
  const r={...row(),p1Unit:''};
  const ref=buildPreviewB313ScreeningReference({row:r,config:config(),previewNodeRows:nodes,rowIndex:0});
  assert.equal(ref.ok,true);
  assert.equal(ref.S.method,'EXACT');
- assert.equal(ref.scenarios.length,0);
- assert(ref.holdReasons.includes('P1 pressure unit unresolved'));
+ assert(ref.scenarios.some(x=>x.calculationOk));
+ assert.equal(ref.pressureUnitAssumed,true);
 });
 
 test('missing route shows all master E choices as independent what-if cases',()=>{
