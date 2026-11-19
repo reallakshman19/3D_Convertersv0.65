@@ -103,6 +103,17 @@ test('incomplete P1/T1 or unavailable schedule cannot enable Pull',()=>{
   }
 });
 
+test('shared class+DN key never propagates to a physically matching occurrence without its own P1/T1',()=>{
+  const config=cfg(),row=testRows[1];
+  const same={...row,branchName:'OTHER-SAME-SIZE',t1:'',t1Source:'none'};
+  const denied=planPreviewB36SelectedPull({rows:[row,same],rowIndex:0,config});
+  assert.equal(denied.code,'B36_PULL_SHARED_SCOPE_UNQUALIFIED');
+  const matching={...row,branchName:'OTHER-SAME-SIZE'};
+  const planned=planPreviewB36SelectedPull({rows:[row,matching],rowIndex:0,config});
+  assert.equal(planned.ok,true,JSON.stringify(planned));
+  assert.deepEqual(planned.affectedRows,[0,1]);
+});
+
 test('insufficient exact Piping Class wall never silently upgrades schedule',()=>{
   const row={...testRows[0],pipingClassPipeSchedule:'5S',pipingClassPipeWallMm:2.77};
   const picked=buildPreviewB36SelectedThickness({row,config:cfg(),rowIndex:0});
