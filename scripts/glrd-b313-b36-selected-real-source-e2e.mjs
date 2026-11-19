@@ -166,15 +166,19 @@ try{
      const rows=[...tbl.querySelectorAll('tbody tr.mc-preview-row')];
      return {headers,total:rows.length,results:rows.map((tr,index)=>{
        const cell=tr.querySelector('[data-mc-b36-selected-row]');
+       const standardCell=tr.querySelector('[data-mc-b36-schedule-standard-row]');
        const button=cell?.querySelector('[data-mc-b36-selected-pull-row]');
        return {index:index+1,value:cell?.querySelector('[data-mc-b36-selected-value]')?.textContent?.trim()||'',
          detail:cell?.querySelector('[data-mc-b36-selected-detail]')?.textContent?.trim()||'',
+         schedule:standardCell?.querySelector('[data-mc-b36-schedule]')?.textContent?.trim()||'',
+         standard:standardCell?.querySelector('[data-mc-b36-standard]')?.textContent?.trim()||'',
          status:cell?.dataset.mcB36SelectedStatus||'',disabled:button?.disabled??true,
          title:cell?.title||''};
      })};
    });
    if(summary.total!==30||summary.results.length!==30
-      ||summary.headers.indexOf('b36SelectedWall')!==summary.headers.indexOf('b313CalculatedWall')+1)
+      ||summary.headers.indexOf('b36SelectedWall')!==summary.headers.indexOf('b313CalculatedWall')+1
+      ||summary.headers.indexOf('b36ScheduleStandard')!==summary.headers.indexOf('b36SelectedWall')+1)
      throw Error('B36 Selected Thickness missing from exact physical table '+JSON.stringify(summary.headers));
    const expected=[
      {index:1,mm:12.7,sch:'80S',std:'B36.19M'},
@@ -184,15 +188,14 @@ try{
    ];
    const checks=expected.map(w=>{
      const row=summary.results[w.index-1];
-     const ok=Math.abs(Number(row.value)-w.mm)<0.013
-       &&row.detail.includes(w.sch)&&row.detail.includes(w.std)
-       &&row.disabled===false;
+     const ok=Math.abs(Number(row.value)-w.mm)<0.0001
+       &&row.schedule===w.sch&&row.standard===w.std&&row.disabled===false;
      return {...w,actual:row,ok};
    });
    if(!checks.every(c=>c.ok))throw Error('Real-source B36 class selection incorrect '+JSON.stringify(checks));
    const other=summary.results.filter(r=>![1,2,29,30].includes(r.index));
-   if(other.some(r=>r.disabled===false))
-     throw Error('Incomplete GLRD required-wall rows exposed an enabled Pull');
+   if(other.some(r=>r.disabled===false||r.schedule!=='—'||r.standard!=='—'))
+     throw Error('Incomplete GLRD rows exposed a Pull or unsupported B36 schedule');
    return {total:summary.total,headers:summary.headers,
      selections:checks,unavailableRows:other.length,
      allIncompletePullDisabled:other.every(r=>r.disabled)};
@@ -347,7 +350,7 @@ try{
    if(!after.pullNote)
      throw Error('Manual B36 Pull did not record user-visible Preview save receipt');
    if(after.manualSelectionStatus!=='MANUAL_PULLED'
-      ||!after.manualSelectionDetail.includes('MANUAL PULLED'))
+      ||!after.manualSelectionDetail.includes('Pulled'))
      throw Error('No distinct persistent unqualified manual-Pull source receipt in selected cell '
        +JSON.stringify(after));
    return {before,after,sourceRowsUnaffected:29,governedAccepted:false};
