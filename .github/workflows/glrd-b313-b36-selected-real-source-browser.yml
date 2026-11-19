@@ -43,7 +43,7 @@ jobs:
       - name: Install Chromium
         run: |
           npm install --no-save --ignore-scripts playwright@1.52.0
-          npx playwright install --with-deps chromium
+          npx playwright install --only-shell chromium
       - name: Serve exact-head application (no deployment)
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/glrd-b36-http.log 2>&1 &
