@@ -860,7 +860,13 @@ export function buildPreviewB313ScreeningReference({
   const pressure = positive(rawP1.match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/)?.[0]);
   if (!pressure || normalizedToken(row?.p1Source)==='DEFAULT')
     holdReasons.push('Positive source P1 is missing or default-only');
-  const pressureBasis = resolveB313EffectivePreviewPressureUnit(row,manualBasis,basisConfig.commonPressureUnitFallback);
+  // Project-wide normal operating convention: P1 is kPa(g) unless the
+  // effective Preview explicitly supplies another unit. Existing saved AUTO
+  // values migrate to this default without creating 30 per-row unit records.
+  // Conflicting declared units still fail rather than being overwritten.
+  const configuredUnit=normalizedToken(basisConfig.commonPressureUnitFallback);
+  const projectUnit=(!configuredUnit||configuredUnit==='AUTO')?'KPA':configuredUnit;
+  const pressureBasis=resolveB313EffectivePreviewPressureUnit(row,manualBasis,projectUnit);
   if (!pressureBasis.unit) holdReasons.push('P1 pressure unit unresolved');
   const corrosion=nonNegative(row?.corrosion);
   if (corrosion===null) holdReasons.push('Corrosion allowance missing');
