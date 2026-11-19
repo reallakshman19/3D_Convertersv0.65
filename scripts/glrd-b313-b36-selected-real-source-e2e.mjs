@@ -197,6 +197,46 @@ try{
      selections:checks,unavailableRows:other.length,
      allIncompletePullDisabled:other.every(r=>r.disabled)};
  });
+ const changedWall=await stage('seed_distinct_wall_using_real_4Preview_override_editor',async()=>{
+   const previewBefore=await page.evaluate(()=>{
+     const h=document.querySelector('#mc-preview-table-host');
+     globalThis.__b36EditedPreviewBefore=h.__xmlCiiPreviewResult;
+     return {row2:h.__xmlCiiPreviewResult?.branchRows?.[1]?.wallThickness,
+       otherWalls:h.__xmlCiiPreviewResult?.branchRows?.map(r=>String(r.wallThickness??''))};
+   });
+   if(Math.abs(Number(previewBefore.row2)-7.112)>0.013)
+     throw Error('Unexpected original class wall for GLRD row 2: '+previewBefore.row2);
+   await page.locator('#mc-preview-table-host [data-mc-edit-type="wallThickness"][data-mc-edit-row="1"]').click();
+   await page.locator('#mc-ov-input').fill('8.18');
+   await page.locator('#mc-ov-save').click();
+   const dirty=await page.evaluate(()=>{
+     const h=document.querySelector('#mc-preview-table-host');
+     return {dirty:h.dataset.mcB313PreviewDirty,
+       selected:h.querySelector('[data-mc-b36-selected-row="1"] [data-mc-b36-selected-value]')?.textContent,
+       pullDisabled:h.querySelector('[data-mc-b36-selected-pull-row="1"]')?.disabled};
+   });
+   if(dirty.dirty!=='true'||dirty.pullDisabled!==true)
+     throw Error('Editing Wall Thk must mark Preview dirty and disable selection Pull '+JSON.stringify(dirty));
+   await page.locator('#mc-preview-table-host [data-mc-preview-build]').click();
+   await page.waitForFunction(()=>{
+     const h=document.querySelector('#mc-preview-table-host');
+     return h?.__xmlCiiPreviewResult!==globalThis.__b36EditedPreviewBefore
+       &&Math.abs(Number(h.__xmlCiiPreviewResult?.branchRows?.[1]?.wallThickness)-8.18)<0.001;
+   },null,{timeout:180000});
+   const after=await page.evaluate(()=>{
+     const h=document.querySelector('#mc-preview-table-host');
+     return {dirty:h.dataset.mcB313PreviewDirty,
+       row2:h.__xmlCiiPreviewResult?.branchRows?.[1]?.wallThickness,
+       otherWalls:h.__xmlCiiPreviewResult?.branchRows?.map(r=>String(r.wallThickness??'')),
+       selected:h.querySelector('[data-mc-b36-selected-row="1"] [data-mc-b36-selected-value]')?.textContent,
+       pullDisabled:h.querySelector('[data-mc-b36-selected-pull-row="1"]')?.disabled};
+   });
+   if(after.otherWalls.some((v,i)=>i!==1&&v!==previewBefore.otherWalls[i]))
+     throw Error('Seed editor affected a different GLRD wall');
+   if(after.pullDisabled!==false||Math.abs(Number(after.selected)-7.112)>0.013)
+     throw Error('Rebuilt Preview did not preserve independent B36 class selection '+JSON.stringify(after));
+   return {before:previewBefore,dirty,after};
+ });
  const manualPull=await stage('B36_pull_selected_into_Preview_and_verify_scope',async()=>{
    const before=await page.evaluate(()=>{
      const host=document.querySelector('#mc-preview-table-host');
@@ -209,6 +249,8 @@ try{
    });
    if(!before.ready||Math.abs(Number(before.selectedValue)-7.112)>0.013)
      throw Error('Row 2 selected Pull cannot be safely clicked');
+   if(Math.abs(Number(before.wallValues[1])-8.18)>0.001)
+     throw Error('Manual Pull did not start from independently edited 8.18 mm wall');
    page.once('dialog',async(dialog)=>{await dialog.accept();});
    await page.locator('[data-mc-b36-selected-pull-row="1"]').click();
    await page.waitForFunction(()=>{
@@ -231,6 +273,8 @@ try{
    });
    if(after.rowCount!==30||Math.abs(Number(after.wallValues[1])-7.112)>0.013)
      throw Error('Selected wall was not retained in rebuilt GLRD Preview '+JSON.stringify(after));
+   if(Math.abs(Number(after.wallValues[1])-Number(before.wallValues[1]))<0.5)
+     throw Error('Pull selected did not actually replace the distinct existing 8.18 mm Preview wall');
    if(after.wallValues.some((v,i)=>i!==1&&v!==before.wallValues[i]))
      throw Error('Manual Pull modified another source-backed GLRD row '+JSON.stringify(after));
    if(after.acceptedStatus==='ACCEPTED')
