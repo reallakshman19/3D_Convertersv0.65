@@ -595,9 +595,12 @@ function panelHtml(models, config = {}, physicalRows = [], previewNodeRows = [])
       ?`Source ${sourceEvidence.basisId} · ${sourceEvidence.sourceReference} · ${sourceEvidence.editionBasis} · S ${sourceEvidence.stressLookupMethod} at ${model.t1}°C`
       :prefill.qualification==='QUALIFIED_ACTIVE_MASTER'?'Active strict qualified factor master':'No numeric screening master evidence at this Preview T1';
     const refreshDisabled = model.tableContext?.materialId && model.t1 ? '' : 'disabled';
+    const conciseStatus=!model.tableContext?.materialId?'Material needed'
+      :!model.t1?'T1 needed'
+      :prefill.evidence?'Factors loaded':'Factor input needed';
     return `<tr data-b313-auto-key="${esc(model.basisKey)}" data-b313-auto-material-id="${esc(model.tableContext?.materialId || '')}" data-b313-auto-temperature="${esc(model.tableContext?.temperatureC ?? '')}">
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;"><strong>${esc(model.material || '—')}</strong><div style="font-size:10px;color:#94a3b8;">${source} · T1 ${t1} · ${pressureTrace}${hydroTrace}</div></td>
-      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status style="font-size:10px;color:${statusColor(model)};font-weight:700;">${esc(model.statusLabel)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${renderPreviewB313NumericScreeningReference(model)}<div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:210px;"><strong>${esc(model.materialId || model.identityCode)}</strong><div data-b313-auto-status data-b313-original-status="${esc(model.statusCode||'')}" style="font-size:10px;color:#94a3b8;">${esc(conciseStatus)}</div><div style="font-size:10px;color:#cbd5e1;">${esc(model.factorSummary)}</div>${renderPreviewB313NumericScreeningReference(model)}<div data-b313-source-trace style="font-size:9px;color:#94a3b8;margin-top:3px;">${esc(model.sourceTrace || 'Exact-DN class evidence unavailable')}</div>${identityHint}${seedHint}</td>
       <td data-b313-auto-calculated-wall style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:166px;max-width:260px;">${wallCellHtml(calculatedWalls.get(model.basisKey)||[])}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:180px;">
         <strong>${esc(route)}</strong><div style="font-size:10px;color:#94a3b8;">${esc(routeSource)}</div>
@@ -611,9 +614,9 @@ function panelHtml(models, config = {}, physicalRows = [], previewNodeRows = [])
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'W', 'weldStrengthReductionW', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;">${fallbackInputCell(model, 'Y', 'coefficientY', { min: 0, max: 1 })}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #334155;vertical-align:top;min-width:260px;">
-        <div style="display:flex;gap:4px;"><span data-b313-auto-preview-punit style="font-size:10px;">P1 unit ${esc(model.previewP1Unit || (text(model.storedBasis?.pressureUnit) && text(model.storedBasis.pressureUnit).toUpperCase() !== 'AUTO' ? 'legacy basis '+model.storedBasis.pressureUnit : 'unresolved'))}</span>
+        <div style="display:flex;gap:4px;"><span data-b313-auto-preview-punit style="font-size:10px;">P1 ${esc(model.previewP1Unit || (text(model.storedBasis?.pressureUnit) && text(model.storedBasis.pressureUnit).toUpperCase() !== 'AUTO' ? model.storedBasis.pressureUnit : 'kPa(g) default'))}</span>
         <select data-b313-auto-field="dimensionStandard" aria-label="Pipe dimension standard"><option value="AUTO">Dimension AUTO</option>${['ASME B36.10M','ASME B36.19M'].map((u)=>`<option value="${u}" ${text(model.storedBasis?.dimensionStandard)===u?'selected':''}>${u}</option>`).join('')}</select></div>
-        <div style="font-size:9px;color:#94a3b8;margin:3px 0;">P1 defaults to kPa(g) unless a different unit is specified.</div>
+        <div style="font-size:9px;color:#94a3b8;margin:3px 0;">Pressure unit is configurable above.</div>
         <div data-b313-auto-factor-qualification data-b313-qualification="${esc(prefill.qualification)}" title="${esc(prefill.qualification)}" style="font-size:10px;color:#94a3b8;">S/E/W/Y: ${prefill.evidence?'master lookup':'inputs needed'}</div>
         <div data-b313-auto-evidence style="font-size:9px;color:#cbd5e1;max-width:360px;overflow-wrap:anywhere;">Evidence: ${esc(evidenceText)}</div>
         <input type="text" data-b313-auto-source-reference aria-label="Factor source reference; replace screening evidence to qualify" placeholder="Qualified source reference (required to approve)" value="${esc(prefill.sourceReference)}" style="margin-top:4px;width:98%;">
