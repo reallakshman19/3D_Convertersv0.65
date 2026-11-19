@@ -25,13 +25,20 @@ const display=(r,c)=>buildPreviewB313CalculatedWallDisplay({
   row:r,config:c,previewNodeRows:nodes,rowIndex:0,
 });
 
-test('without a configured common fallback, unknown P1 unit remains unresolved (no implicit kPa)',()=>{
-  const cfg=config();
-  const result=display(row(),cfg);
-  assert.equal(result.ok,false,JSON.stringify(result));
-  assert.equal(result.requiredNominalThicknessMm,null);
-  assert.match(result.reason,/P1 pressure unit unresolved/);
-  assert.equal(cfg.b313WallUpdate.commonPressureUnitFallback,undefined);
+test('common project P1 defaults to kPa(g), including unconfigured and old AUTO sessions',()=>{
+  for(const fallback of [undefined,'AUTO']){
+    const cfg=config();
+    if(fallback)cfg.b313WallUpdate.commonPressureUnitFallback=fallback;
+    const before=JSON.stringify(cfg);
+    const result=display(row(),cfg);
+    assert.equal(result.ok,true,JSON.stringify(result));
+    assert.equal(result.pressureUnit,'KPA');
+    assert.equal(result.pressureUnitSource,'B313_COMMON_PRESSURE_UNIT_FALLBACK');
+    assert.equal(result.pressureUnitAssumed,true);
+    assert(result.requiredNominalThicknessMm>0);
+    assert.equal(result.eligibleForPull,false);
+    assert.equal(JSON.stringify(cfg),before,'default must not mutate source/override config');
+  }
 });
 
 test('one common fallback supplies explicitly labeled read-only scenario; no per-row mutation',()=>{
