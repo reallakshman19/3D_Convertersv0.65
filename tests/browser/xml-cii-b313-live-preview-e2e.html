@@ -75,6 +75,12 @@ try {
     'Separate B36 selected nominal wall column must appear immediately beside B31.3 Required');
   assert(liveBranchTable.querySelectorAll('[data-mc-b36-selected-row]').length===41,
     'Physical 4 Preview must render B36 selected wall cells for every branch');
+  const hids=headerElements.map(h=>h.dataset.colId);
+  assert(hids.indexOf('b36SelectedWall')===hids.indexOf('b313CalculatedWall')+1
+    &&hids.indexOf('b36ScheduleStandard')===hids.indexOf('b36SelectedWall')+1,
+    'Required / Selected / Schedule must be adjacent and in this exact order');
+  assert(liveBranchTable.querySelectorAll('[data-mc-b36-schedule-standard-row]').length===41,
+    'Schedule / Standard must be a separate cell on each physical row');
   assert([...liveBranchTable.querySelectorAll('[data-mc-b36-selected-pull-row]')].every(b=>b.disabled),
     'Incomplete B31.3 rows must never auto-enable B36 manual Pull');
   assert(headerElements.some(h=>h.dataset.colId==='wallThickness'),
@@ -195,7 +201,9 @@ try {
     +'<small data-mc-b313-calculated-detail>Calculate</small></td>'
     +'<td data-mc-b36-selected-row="0"><strong data-mc-b36-selected-value>—</strong>'
     +'<small data-mc-b36-selected-detail>Build</small>'
-    +'<button data-mc-b36-selected-pull-row="0" disabled>Pull selected</button></td></tr></tbody></table>';
+    +'<button data-mc-b36-selected-pull-row="0" disabled>Pull selected</button></td>'
+    +'<td data-mc-b36-schedule-standard-row="0"><strong data-mc-b36-schedule>—</strong>'
+    +'<small data-mc-b36-standard>—</small></td></tr></tbody></table>';
   builtPreviewHost.__xmlCiiPreviewResult={
     branchRows:[candidateWithUnit],nodeBoreWallRows:[]};
   card.appendChild(builtPreviewHost);
@@ -209,9 +217,9 @@ try {
     ?.textContent==='5.983','automatically populated GLRD numerical wall on Preview build');
   await waitFor(()=>builtPreviewHost.querySelector('[data-mc-b36-selected-value]')
     ?.textContent==='7.112','B36 selected thickness must populate from exact-DN class schedule');
-  assert(builtPreviewHost.querySelector('[data-mc-b36-selected-detail]').textContent.includes('40S')
-    && builtPreviewHost.querySelector('[data-mc-b36-selected-detail]').textContent.includes('B36.19M'),
-    'B36.19M + 40S source schedule not shown in Selected Thickness cell');
+  assert(builtPreviewHost.querySelector('[data-mc-b36-schedule]').textContent==='40S'
+    &&builtPreviewHost.querySelector('[data-mc-b36-standard]').textContent==='B36.19M',
+    'B36.19M + Sch 40S must appear in the new Schedule / Standard column');
   assert(!builtPreviewHost.querySelector('[data-mc-b36-selected-pull-row]').disabled,
     'B36 class-parity manual Preview Pull must be enabled even though strict B31.3 Pull is held');
   assert(autoButtonClicks===0,'Numerical auto-display must not click governed Calculate');
@@ -226,8 +234,10 @@ try {
   assert(builtPreviewHost.querySelector('[data-mc-b313-calculated-detail]')
     .textContent==='Rebuild Preview');
   assert(builtPreviewHost.querySelector('[data-mc-b36-selected-value]').textContent==='—'
-    && builtPreviewHost.querySelector('[data-mc-b36-selected-pull-row]').disabled,
-    'Dirty Preview must clear selected B36 thickness and disable manual Pull');
+    &&builtPreviewHost.querySelector('[data-mc-b36-schedule]').textContent==='—'
+    &&builtPreviewHost.querySelector('[data-mc-b36-standard]').textContent==='—'
+    &&builtPreviewHost.querySelector('[data-mc-b36-selected-pull-row]').disabled,
+    'Dirty Preview must clear B36 thickness and schedule and disable Pull');
   builtPreviewHost.__xmlCiiPreviewResult={branchRows:[candidateWithUnit],
     nodeBoreWallRows:[]};
   builtPreviewHost.dataset.mcB313PreviewDirty='false';
@@ -246,8 +256,8 @@ try {
   const calcCell=independentTableHost.querySelector('[data-mc-b313-calculated-row="0"]');
   assert(calcCell.querySelector('[data-mc-b313-calculated-value]').textContent==='5.983',
     'Required nominal wall must appear as 5.983 mm next to Wall Thk');
-  assert(calcCell.querySelector('[data-mc-b313-calculated-detail]').textContent.includes('Common fallback KPA'),
-    'Hypothetical pressure unit must be visible without opening a tooltip');
+  assert(calcCell.querySelector('[data-mc-b313-calculated-detail]').textContent==='kPa(g) default',
+    'Project pressure default must appear concisely beside the numerical wall');
   assert(calcCell.title.includes('Source')||calcCell.title.includes('Evidence'),
     'Displayed wall must have independent source and interpolation proof');
   assert(independentTableHost.querySelector('[data-test-preserved-wall]').textContent==='7.112',
@@ -270,13 +280,11 @@ try {
   installPreviewB313AutoBasisPanel({host:screenHost,config:screenConfig,
     rows:[screeningOnlyRow],watchLive:false,
     options:{onSaveConfigPreservePreview:async()=>{basisSaveCount++;}}});
-  // Even with shared P1 AUTO, a clearly labelled diagnostic can show
-  // numerical kPa(g) arithmetic. The governing wall remains INPUT REQUIRED.
-  const initialWhatIf=screenHost.querySelector('[data-b313-auto-calculated-wall]');
-  assert(initialWhatIf?.textContent.includes('5.983') &&
-    initialWhatIf.textContent.includes('HYPOTHETICAL kPa(g) ONLY') &&
-    initialWhatIf.textContent.includes('governing result HELD'),
-    '4 Preview must show a distinct numerical what-if rather than only qualification warnings');
+  // The project default is kPa(g); the original P1 and its source stay unchanged.
+  const initialWall=screenHost.querySelector('[data-b313-auto-calculated-wall]');
+  assert(initialWall?.textContent.includes('5.983') &&
+    initialWall.textContent.includes('P1 kPa(g) · project default'),
+    '4 Preview must display numerical required wall with concise project pressure default');
   assert(screenConfig.b313WallUpdate?.commonPressureUnitFallback==null,
     'Display-only kPa hypothesis must never save a shared pressure unit');
   assert(!Object.keys(screenConfig.b313WallUpdate.proposalsByBranch||{}).length,
@@ -317,7 +325,7 @@ try {
     'Factor S popup omitted exact temperature lookup and source');
   infoButton.click();
   const unitChoice=screenHost.querySelector('[data-b313-common-pressure-unit]');
-  assert(unitChoice?.value==='AUTO','Shared missing P1 unit must remain AUTO before selection');
+  assert(unitChoice?.value==='KPA','Shared P1 selector must initialize to kPa(g) project default');
   unitChoice.value='KPA';
   unitChoice.dispatchEvent(new Event('change',{bubbles:true}));
   await waitFor(()=>basisSaveCount===1 &&
@@ -532,7 +540,7 @@ try {
     noAuditButtonNeededForNumericWall: true,
     editInvalidatesWallAndRebuildRestores: true,
     calculatedWallColumnVerified: true,
-    b36SelectedWallColumnVerified:true,b36ClassScheduleAndManualPullReadyVerified:true,
+    b36SelectedWallColumnVerified:true,b36ScheduleStandardColumnVerified:true,b36ClassScheduleAndManualPullReadyVerified:true,
     dirtyPreviewDisablesSelectedPullVerified:true,
     assumedKpaWhatIfVisibleInColumnVerified: true,
     populatedNumericFactorsAndEvidenceVerified: true,
