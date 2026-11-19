@@ -161,8 +161,31 @@ try{
      nominal:r.requiredValue,status:r.calculatedStatus})),
    noneWithoutP1T1:numeric.every(r=>String(r.p1??'').trim()&&String(r.t1??'').trim()),
    note:'Numerical values must be interpreted from effective actual Preview inputs; no source P1/T1 injected.'};
+ // A table full of dashes is NOT a B31.3 acceptance pass. Derive
+ // decisive four witnesses from actual source-backed Preview values, not
+ // assumed row indices or artificial P1/T1 injection.
+ const witnesses=[
+   {line:'P4110001',dn:200,expected:7.800},
+   {line:'P4110001',dn:150,expected:5.983},
+   {line:'B4110003',dn:100,expected:3.759},
+   {line:'B4110003',dn:400,expected:4.606},
+ ];
+ record.analysis.fourNumericalWitnesses=witnesses.map(w=>{
+   const matching=result.rows.filter(r=>
+     String(r.lineKey||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase()===w.line
+     &&Number(r.sizeMm)===w.dn);
+   const actual=matching[0]||null;
+   const nominal=Number(actual?.requiredValue);
+   const valid=Boolean(actual&&matching.length===1&&
+     /^\\d+(?:\\.\\d+)?$/.test(actual.requiredValue||'')&&
+     Math.abs(nominal-w.expected)<=0.03);
+   return {...w,actual,nominal:Number.isFinite(nominal)?nominal:null,
+     comparison:valid?'MATCH':'NOT_ESTABLISHED'};
+ });
+ record.analysis.fourWitnessesPass=record.analysis.fourNumericalWitnesses.every(x=>x.comparison==='MATCH');
  record.pass=record.analysis['30Rows']&&record.analysis.allCellsPresent&&
-   record.analysis.noneWithoutP1T1&&record.pageErrors.length===0;
+   record.analysis.noneWithoutP1T1&&record.analysis.fourWitnessesPass&&
+   record.pageErrors.length===0;
 }catch(e){record.failed=String(e?.stack||e).slice(0,4500);process.exitCode=1;}
 finally{
  try{await page.screenshot({path:path.join(out,'GLRD-PSI02-rebuild.png'),fullPage:true,timeout:20000});}catch(e){record.screenshotError=String(e);}
