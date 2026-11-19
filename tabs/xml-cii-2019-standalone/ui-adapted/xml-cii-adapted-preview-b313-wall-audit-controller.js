@@ -546,14 +546,16 @@ export function renderPreviewB36SelectedThicknessCells(host,report={}){
     if(value)value.textContent=Number(result.selectedNominalWallMm).toFixed(3);
     if(detail)detail.textContent=result.selectedSchedule+' · '+result.dimensionStandard.replace('ASME ','')
       +(result.hypothetical?' · WHAT-IF':' · reference')
-      +(result.selectionAuthority.startsWith('EXACT_DN')?' · class schedule':'');
+      +(result.selectionAuthority.startsWith('EXACT_DN')?' · class schedule':'')
+      +(result.manuallyPulled?' · MANUAL PULLED (not B31.3 approved)':'');
     if(button){
       button.disabled=result.eligibleForManualPreviewPull!==true;
       button.title=result.eligibleForManualPreviewPull
         ?'Explicit MANUAL Preview wall override; B31.3 engineering approval not implied'
         :(result.manualPullReason||'Selected pipe wall cannot be manually pulled');
     }
-    cell.dataset.mcB36SelectedStatus=result.hypothetical?'HYPOTHETICAL_SELECTION':'SELECTED';
+    cell.dataset.mcB36SelectedStatus=result.manuallyPulled?'MANUAL_PULLED'
+      :result.hypothetical?'HYPOTHETICAL_SELECTION':'SELECTED';
     cell.title=[
       'ASME '+result.dimensionStandard.replace('ASME ','')+' selected nominal wall: '
         +Number(result.selectedNominalWallMm).toFixed(4)+' mm',
@@ -566,6 +568,8 @@ export function renderPreviewB36SelectedThicknessCells(host,report={}){
       result.hypothetical?'PRESSURE UNIT UNVERIFIED — HYPOTHETICAL KPA, NOT ENGINEERING DESIGN':
         'SCREENING VALUES DO NOT CERTIFY B31.3 DESIGN',
       'Pull selected is a separate manual Preview override; governed B31.3 Pull unchanged',
+      result.manuallyPulled?'User manual Pull receipt: '+result.manualPullReceipt?.timestamp
+        +' · B31.3 engineering approval remains false':'Not yet pulled as a manual Preview override',
     ].join('\n');
   }
   return {physicalRows:physical.length,selectedRows:available};
