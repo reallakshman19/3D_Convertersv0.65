@@ -103,6 +103,7 @@ jobs:
             tests/xml-cii-preview-b2a-worker-rebuild.test.mjs \
             tests/xml-cii-mode-a-preview-restoration.test.mjs \
             tests/xml-cii-b313-header-band-source-unit.test.mjs \
+            tests/xml-cii-b313-ui-import-pressure-unit-receipt.test.mjs \
             tests/xml-cii-b313-preview-source-pressure-class-wall.test.mjs \
             tests/xml-cii-b313-preview-od-selection.test.mjs \
             tests/xml-cii-issue-781-b313-auto-basis.test.mjs \
