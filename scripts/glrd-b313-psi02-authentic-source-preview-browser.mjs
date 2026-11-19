@@ -156,7 +156,7 @@ try{
  const rowsWithBoth=result.rows.filter(r=>String(r.p1??'').trim()&&String(r.t1??'').trim());
  record.analysis={actualBranchCount:result.effectiveRowCount,
    actualNumericCount:result.numericCount,rowsWithBothP1T1:rowsWithBoth.length,
-   30Rows:result.effectiveRowCount===30,allCellsPresent:result.calculatedCellCount===result.effectiveRowCount,
+   '30Rows':result.effectiveRowCount===30,allCellsPresent:result.calculatedCellCount===result.effectiveRowCount,
    numericalRows:numeric.map(r=>({index:r.index,lineKey:r.lineKey,p1:r.p1,t1:r.t1,
      nominal:r.requiredValue,status:r.calculatedStatus})),
    noneWithoutP1T1:numeric.every(r=>String(r.p1??'').trim()&&String(r.t1??'').trim()),
