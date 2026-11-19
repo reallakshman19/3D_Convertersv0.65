@@ -461,7 +461,7 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
         ?result.hypotheticalScenario:null;
       if(hypothetical){
         if(value)value.textContent=Number(hypothetical.requiredNominalThicknessMm).toFixed(3);
-        if(detail)detail.textContent='HYPOTHETICAL kPa(g) ONLY · source P1 unit UNKNOWN · governing wall HELD';
+        if(detail)detail.textContent='kPa(g) default';
         cell.title=[
           'HYPOTHETICAL, NOT ENGINEERING DESIGN / NO Pull',
           'Assume P1 '+hypothetical.pressure+' kPa(g) with UNVERIFIED unit',
@@ -475,7 +475,7 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
         cell.dataset.mcB313CalculatedStatus='HYPOTHETICAL_KPA_UNIT_UNKNOWN';
       }else{
         if(value)value.textContent='—';
-        if(detail)detail.textContent=result?.reason||'Input incomplete';
+        if(detail)detail.textContent='Inputs needed';
         cell.title=result?.reason||'Calculate B31.3 to see result';
         cell.dataset.mcB313CalculatedStatus='INPUT_REQUIRED';
       }
@@ -485,16 +485,15 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
     if(result.pressureUnitAssumed)assumedUnits++;
     if(value)value.textContent=Number(result.requiredNominalThicknessMm).toFixed(3);
     if(detail)detail.textContent=result.pressureUnitAssumed
-      ?'Common fallback '+result.pressureUnit+' · WHAT-IF only'
-      :'P unit '+result.pressureUnit+' · t '+Number(result.pressureDesignThicknessMm).toFixed(3);
+      ?'kPa(g) default'
+      :'P1 '+(result.pressureUnit==='KPA'?'kPa(g)':result.pressureUnit);
     const bracket=Array.isArray(result.interpolationBracket)
       ? result.interpolationBracket.map(x=>x.temperatureC+'°C='+x.Sksi+' ksi').join(' → '):'';
     cell.title=[
       'Calculated B31.3 required nominal: '+Number(result.requiredNominalThicknessMm).toFixed(4)+' mm',
       'Pressure-design wall t: '+Number(result.pressureDesignThicknessMm).toFixed(4)+' mm',
       'P1: '+result.pressure+' '+result.pressureUnit
-        +(result.hypotheticalKpa?' (HYPOTHETICAL kPa(g) ONLY; SOURCE UNIT UNKNOWN; NO Pull)'
-          :result.pressureUnitAssumed?' (WHAT-IF: selected common fallback, NOT SOURCE VERIFIED)':''),
+        +(result.pressureUnitAssumed?' (project default)':''),
       'P1 unit evidence: '+(result.pressureUnitSource||'unresolved'),
       'T1: '+result.temperatureC+'°C',
       'S '+result.factors.S_MPa+' MPa · E '+result.factors.E
@@ -504,8 +503,8 @@ export function renderPreviewB313CalculatedWallCells(host,report={}) {
       'CA: '+result.corrosionAllowanceMm+' mm',
       'Class wall: '+result.classNominalWallMm+' mm · class pass: '+result.classPass,
       'Evidence: '+result.factorBasisId+' · '+result.factorSourceReference,
-      'Edition/source qualification: '+result.factorCodeEditionBasis,
-      'Independent calculation: NOT a saved Wall Thk or approved Pull',
+      'Master source: '+result.factorCodeEditionBasis,
+      'Required wall is read-only; Pull selected applies a separate B36 nominal wall',
     ].join('\\n');
     cell.dataset.mcB313CalculatedStatus=result.hypotheticalKpa?'HYPOTHETICAL_KPA_UNIT_UNKNOWN'
       :result.pressureUnitAssumed?'WHAT_IF_P_UNIT':'CALCULATED';
@@ -550,7 +549,7 @@ export function renderPreviewB36SelectedThicknessCells(host,report={}){
       continue;
     }
     available++;
-    if(value)value.textContent=Number(result.selectedNominalWallMm).toFixed(3);
+    if(value)value.textContent=Number(result.selectedNominalWallMm.toFixed(4)).toString();
     if(detail)detail.textContent=result.manuallyPulled?'Pulled'
       :result.selectionAuthority.startsWith('EXACT_DN')?'Class matched':'B36 minimum';
     if(standardSchedule)standardSchedule.textContent=result.selectedSchedule||'—';
@@ -758,7 +757,9 @@ export function installPreviewB313WallUpdateAuditController({ host, config, xmlT
     if(lastAutoSignature===signature
       && [...cells].every(cell=>cell.dataset.mcB313CalculatedStatus)
       && [...(table?.querySelectorAll('[data-mc-b36-selected-row]')||[])]
-         .every(cell=>cell.dataset.mcB36SelectedStatus))return;
+         .every(cell=>cell.dataset.mcB36SelectedStatus)
+      && [...(table?.querySelectorAll('[data-mc-b36-schedule-standard-row]')||[])]
+         .every(cell=>cell.dataset.mcB36ScheduleStandardStatus))return;
     lastAutoSignature=signature;
     const report=buildPreviewB313AutomaticWallColumnReport({rows:current,config,host});
     renderPreviewB313CalculatedWallCells(host,report);
