@@ -12,6 +12,8 @@ import {runXml229IndependentEngineeringPreview}
  from './xml229-independent-engineering-preview-client.mjs';
 import {projectXmlCiiOccurrences}
  from '../ui-adapted/xml-cii-adapted-preview-facts-xml-source.js';
+import {attestXml229PreviewWallLedger}
+ from './xml229-preview-wall-ledger-proof.mjs';
 import {createPreviewBasis}
  from '../ui-adapted/xml-cii-adapted-preview-facts-basis.js';
 import {openXml229EngineeringFactModel}
@@ -131,6 +133,11 @@ async function start(req){
  }finally{if(previewAbortController===abort)previewAbortController=null;}
  if(cancelled)return;
  flow(req.requestId,'PREVIEW_CHILD_COMPLETED');
+ // The original Preview Worker computed individual bore/wall occurrences,
+ // but the GC-PW handoff previously dropped that ledger. Attest the exact
+ // source Node ordinal/ComponentRefNo population BEFORE exposing it to UI.
+ // Source FactRecords and acceptance authority remain separate.
+ const nodeWallProof=attestXml229PreviewWallLedger(original,computed);
  progress(req.requestId,'all-physical-field-assessment');
  const previewResult={...computed,sourceOccurrences:original,
    engineeringAcceptance:'NOT_ASSESSED',fullFactPopulationAccepted:false};
@@ -174,6 +181,8 @@ async function start(req){
     session.openedFacts!==produced.expectedPhysicalFactCount)
    fail('VERIFIED_WEIGHT_SOURCE_DRIFT','Review service did not open complete original physical population');
  verifiedPreviewResult={branchRows:computed.branchRows,nodeRows:computed.nodeRows,
+   nodeBoreWallRows:nodeWallProof.rows,
+   nodeWallCoverage:nodeWallProof.coverage,
    // Display-only independent Format 1/2 passes; the canonical authoritative
    // branch rows remain ambiguous until explicit review.
    formatPreviewPasses:Array.isArray(computed.formatPreviewPasses)
